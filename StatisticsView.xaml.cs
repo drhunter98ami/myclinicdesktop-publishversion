@@ -195,39 +195,9 @@ namespace MyClinic
             //    need the gross billed amount per treatment name, so we sum
             //    (Cost × Quantity) converted to SYP using the visit's snapshot.
 
-            var totals = new Dictionary<string, double>(StringComparer.Ordinal);
-
-            foreach (var visit in visits)
-            {
-                if (visit.CurrentCost == 0 && visit.TodayPaid == 0) continue;
-
-                double rate = visit.UsdToSypRateSnapshot > 0
-                    ? visit.UsdToSypRateSnapshot
-                    : 15000;
-
-                var treatments = ParseTreatments(visit.SelectedTreatmentsJson);
-                if (treatments.Count == 0)
-                {
-                    // No treatment detail — add to أخرى
-                    double paid = visit.TodayPaid > 0 ? visit.TodayPaid : visit.CurrentCost;
-                    AddTo(totals, OtherLabel, paid);
-                }
-                else
-                {
-                    foreach (var t in treatments)
-                    {
-                        double amountSyp = t.Currency == "USD"
-                            ? (double)t.Cost * t.Quantity * rate
-                            : (double)t.Cost * t.Quantity;
-
-                        string name = string.IsNullOrWhiteSpace(t.TreatmentName)
-                            ? OtherLabel
-                            : t.TreatmentName;
-
-                        AddTo(totals, name, amountSyp);
-                    }
-                }
-            }
+            // الشؤون المالية counts received payments only (TodayPaid), not
+            // billed/unpaid CurrentCost. Keep the statistics total identical.
+            var totals = BuildPaidIncomeCategoryTotals(visits);
 
             // 3. Build slice list: known treatments first, then unknowns, أخرى last
             var slices = BuildIncomeSlices(knownTreatments, totals);
@@ -267,15 +237,13 @@ namespace MyClinic
             int colorIdx = 0;
             foreach (var label in fixedOrder)
             {
-                if (totals.TryGetValue(label, out double amount) && amount > 0)
+                totals.TryGetValue(label, out double amount);
+                slices.Add(new PieSlice
                 {
-                    slices.Add(new PieSlice
-                    {
-                        Label  = label,
-                        Amount = amount,
-                        Color  = SliceColors[colorIdx % SliceColors.Length]
-                    });
-                }
+                    Label  = label,
+                    Amount = amount,
+                    Color  = SliceColors[colorIdx % SliceColors.Length]
+                });
                 colorIdx++;
             }
 
@@ -317,7 +285,38 @@ namespace MyClinic
             DrawIncomeChart(buckets.Select(kv => (kv.Key, kv.Value)).ToList());
         }
 
-        private static double IncomeAmount(Visit visit) => visit.TodayPaid > 0 ? visit.TodayPaid : visit.CurrentCost;
+        private static double IncomeAmount(Visit visit) => visit.TodayPaid;
+
+        private static Dictionary<string, double> BuildPaidIncomeCategoryTotals(List<Visit> visits)
+        {
+            var totals = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (var visit in visits)
+            {
+                if (visit.TodayPaid <= 0) continue;
+
+                var treatments = ParseTreatments(visit.SelectedTreatmentsJson)
+                    .Select(t =>
+                    {
+                        double rate = visit.UsdToSypRateSnapshot > 0 ? visit.UsdToSypRateSnapshot : 15000;
+                        double cost = t.Currency == "USD" ? (double)t.Cost * rate : (double)t.Cost;
+                        return (Name: string.IsNullOrWhiteSpace(t.TreatmentName) ? OtherLabel : t.TreatmentName,
+                                Cost: Math.Max(0, cost * Math.Max(1, t.Quantity)));
+                    })
+                    .Where(t => t.Cost > 0)
+                    .ToList();
+
+                if (treatments.Count == 0)
+                {
+                    AddTo(totals, OtherLabel, visit.TodayPaid);
+                    continue;
+                }
+
+                double totalCost = treatments.Sum(t => t.Cost);
+                foreach (var treatment in treatments)
+                    AddTo(totals, treatment.Name, visit.TodayPaid * treatment.Cost / totalCost);
+            }
+            return totals;
+        }
 
         private void DrawIncomeChart(List<(string Label, double Amount)> points)
         {
@@ -348,6 +347,24 @@ namespace MyClinic
                     Canvas.SetLeft(label, i * step);
                     Canvas.SetTop(label, height + 6);
                     IncomeChartCanvas.Children.Add(label);
+                }
+
+                if (points[i].Amount > 0)
+                {
+                    var value = new TextBlock
+                    {
+                        Text = points[i].Amount.ToString("N0"),
+                        FontSize = points.Count > 20 ? 9 : 11,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = (Brush)Application.Current.Resources["AppTextPrimary"],
+                        Width = Math.Max(24, step),
+                        TextAlignment = TextAlignment.Center,
+                        FlowDirection = FlowDirection.LeftToRight,
+                        ToolTip = $"{points[i].Amount:N0} ل.س"
+                    };
+                    Canvas.SetLeft(value, i * step);
+                    Canvas.SetTop(value, Math.Max(0, height - barHeight - 22));
+                    IncomeChartCanvas.Children.Add(value);
                 }
             }
         }
@@ -382,18 +399,20 @@ namespace MyClinic
             var dialog = new SaveFileDialog { Filter = "PDF files (*.pdf)|*.pdf", FileName = $"تقرير-المصاريف-{DateTime.Now:yyyyMMdd-HHmm}.pdf" };
             if (dialog.ShowDialog() != true) return;
 
-            var grouped = expenses.GroupBy(e => ClassifyExpense(e.Description))
-                .OrderBy(g => Array.IndexOf(ExpenseKeywords.Select(k => k.Label).Append(OtherLabel).ToArray(), g.Key))
+            var grouped = ExpenseKeywords.Select(k => k.Label).Append(OtherLabel)
+                .Select(label => (
+                    Category: label,
+                    Items: expenses.Where(e => ClassifyExpense(e.Description) == label)
+                                   .OrderBy(e => e.ExpenseDate)
+                                   .ToList()))
                 .ToList();
             var pages = new List<byte[]>();
-            if (grouped.Count == 0) pages.Add(RenderPdfPage(new List<(string, List<ExpenseEntry>)> { ("لا توجد مصاريف", new List<ExpenseEntry>()) }));
-            else
             {
                 var pageGroups = new List<(string, List<ExpenseEntry>)>();
                 foreach (var group in grouped)
                 {
                     if (pageGroups.Count > 0 && pageGroups.Sum(x => x.Item2.Count) >= 18) { pages.Add(RenderPdfPage(pageGroups)); pageGroups.Clear(); }
-                    pageGroups.Add((group.Key, group.OrderBy(e => e.ExpenseDate).ToList()));
+                    pageGroups.Add((group.Category, group.Items));
                 }
                 if (pageGroups.Count > 0) pages.Add(RenderPdfPage(pageGroups));
             }
@@ -644,6 +663,8 @@ namespace MyClinic
             {
                 TblNoData.Visibility = Visibility.Visible;
                 TblTotal.Text        = "";
+                if (slices.Count > 0)
+                    BuildLegend(slices, 0);
                 return;
             }
             TblNoData.Visibility = Visibility.Collapsed;
@@ -653,6 +674,7 @@ namespace MyClinic
 
             foreach (var slice in slices)
             {
+                if (slice.Amount <= 0) continue;
                 double sweep = (slice.Amount / total) * 360.0;
                 // Clamp to avoid degenerate arcs at exactly 360
                 if (sweep >= 360) sweep = 359.9999;
