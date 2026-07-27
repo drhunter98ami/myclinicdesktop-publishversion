@@ -1,5 +1,5 @@
 #define MyAppName "My Clinic"
-#define MyAppVersion "1.2"
+#define MyAppVersion "1.3"
 #define MyAppPublisher "Dr. Ahmed Khalif"
 #define MyAppExeName "MyClinic.exe"
 ; Notice the path is updated to match your .NET 9 Windows target framework
@@ -33,6 +33,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; This grabs the MyClinic.exe, all the DLLs, the Google API credentials.json, and the Assets folder
 Source: "{#MyPublishFolder}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Assets\logo.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -41,7 +42,6 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
-[Dirs]
-; Database folder in AppData - DO NOT delete on upgrade to preserve user data
-; Only deleted when user explicitly uninstalls the application
-Name: "{localappdata}\MyClinicApp"
+; The application database is stored outside the install directory at:
+; %LOCALAPPDATA%\MyClinicApp\ClinicData.db
+; This installer does not include, copy, overwrite, or delete that database.

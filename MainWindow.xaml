@@ -188,7 +188,7 @@
                     </StackPanel>
 
                     <!-- App Version -->
-                    <TextBlock Text="الإصدار 1.2" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
+                    <TextBlock Text="الإصدار 1.3" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>
