@@ -5,6 +5,8 @@ using Google.Apis.Util.Store;
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,13 +32,14 @@ namespace MyClinic.Services
 
                 UserCredential credential;
                 // توجيه مسار حفظ رمز المصادقة (Token) الخاص بجوجل إلى المسار الآمن
-                string credPath = Path.Combine(clinicFolder, "GoogleDriveToken");
+                string credPath = GetUserTokenPath(clinicFolder);
 
                 // ملف credentials.json لا يزال يُقرأ من مجلد البرنامج الأساسي (read-only)
-                if (!File.Exists("credentials.json"))
+                string credentialsPath = Path.Combine(AppContext.BaseDirectory, "credentials.json");
+                if (!File.Exists(credentialsPath))
                     return (false, "ملف credentials.json غير موجود. تأكد من إعدادات Copy to Output Directory.");
 
-                using (var stream = new FileStream("credentials.json", FileMode.Open, FileAccess.Read))
+                using (var stream = new FileStream(credentialsPath, FileMode.Open, FileAccess.Read))
                 {
                     credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                         GoogleClientSecrets.FromStream(stream).Secrets,
@@ -106,12 +109,13 @@ namespace MyClinic.Services
 
                 UserCredential credential;
                 // توجيه مسار التوكن الآمن
-                string credPath = Path.Combine(clinicFolder, "GoogleDriveToken");
+                string credPath = GetUserTokenPath(clinicFolder);
 
-                if (!File.Exists("credentials.json"))
+                string credentialsPath = Path.Combine(AppContext.BaseDirectory, "credentials.json");
+                if (!File.Exists(credentialsPath))
                     return (false, "ملف credentials.json غير موجود.");
 
-                using (var stream = new FileStream("credentials.json", FileMode.Open, FileAccess.Read))
+                using (var stream = new FileStream(credentialsPath, FileMode.Open, FileAccess.Read))
                 {
                     credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                         GoogleClientSecrets.FromStream(stream).Secrets,
@@ -163,6 +167,19 @@ namespace MyClinic.Services
             {
                 return (false, ex.Message);
             }
+        }
+
+        private static string GetUserTokenPath(string clinicFolder)
+        {
+            string username = LoginSessionStore.CurrentUsername;
+            if (string.IsNullOrWhiteSpace(username))
+                username = "unidentified-user";
+
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(username.Trim().ToUpperInvariant()));
+            string userKey = Convert.ToHexString(hash).ToLowerInvariant();
+            string tokenPath = Path.Combine(clinicFolder, "GoogleDriveToken", userKey);
+            Directory.CreateDirectory(tokenPath);
+            return tokenPath;
         }
     }
 }

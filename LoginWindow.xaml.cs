@@ -135,7 +135,7 @@ namespace MyClinic
                     if (user != null && BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
                     {
                         txtError.Visibility = Visibility.Collapsed;
-                        LoginSessionStore.MarkSuccessfulLogin();
+                        LoginSessionStore.MarkSuccessfulLogin(user.Username);
 
                         MainWindow mainAppWindow = new MainWindow();
                         Application.Current.MainWindow = mainAppWindow;

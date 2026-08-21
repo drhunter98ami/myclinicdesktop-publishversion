@@ -316,7 +316,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="أهلاً د. أحمد" Foreground="White" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock x:Name="TxtWelcome" Foreground="White" FontSize="30" FontWeight="Bold"/>
                     <TextBlock Text="رتّب المواعيد القادمة بسرعة واحفظ بيانات المراجعين في مكان واحد." Foreground="#DDE7FF" FontSize="15" Margin="0,8,0,0"/>
                 </StackPanel>
 

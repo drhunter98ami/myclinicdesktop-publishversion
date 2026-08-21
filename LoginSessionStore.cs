@@ -11,6 +11,23 @@ namespace MyClinic
 
         private static readonly string SessionFilePath = Path.Combine(SessionDirectory, "session.txt");
 
+        public static string CurrentUsername
+        {
+            get
+            {
+                try
+                {
+                    if (!File.Exists(SessionFilePath)) return string.Empty;
+                    string[] lines = File.ReadAllLines(SessionFilePath);
+                    return lines.Length > 1 ? lines[1].Trim() : string.Empty;
+                }
+                catch
+                {
+                    return string.Empty;
+                }
+            }
+        }
+
         public static bool HasValidLoginSession(TimeSpan maxAge)
         {
             try
@@ -34,10 +51,14 @@ namespace MyClinic
             }
         }
 
-        public static void MarkSuccessfulLogin()
+        public static void MarkSuccessfulLogin(string username)
         {
             Directory.CreateDirectory(SessionDirectory);
-            File.WriteAllText(SessionFilePath, DateTime.UtcNow.ToString("O"));
+            File.WriteAllLines(SessionFilePath, new[]
+            {
+                DateTime.UtcNow.ToString("O"),
+                username.Trim()
+            });
         }
     }
 }

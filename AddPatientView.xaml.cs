@@ -23,7 +23,9 @@ namespace MyClinic
     public partial class AddPatientView : UserControl
     {
         private const int MaxVisitImages = 5;
-        private const string VisitDoctorName = "د. احمد";
+        private static string VisitDoctorName => string.IsNullOrWhiteSpace(LoginSessionStore.CurrentUsername)
+            ? "د."
+            : $"د. {LoginSessionStore.CurrentUsername}";
         private readonly List<PrescriptionItem> _prescriptionItems = new();
         private readonly List<string> _selectedImagePaths = new();
         private readonly ObservableCollection<PatientLookupSuggestion> _patientSuggestions = new();

@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using System.IO;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using MyClinic.Services;
 
@@ -25,6 +26,7 @@ namespace MyClinic
         private int _lastSyncedHour = -1;
         private readonly string _syncSettingsPath;
         private readonly string _themeSettingsPath;
+        private UpdateInfo? _availableUpdate;
 
         public MainWindow()
         {
@@ -55,6 +57,37 @@ namespace MyClinic
             InitializeAppClock();
 
             ShowDashboard();
+            TxtCurrentVersion.Text = $"الإصدار {UpdateService.CurrentVersion.ToString(3)}";
+            Loaded += MainWindow_Loaded;
+        }
+
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded;
+            UpdateInfo? update = await UpdateService.GetLatestUpdateAsync();
+            if (update is null)
+                return;
+
+            _availableUpdate = update;
+            TxtUpdateMessage.Text = $"الإصدار {update.Version} متاح الآن — حجم الملف: {update.SizeText}";
+            UpdateBanner.Visibility = Visibility.Visible;
+        }
+
+        private void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (_availableUpdate is null)
+                return;
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _availableUpdate.DownloadUrl,
+                UseShellExecute = true
+            });
+        }
+
+        private void BtnDismissUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateBanner.Visibility = Visibility.Collapsed;
         }
 
         private void InitializeAppClock()

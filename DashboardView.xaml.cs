@@ -32,6 +32,11 @@ namespace MyClinic
         {
             InitializeComponent();
 
+            string username = LoginSessionStore.CurrentUsername;
+            TxtWelcome.Text = string.IsNullOrWhiteSpace(username)
+                ? "أهلاً بك"
+                : $"أهلاً د. {username}";
+
             _viewMode = ViewMode.Monthly;
             _statusFilter = StatusFilter.Upcoming;
 

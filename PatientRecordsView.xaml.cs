@@ -20,7 +20,9 @@ namespace MyClinic
 {
     public partial class PatientRecordsView : UserControl
     {
-        private const string VisitDoctorName = "د. احمد";
+        private static string VisitDoctorName => string.IsNullOrWhiteSpace(LoginSessionStore.CurrentUsername)
+            ? "د."
+            : $"د. {LoginSessionStore.CurrentUsername}";
 
         private readonly List<PatientCardModel> _allPatients = new();
 

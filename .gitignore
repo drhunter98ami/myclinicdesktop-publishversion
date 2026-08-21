@@ -31,13 +31,20 @@ bld/
 *.db-wal
 DevData/
 LocalApplicationData/
+.localappdata/
 
 # Google credentials
 credentials.json
-token.json/
+token.json
+GoogleDriveToken/
 
 # Output directory
 Output/
+
+# Workspace-generated attachments and local patient images
+attached_assets/
+PatientVisitImages/*
+!PatientVisitImages/.gitkeep
 
 # Temporary files
 *.tmp
