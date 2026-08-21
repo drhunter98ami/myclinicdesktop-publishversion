@@ -116,8 +116,6 @@ public partial class App : Application
         EnsureColumnExists(context, "Visits", "RemainingAmount", "REAL NOT NULL DEFAULT 0");
         EnsureColumnExists(context, "Visits", "SelectedTreatmentsJson", "TEXT NULL");
         EnsureColumnExists(context, "Visits", "UsdToSypRateSnapshot", "REAL NOT NULL DEFAULT 15000");
-        EnsureColumnExists(context, "AppSettings", "DefaultCurrency", "TEXT NOT NULL DEFAULT 'SYP'");
-
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Shortages (
                 Id INTEGER NOT NULL CONSTRAINT PK_Shortages PRIMARY KEY AUTOINCREMENT,
@@ -153,12 +151,15 @@ public partial class App : Application
                 CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
             );");
 
+        // AppSettings must exist before checking/adding columns to it.
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS AppSettings (
                 Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY AUTOINCREMENT,
                 UsdToSypRate REAL NOT NULL DEFAULT 15000,
                 UpdatedAt TEXT NOT NULL DEFAULT (datetime('now'))
             );");
+
+        EnsureColumnExists(context, "AppSettings", "DefaultCurrency", "TEXT NOT NULL DEFAULT 'SYP'");
 
         EnsureColumnExists(context, "LabWorks", "LabName", "TEXT NULL");
 
