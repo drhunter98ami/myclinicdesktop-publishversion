@@ -21,7 +21,7 @@ namespace MyClinic.Services
     public static class UpdateService
     {
         private const string LatestReleaseUrl =
-            "https://api.github.com/repos/drhunter98ami/myclinicdesktop/releases/latest";
+            "https://api.github.com/repos/drhunter98ami/myclinicdesktop-publishversion/releases/latest";
 
         private static readonly HttpClient HttpClient = CreateHttpClient();
 
