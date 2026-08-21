@@ -64,13 +64,20 @@ namespace MyClinic
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= MainWindow_Loaded;
-            UpdateInfo? update = await UpdateService.GetLatestUpdateAsync();
-            if (update is null)
-                return;
+            try
+            {
+                UpdateInfo? update = await UpdateService.GetLatestUpdateAsync();
+                if (update is null)
+                    return;
 
-            _availableUpdate = update;
-            TxtUpdateMessage.Text = $"الإصدار {update.Version} متاح الآن — حجم الملف: {update.SizeText}";
-            UpdateBanner.Visibility = Visibility.Visible;
+                _availableUpdate = update;
+                TxtUpdateMessage.Text = $"الإصدار {update.Version} متاح الآن — حجم الملف: {update.SizeText}";
+                UpdateBanner.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                // An update check must never prevent the clinic app from opening.
+            }
         }
 
         private void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)

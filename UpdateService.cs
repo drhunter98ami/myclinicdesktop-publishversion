@@ -77,6 +77,11 @@ namespace MyClinic.Services
             {
                 return null;
             }
+            catch
+            {
+                // Update checks are optional. Ignore any unexpected API or parsing issue.
+                return null;
+            }
         }
 
         private static HttpClient CreateHttpClient()
