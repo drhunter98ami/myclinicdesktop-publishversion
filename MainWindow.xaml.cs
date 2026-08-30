@@ -410,7 +410,9 @@ namespace MyClinic
 
         public void ShowPatientRecords()
         {
-            _patientRecordsView ??= new PatientRecordsView();
+            // Create a fresh records view whenever the tab is opened so it never
+            // displays a stale in-memory list after a patient was added.
+            _patientRecordsView = new PatientRecordsView();
             MainContent.Content = _patientRecordsView;
             _patientRecordsView.RequestRefresh();
             _ = _patientRecordsView.EnsureDataCurrentAsync();
