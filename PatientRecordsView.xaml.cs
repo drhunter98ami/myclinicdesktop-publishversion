@@ -38,6 +38,7 @@ namespace MyClinic
         private bool _hasLoadedData;
         private bool _refreshRequested = true;
         private Task? _refreshTask;
+        private int _refreshVersion;
 
         // Debounce search to avoid filtering on every keystroke
         private DispatcherTimer? _searchDebounceTimer;
@@ -83,7 +84,7 @@ namespace MyClinic
                 // may have cleared _refreshRequested while the view was hidden, so without
                 // this line EnsureDataCurrentAsync would skip loading and the new patient
                 // would not appear until the next app restart.
-                _refreshRequested = true;
+                RequestRefresh();
                 _ = EnsureDataCurrentAsync();
             }
         }
@@ -99,7 +100,7 @@ namespace MyClinic
             Application.Current.Dispatcher.Invoke(() =>
             {
                 // Always mark as needing a refresh
-                _refreshRequested = true;
+                RequestRefresh();
 
                 // If the view is currently visible, kick off a refresh immediately.
                 // Use EnsureDataCurrentAsync so _refreshTask is tracked correctly
@@ -123,6 +124,7 @@ namespace MyClinic
         public void RequestRefresh()
         {
             _refreshRequested = true;
+            _refreshVersion++;
         }
 
         public Task EnsureDataCurrentAsync()
@@ -293,6 +295,7 @@ namespace MyClinic
         private async Task RefreshDataAsync()
         {
             SetLoadingState(true);
+            int refreshVersionAtStart = _refreshVersion;
 
             try
             {
@@ -301,7 +304,9 @@ namespace MyClinic
                 _allPatients.Clear();
                 _allPatients.AddRange(loaded);
                 _hasLoadedData     = true;
-                _refreshRequested  = false;
+                // A new request may have arrived while this query was running.
+                // Keep the flag set so the latest data is loaded once more.
+                _refreshRequested  = _refreshVersion != refreshVersionAtStart;
 
                 ApplyFilters();
                 UpdateSelectedPatientState();
@@ -314,11 +319,20 @@ namespace MyClinic
                 EmptyStateTitle.Text          = "تعذر تحميل السجلات";
                 EmptyStateDescription.Text    = "حدث خطأ أثناء تحميل بيانات المرضى. حاول فتح السجل مرة أخرى.";
                 EmptyStateCard.Visibility     = Visibility.Visible;
+                _refreshRequested = _refreshVersion != refreshVersionAtStart;
             }
             finally
             {
                 SetLoadingState(false);
                 _refreshTask = null;
+
+                // If the view was refreshed while the previous query was still in
+                // flight, immediately run the pending refresh instead of leaving
+                // the UI with the older result.
+                if (_refreshRequested && IsVisible)
+                {
+                    _ = EnsureDataCurrentAsync();
+                }
             }
         }
 

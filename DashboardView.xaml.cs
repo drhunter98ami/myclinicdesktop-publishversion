@@ -19,11 +19,13 @@ namespace MyClinic
         private enum StatusFilter { Upcoming, Past, All }
 
         private readonly ObservableCollection<AppointmentCardModel> _appointments = new();
+        private readonly ObservableCollection<CalendarDayModel> _calendarDays = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
         private readonly List<Patient> _allPatients = new(); 
         private bool _refreshRequested = true;
         private bool _hasLoadedData;
         private Task? _refreshTask;
+        private int _selectedAppointmentId;
 
         private ViewMode _viewMode;
         private StatusFilter _statusFilter;
@@ -38,9 +40,10 @@ namespace MyClinic
                 : $"أهلاً د. {username}";
 
             _viewMode = ViewMode.Monthly;
-            _statusFilter = StatusFilter.Upcoming;
+            _statusFilter = StatusFilter.All;
 
             AppointmentsItemsControl.ItemsSource = _appointments;
+            MonthlyCalendarItemsControl.ItemsSource = _calendarDays;
             
             DateTime syrianNow = GetSyrianTime();
             DpAppointmentsFilter.SelectedDate = syrianNow.Date;
@@ -269,6 +272,122 @@ namespace MyClinic
             }
         }
 
+        private async void BtnDeleteAppointment_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: AppointmentCardModel card })
+            {
+                if (sender is Button { Tag: CalendarAppointmentModel calendarAppointment })
+                {
+                    await DeleteAppointmentAsync(calendarAppointment.Id, calendarAppointment.PatientName, calendarAppointment.AppointmentDateText);
+                }
+                return;
+            }
+
+            await DeleteAppointmentAsync(card.Id, card.PatientName, card.AppointmentDateText);
+        }
+
+        private void DeleteButton_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void AppointmentDetails_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is Border { Tag: AppointmentCardModel card })
+            {
+                ShowAppointmentDetails(card.PatientName, card.PhoneNumber, card.AppointmentDateText, card.AppointmentTimeText, card.Reason);
+            }
+            else if (sender is Border { Tag: CalendarAppointmentModel calendarAppointment })
+            {
+                ShowAppointmentDetails(calendarAppointment.PatientName, calendarAppointment.PhoneNumber, calendarAppointment.AppointmentDateText, calendarAppointment.AppointmentTimeText, calendarAppointment.Reason);
+            }
+
+            e.Handled = true;
+        }
+
+        private void ShowAppointmentDetails(string patientName, string phoneNumber, string dateText, string timeText, string reason)
+        {
+            AppointmentEntry? appointment = _allAppointments.FirstOrDefault(a =>
+                a.PatientName == patientName &&
+                a.PhoneNumber == phoneNumber &&
+                a.AppointmentDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) == dateText &&
+                a.AppointmentDateTime.ToString("hh:mm tt", CultureInfo.InvariantCulture) == timeText);
+            _selectedAppointmentId = appointment?.Id ?? 0;
+            TxtAppointmentDetailsPatient.Text = patientName;
+            TxtAppointmentDetailsTime.Text = timeText;
+            TxtAppointmentDetailsDate.Text = dateText;
+            TxtAppointmentDetailsContact.Text = $"{phoneNumber}  •  {reason}";
+            AppointmentDetailsOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void BtnCloseAppointmentDetails_Click(object sender, RoutedEventArgs e)
+        {
+            AppointmentDetailsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private async void BtnDeleteAppointmentFromDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedAppointmentId == 0)
+                return;
+
+            int appointmentId = _selectedAppointmentId;
+            AppointmentEntry? appointment = _allAppointments.FirstOrDefault(a => a.Id == appointmentId);
+            if (appointment is null)
+                return;
+
+            await DeleteAppointmentAsync(appointment.Id, appointment.PatientName, appointment.AppointmentDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
+            if (_allAppointments.All(a => a.Id != appointmentId))
+            {
+                _selectedAppointmentId = 0;
+                AppointmentDetailsOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BtnPreviousMonth_Click(object sender, RoutedEventArgs e)
+        {
+            DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? GetSyrianTime()).Date;
+            DpAppointmentsFilter.SelectedDate = new DateTime(selectedDate.Year, selectedDate.Month, 1).AddMonths(-1);
+        }
+
+        private void BtnNextMonth_Click(object sender, RoutedEventArgs e)
+        {
+            DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? GetSyrianTime()).Date;
+            DpAppointmentsFilter.SelectedDate = new DateTime(selectedDate.Year, selectedDate.Month, 1).AddMonths(1);
+        }
+
+        private void AppointmentDetailsBackdrop_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            AppointmentDetailsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private async Task DeleteAppointmentAsync(int appointmentId, string patientName, string dateText)
+        {
+            MessageBoxResult confirmation = MessageBox.Show(
+                $"هل تريد حذف موعد {patientName} بتاريخ {dateText}؟",
+                "تأكيد حذف الموعد", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                using var db = new AppDbContext();
+                AppointmentEntry? appointment = await db.Appointments.FirstOrDefaultAsync(a => a.Id == appointmentId);
+                if (appointment is null)
+                    return;
+
+                db.Appointments.Remove(appointment);
+                await db.SaveChangesAsync();
+                _allAppointments.RemoveAll(a => a.Id == appointmentId);
+                UpdateSearchSuggestions();
+                ApplyAppointmentsFilter();
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("تعذر حذف الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void BtnCloseAppointmentDialog_Click(object sender, RoutedEventArgs e)
         {
             HideAppointmentDialog();
@@ -405,17 +524,14 @@ namespace MyClinic
 
             var query = _allAppointments.AsEnumerable();
 
-            if (!isSearching)
+            if (_viewMode == ViewMode.Monthly)
             {
-                if (_viewMode == ViewMode.Monthly)
-                {
-                    query = query.Where(a => a.AppointmentDateTime.Month == selectedDate.Month && 
-                                             a.AppointmentDateTime.Year == selectedDate.Year);
-                }
-                else
-                {
-                    query = query.Where(a => a.AppointmentDateTime.Date == selectedDate.Date);
-                }
+                query = query.Where(a => a.AppointmentDateTime.Month == selectedDate.Month &&
+                                         a.AppointmentDateTime.Year == selectedDate.Year);
+            }
+            else if (!isSearching)
+            {
+                query = query.Where(a => a.AppointmentDateTime.Date == selectedDate.Date);
             }
 
             if (_statusFilter == StatusFilter.Upcoming)
@@ -433,14 +549,17 @@ namespace MyClinic
                                          (a.PhoneNumber?.Contains(searchText) == true));
             }
 
-            List<AppointmentCardModel> visibleAppointments = query
+            List<AppointmentEntry> filteredAppointments = query
                 .OrderBy(a => Math.Abs((a.AppointmentDateTime - syrianNow).TotalSeconds)) 
                 .ThenBy(a => a.AppointmentDateTime)
-                .Select(MapAppointment)
                 .ToList();
 
-            ReplaceAppointments(visibleAppointments);
-            EmptyAppointmentsState.Visibility = _appointments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            ReplaceAppointments(filteredAppointments.Select(MapAppointment));
+            BuildMonthlyCalendar(selectedDate, filteredAppointments);
+            MonthlyCalendarPanel.Visibility = _viewMode == ViewMode.Monthly ? Visibility.Visible : Visibility.Collapsed;
+            AppointmentsItemsControl.Visibility = _viewMode == ViewMode.Daily ? Visibility.Visible : Visibility.Collapsed;
+            // لا تعرض رسالة الحالة الفارغة فوق شبكة التقويم؛ الخلايا الفارغة توضح ذلك بشكل طبيعي.
+            EmptyAppointmentsState.Visibility = Visibility.Collapsed;
 
             UpdateButtonStyles();
         }
@@ -476,6 +595,18 @@ namespace MyClinic
 
             BtnCurrentDate.Visibility = isCurrent ? Visibility.Collapsed : Visibility.Visible;
             BtnCurrentDate.Content = _viewMode == ViewMode.Monthly ? "الشهر الحالي" : "اليوم الحالي";
+            MonthlyNavigationPanel.Visibility = _viewMode == ViewMode.Monthly ? Visibility.Visible : Visibility.Collapsed;
+            TxtCurrentMonth.Text = GetArabicMonthName(selectedDate.Month);
+        }
+
+        private static string GetArabicMonthName(int month)
+        {
+            string[] monthNames =
+            {
+                "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+            };
+            return monthNames[month - 1];
         }
 
         private static AppointmentCardModel MapAppointment(AppointmentEntry appointment)
@@ -484,6 +615,53 @@ namespace MyClinic
 
             return new AppointmentCardModel
             {
+                PatientName = appointment.PatientName,
+                Id = appointment.Id,
+                PhoneNumber = appointment.PhoneNumber,
+                Reason = appointment.Reason,
+                AppointmentDateText = appointment.AppointmentDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                AppointmentTimeText = appointment.AppointmentDateTime.ToString("hh:mm tt", CultureInfo.InvariantCulture),
+                ReasonBackground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isNewConsultation ? "#EAF1FF" : "#F0FDF4")),
+                ReasonForeground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isNewConsultation ? "#235DF6" : "#15803D"))
+            };
+        }
+
+        private void BuildMonthlyCalendar(DateTime selectedDate, IEnumerable<AppointmentEntry> appointments)
+        {
+            _calendarDays.Clear();
+
+            DateTime firstDay = new(selectedDate.Year, selectedDate.Month, 1);
+            DateTime calendarStart = firstDay.AddDays(-(int)firstDay.DayOfWeek);
+            DateTime today = GetSyrianTime().Date;
+            var appointmentsByDate = appointments.GroupBy(a => a.AppointmentDateTime.Date)
+                .ToDictionary(group => group.Key, group => group.OrderBy(a => a.AppointmentDateTime).ToList());
+
+            for (int offset = 0; offset < 42; offset++)
+            {
+                DateTime date = calendarStart.AddDays(offset);
+                var day = new CalendarDayModel
+                {
+                    DayNumber = date.Day.ToString(CultureInfo.InvariantCulture),
+                    DayForeground = date.Date == today ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#235DF6")) : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6C82")),
+                    MonthOpacity = date.Month == selectedDate.Month ? 1.0 : 0.45
+                };
+
+                if (appointmentsByDate.TryGetValue(date.Date, out List<AppointmentEntry>? dayAppointments))
+                {
+                    foreach (AppointmentEntry appointment in dayAppointments)
+                        day.Appointments.Add(MapCalendarAppointment(appointment));
+                }
+
+                _calendarDays.Add(day);
+            }
+        }
+
+        private static CalendarAppointmentModel MapCalendarAppointment(AppointmentEntry appointment)
+        {
+            bool isNewConsultation = string.Equals(appointment.Reason, "معاينة جديدة", StringComparison.Ordinal);
+            return new CalendarAppointmentModel
+            {
+                Id = appointment.Id,
                 PatientName = appointment.PatientName,
                 PhoneNumber = appointment.PhoneNumber,
                 Reason = appointment.Reason,
@@ -531,6 +709,27 @@ namespace MyClinic
 
     public sealed class AppointmentCardModel
     {
+        public int Id { get; init; }
+        public string PatientName { get; init; } = string.Empty;
+        public string PhoneNumber { get; init; } = string.Empty;
+        public string Reason { get; init; } = string.Empty;
+        public string AppointmentDateText { get; init; } = string.Empty;
+        public string AppointmentTimeText { get; init; } = string.Empty;
+        public Brush ReasonBackground { get; init; } = Brushes.Transparent;
+        public Brush ReasonForeground { get; init; } = Brushes.Black;
+    }
+
+    public sealed class CalendarDayModel
+    {
+        public string DayNumber { get; init; } = string.Empty;
+        public Brush DayForeground { get; init; } = Brushes.Black;
+        public double MonthOpacity { get; init; } = 1;
+        public ObservableCollection<CalendarAppointmentModel> Appointments { get; } = new();
+    }
+
+    public sealed class CalendarAppointmentModel
+    {
+        public int Id { get; init; }
         public string PatientName { get; init; } = string.Empty;
         public string PhoneNumber { get; init; } = string.Empty;
         public string Reason { get; init; } = string.Empty;
