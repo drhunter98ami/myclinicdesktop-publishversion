@@ -25,6 +25,8 @@ namespace MyClinic.Models
 
         public string? BloodType { get; set; }
 
+        public bool IsDiabetic { get; set; }
+
         // ── Medical Background (stable per patient) ────────────────────
         public bool IsSmoker { get; set; }
         public string? SmokingType { get; set; }

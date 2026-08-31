@@ -476,6 +476,7 @@ namespace MyClinic
                     Age = patient.Age,
                     Gender = patient.Gender,
                     BloodType = patient.BloodType,
+                    IsDiabetic = patient.IsDiabetic,
                     IsSmoker = patient.IsSmoker,
                     SmokingType = patient.SmokingType,
                     SmokingFrequency = patient.SmokingFrequency,
@@ -538,6 +539,7 @@ namespace MyClinic
 
                 TxtAllergies.Text = snapshot.Allergies ?? string.Empty;
                 TxtChronicDiseases.Text = snapshot.ChronicDiseases ?? string.Empty;
+                ChkDiabetic.IsChecked = snapshot.IsDiabetic;
 
                 ChkSmoker.IsChecked = snapshot.IsSmoker;
                 TxtSmokingType.Text = snapshot.SmokingType ?? string.Empty;
@@ -825,6 +827,7 @@ namespace MyClinic
                 patient.Age = age;
                 patient.Gender = GetSelectedComboBoxText(CmbGender);
                 patient.BloodType = NormalizeBloodType(GetSelectedComboBoxText(CmbBloodType));
+                patient.IsDiabetic = ChkDiabetic.IsChecked == true;
                 patient.IsSmoker = ChkSmoker.IsChecked == true;
                 patient.SmokingType = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingType.Text) : null;
                 patient.SmokingFrequency = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingFrequency.Text) : null;
@@ -1653,6 +1656,7 @@ namespace MyClinic
             public int? Age { get; init; }
             public string? Gender { get; init; }
             public string? BloodType { get; init; }
+            public bool IsDiabetic { get; init; }
             public bool IsSmoker { get; init; }
             public string? SmokingType { get; init; }
             public string? SmokingFrequency { get; init; }

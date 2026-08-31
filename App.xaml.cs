@@ -37,9 +37,15 @@ public partial class App : Application
                 ChronicDiseases TEXT NULL
             );");
 
+        // Phone numbers are searchable but are not unique: family members may
+        // share one number. Recreate the old unique index as a normal index.
         context.Database.ExecuteSqlRaw(
-            @"CREATE UNIQUE INDEX IF NOT EXISTS IX_Patients_PhoneNumber
+            @"DROP INDEX IF EXISTS IX_Patients_PhoneNumber;
+              CREATE INDEX IF NOT EXISTS IX_Patients_PhoneNumber
               ON Patients (PhoneNumber);");
+
+        // Add newer patient fields to databases created by older releases.
+        EnsureColumnExists(context, "Patients", "IsDiabetic", "INTEGER NOT NULL DEFAULT 0");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Appointments (

@@ -317,6 +317,11 @@
                                                    Foreground="#D8F3EE"
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
+                                    <TextBlock Text="{Binding DiabetesLabel}"
+                                               FontSize="13"
+                                               Foreground="#FDE68A"
+                                               HorizontalAlignment="Right"
+                                               Margin="0,4,0,0"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2"
@@ -972,6 +977,11 @@
                                             </StackPanel>
                                         </Border>
                                     </Grid>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                                        <TextBlock Text="السكري:" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding DiabetesText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+                                    </StackPanel>
 
                                     <Grid>
                                         <Grid.ColumnDefinitions>

@@ -209,6 +209,7 @@ namespace MyClinic
                 DoctorName     = VisitDoctorName,
                 VisitDateTimeText      = visit.VisitDateTimeText,
                 BloodTypeText          = _selectedPatient.BloodType,
+                DiabetesText           = _selectedPatient.DiabetesLabel,
                 AllergiesText          = _selectedPatient.Allergies,
                 ChronicDiseasesText    = _selectedPatient.ChronicDiseases,
                 SmokingText            = _selectedPatient.SmokingSummary,
@@ -425,6 +426,7 @@ namespace MyClinic
                     Age              = p.Age,
                     Gender           = p.Gender,
                     BloodType        = p.BloodType,
+                    IsDiabetic       = p.IsDiabetic,
                     Allergies        = p.Allergies,
                     ChronicDiseases  = p.ChronicDiseases,
                     IsSmoker         = p.IsSmoker,
@@ -670,6 +672,7 @@ namespace MyClinic
                     existing.Age             ??= v.Patient.Age;
                     existing.Gender          ??= v.Patient.Gender;
                     existing.BloodType       ??= v.Patient.BloodType;
+                    existing.IsDiabetic      = existing.IsDiabetic || v.Patient.IsDiabetic;
                     existing.Allergies       ??= v.Patient.Allergies;
                     existing.ChronicDiseases ??= v.Patient.ChronicDiseases;
                     existing.IsSmoker        = existing.IsSmoker || v.Patient.IsSmoker;
@@ -686,6 +689,7 @@ namespace MyClinic
                     Age              = v.Patient.Age,
                     Gender           = v.Patient.Gender,
                     BloodType        = v.Patient.BloodType,
+                    IsDiabetic       = v.Patient.IsDiabetic,
                     Allergies        = v.Patient.Allergies,
                     ChronicDiseases  = v.Patient.ChronicDiseases,
                     IsSmoker         = v.Patient.IsSmoker,
@@ -707,6 +711,7 @@ namespace MyClinic
             AgeText         = p.Age?.ToString(CultureInfo.CurrentCulture) ?? "--",
             AgeWithUnit     = p.Age.HasValue ? $"{p.Age.Value} سنة" : "العمر غير محدد",
             GenderLabel     = string.IsNullOrWhiteSpace(p.Gender) ? "غير محدد" : p.Gender.Trim(),
+            DiabetesLabel   = p.IsDiabetic ? "مصاب بالسكري" : "غير مصاب بالسكري",
             VisitCount      = p.VisitCount,
             LatestVisitDate = p.LatestVisitDate ?? DateTime.MinValue,
             BloodType       = NormalizeOrFallback(p.BloodType,        "غير محدد"),
@@ -980,6 +985,7 @@ namespace MyClinic
             public int?     Age              { get; set; }
             public string?  Gender           { get; set; }
             public string?  BloodType        { get; set; }
+            public bool     IsDiabetic       { get; set; }
             public bool     IsSmoker         { get; set; }
             public string?  SmokingType      { get; set; }
             public string?  SmokingFrequency { get; set; }
@@ -1000,6 +1006,7 @@ namespace MyClinic
         public string   AgeText         { get; init; } = "--";
         public string   AgeWithUnit     { get; init; } = "العمر غير محدد";
         public string   GenderLabel     { get; init; } = "غير محدد";
+        public string   DiabetesLabel   { get; init; } = "غير مصاب بالسكري";
         public int      VisitCount      { get; init; }
         public DateTime LatestVisitDate { get; init; }
         public string   BloodType       { get; init; } = "غير محدد";
@@ -1047,6 +1054,7 @@ namespace MyClinic
         public string DoctorName            { get; init; } = string.Empty;
         public string VisitDateTimeText     { get; init; } = string.Empty;
         public string BloodTypeText         { get; init; } = "غير محدد";
+        public string DiabetesText          { get; init; } = "غير مصاب بالسكري";
         public string AllergiesText         { get; init; } = "غير محددة";
         public string ChronicDiseasesText   { get; init; } = "غير محددة";
         public string SmokingText           { get; init; } = "غير مدخن";

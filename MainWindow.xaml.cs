@@ -64,19 +64,50 @@ namespace MyClinic
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= MainWindow_Loaded;
+            await CheckForUpdatesAsync(showResult: false);
+        }
+
+        private async void BtnCheckForUpdates_Click(object sender, RoutedEventArgs e) =>
+            await CheckForUpdatesAsync(showResult: true);
+
+        private async Task CheckForUpdatesAsync(bool showResult)
+        {
+            BtnCheckForUpdates.IsEnabled = false;
+            string originalContent = BtnCheckForUpdates.Content?.ToString() ?? "تفقد وجود نسخة جديدة";
+            BtnCheckForUpdates.Content = "جاري التفقد...";
+
             try
             {
                 UpdateInfo? update = await UpdateService.GetLatestUpdateAsync();
                 if (update is null)
+                {
+                    if (showResult)
+                    {
+                        MessageBox.Show("أنت تستخدم أحدث نسخة متاحة حالياً.", "تفقد التحديثات", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
                     return;
+                }
 
                 _availableUpdate = update;
                 TxtUpdateMessage.Text = $"الإصدار {update.Version} متاح الآن — حجم الملف: {update.SizeText}";
                 UpdateBanner.Visibility = Visibility.Visible;
+
+                if (showResult)
+                {
+                    MessageBox.Show($"تتوفر نسخة جديدة: {update.Version}. يمكنك تحميلها من الشريط العلوي.", "تحديث جديد", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch
             {
-                // An update check must never prevent the clinic app from opening.
+                if (showResult)
+                {
+                    MessageBox.Show("تعذر الاتصال بخادم GitHub للتحقق من التحديثات. حاول لاحقاً.", "تعذر التفقد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            finally
+            {
+                BtnCheckForUpdates.Content = originalContent;
+                BtnCheckForUpdates.IsEnabled = true;
             }
         }
 

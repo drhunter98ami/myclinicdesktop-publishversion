@@ -151,6 +151,7 @@
                         
                         <!-- التبويب الجديد: الإعدادات -->
                         <Button Name="BtnSettings" Content="الإعدادات" Style="{StaticResource SidebarButton}" Click="BtnSettings_Click"/>
+                        <Button Name="BtnCheckForUpdates" Content="تفقد وجود نسخة جديدة" Style="{StaticResource SidebarButton}" Click="BtnCheckForUpdates_Click"/>
                         
                         <Border Margin="15,20,15,5" Height="1" Background="#334155"/>
                         <Button Name="BtnSyncDrive" Content="مزامنة مع Google Drive" Style="{StaticResource SidebarButton}" Click="BtnSyncDrive_Click"/>
@@ -185,6 +186,8 @@
 
                     <!-- App Version -->
                     <TextBlock x:Name="TxtCurrentVersion" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
+                    <TextBlock Text="للتواصل مع المطور (د. احمد خليف)" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <TextBlock Text="واتساب: +963935606912" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>
