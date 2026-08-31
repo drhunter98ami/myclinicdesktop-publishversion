@@ -1,5 +1,5 @@
 #define MyAppName "My Clinic"
-#define MyAppVersion "1.3.1"
+#define MyAppVersion "1.3.2"
 #define MyAppPublisher "Dr. Ahmed Khalif"
 #define MyAppExeName "MyClinic.exe"
 ; Notice the path is updated to match your .NET 9 Windows target framework
@@ -14,9 +14,15 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputBaseFilename=Install_MyClinic
+OutputDir=Output
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
+; Keep the same AppId and installation directory so installing a newer version
+; upgrades the existing installation instead of creating a second one.
+VersionInfoVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersion}
+CloseApplications=yes
 
 ; This will use your app's logo for the setup wizard icon itself!
 SetupIconFile=Assets\logo.ico
@@ -32,7 +38,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; This grabs the MyClinic.exe, all the DLLs, the Google API credentials.json, and the Assets folder
-Source: "{#MyPublishFolder}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Never package SQLite data files. Production data lives in LocalAppData and is
+; intentionally preserved across upgrades.
+Source: "{#MyPublishFolder}\*"; DestDir: "{app}"; Excludes: "*.db,*.db-shm,*.db-wal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Assets\logo.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
 [Icons]
