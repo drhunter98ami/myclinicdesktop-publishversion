@@ -27,9 +27,11 @@ namespace MyClinic
             string dbPath;
 
             // Check if running in development mode (dotnet run)
-            #if DEBUG
-            // Use local project database for development
-            string projectFolder = Directory.GetCurrentDirectory();
+#if DEBUG
+            // Use the project DevData database regardless of the process working
+            // directory. This keeps settings persistent when the app is reopened
+            // from a different shortcut, IDE, or output folder.
+            string projectFolder = FindDevelopmentProjectFolder(AppContext.BaseDirectory);
             string devDbFolder = Path.Combine(projectFolder, "DevData");
             if (!Directory.Exists(devDbFolder))
             {
@@ -49,6 +51,25 @@ namespace MyClinic
 
             optionsBuilder.UseSqlite($"Data Source={dbPath};Foreign Keys=True");
         }
+
+#if DEBUG
+        private static string FindDevelopmentProjectFolder(string startDirectory)
+        {
+            DirectoryInfo? current = new DirectoryInfo(startDirectory);
+            while (current != null)
+            {
+                if (Directory.Exists(Path.Combine(current.FullName, "DevData")))
+                    return current.FullName;
+                current = current.Parent;
+            }
+
+            string fallback = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MyClinicApp", "DevData");
+            Directory.CreateDirectory(fallback);
+            return Directory.GetParent(fallback)!.FullName;
+        }
+#endif
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

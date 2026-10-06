@@ -1,4 +1,4 @@
-modules = ["dotnet-7.0"]
+modules = ["dotnet-7.0", "python-base-3.13", "dotnet-9.0"]
 [agent]
 expertMode = true
 

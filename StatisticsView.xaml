@@ -22,12 +22,14 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Margin="{TemplateBinding Padding}"/>
+                                </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -52,13 +54,15 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Margin="{TemplateBinding Padding}"/>
+                                </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -83,13 +87,15 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="8">
+                                    <ContentPresenter HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Margin="{TemplateBinding Padding}"/>
+                                </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -103,6 +109,13 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#3B82F6"/>
             <Setter Property="BorderBrush" Value="#3B82F6"/>
+        </Style>
+
+        <!-- Export action button -->
+        <Style x:Key="ExportBtn" BasedOn="{StaticResource NowBtn}" TargetType="Button">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#0F766E"/>
+            <Setter Property="BorderBrush" Value="#0F766E"/>
         </Style>
 
     </UserControl.Resources>
@@ -132,6 +145,14 @@
                         Content="المصاريف"
                         Style="{StaticResource MainTabBtn}"
                         Click="BtnTabExpenses_Click"/>
+                <Button x:Name="BtnTabTreatments"
+                        Content="المعالجات"
+                        Style="{StaticResource MainTabBtn}"
+                        Click="BtnTabTreatments_Click"/>
+                <Button x:Name="BtnTabVisits"
+                        Content="الزيارات"
+                        Style="{StaticResource MainTabBtn}"
+                        Click="BtnTabVisits_Click"/>
             </StackPanel>
         </Border>
 
@@ -153,14 +174,19 @@
 
                 <!-- Subtabs -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="BtnDaily"   Content="يومي"   Style="{StaticResource SubTabBtn}"       Margin="0,0,12,0" Click="BtnDaily_Click"/>
-                    <Button x:Name="BtnMonthly" Content="شهري"   Style="{StaticResource SubTabBtnActive}" Margin="0,0,12,0" Click="BtnMonthly_Click"/>
+                    <Button x:Name="BtnDaily"   Content="يومي"   Style="{StaticResource SubTabBtnActive}" Margin="0,0,12,0" Click="BtnDaily_Click"/>
+                    <Button x:Name="BtnMonthly" Content="شهري"   Style="{StaticResource SubTabBtn}"       Margin="0,0,12,0" Click="BtnMonthly_Click"/>
                     <Button x:Name="BtnYearly"  Content="سنوي"   Style="{StaticResource SubTabBtn}"                         Click="BtnYearly_Click"/>
                 </StackPanel>
 
                 <!-- Date navigation -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="BtnNow" Content="الآن" Style="{StaticResource NowBtn}" Margin="0,0,10,0" Click="BtnNow_Click"/>
+                    <Button x:Name="BtnIncomeArea" Content="منحني" Style="{StaticResource ExportBtn}" Margin="0,0,6,0" Click="BtnIncomeArea_Click"/>
+                    <Button x:Name="BtnIncomeColumns" Content="أعمدة" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnIncomeColumns_Click"/>
+                    <Button x:Name="BtnExportExpensesPdf" Content="تصدير المصاريف PDF" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportExpensesPdf_Click" Visibility="Collapsed"/>
+                    <Button x:Name="BtnExportTreatmentsExcel" Content="تصدير العلاجات Excel" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportTreatmentsExcel_Click"/>
+                    <Button x:Name="BtnExportIncomeExcel" Content="تصدير الدخل Excel" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportIncomeExcel_Click"/>
                     <!-- forward (toward future) -->
                     <Button Content="&#8249;" Style="{StaticResource NavBtn}" Margin="0,0,6,0" Click="BtnNext_Click"/>
                     <TextBlock x:Name="TblDateLabel"
@@ -174,27 +200,24 @@
                                Margin="4,0"/>
                     <!-- back (toward past) -->
                     <Button Content="&#8250;" Style="{StaticResource NavBtn}" Margin="6,0,0,0" Click="BtnPrev_Click"/>
-                    <Button x:Name="BtnExportPdf" Content="تصدير PDF" Style="{StaticResource NowBtn}" Margin="12,0,0,0" Click="BtnExportPdf_Click"/>
-                    <Button x:Name="BtnExportExcel" Content="تصدير Excel" Style="{StaticResource NowBtn}" Margin="8,0,0,0" Click="BtnExportExcel_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- ══ Row 2 — Pie chart + legend ══ -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="24,24,24,24">
+            <Grid Margin="24,24,24,24" FlowDirection="LeftToRight">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Total label above pie + pie canvas -->
-                <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top">
+                <StackPanel Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" FlowDirection="RightToLeft">
 
                     <!-- No data message -->
                     <TextBlock x:Name="TblNoData"
@@ -222,42 +245,44 @@
 
                 </StackPanel>
 
+                <!-- Income period chart -->
+                <Border Grid.Row="2" Grid.Column="0"
+                        x:Name="IncomeChartPanel"
+                        Background="{DynamicResource AppCardBg}"
+                        BorderBrush="{DynamicResource AppBorder}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="18,16"
+                        Margin="0,24,0,0"
+                        VerticalAlignment="Top"
+                        Visibility="Collapsed">
+                    <StackPanel FlowDirection="RightToLeft">
+                        <TextBlock x:Name="IncomeChartTitle" Text="الدخل حسب الفترة"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppTextPrimary}"
+                                   HorizontalAlignment="Right"
+                                   Margin="0,0,0,10"/>
+                        <Canvas x:Name="IncomeChartCanvas"
+                                Width="1100"
+                                Height="360"
+                                HorizontalAlignment="Center"
+                                ClipToBounds="True"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Legend -->
-                <Border Grid.Row="0" Grid.Column="2"
+                <Border Grid.Row="1" Grid.Column="0"
                         Background="{DynamicResource AppCardBg}"
                         BorderBrush="{DynamicResource AppBorder}"
                         BorderThickness="1"
                         CornerRadius="16"
                         Padding="20,16"
-                        Margin="24,0,0,0"
+                        Margin="0,24,0,0"
                         VerticalAlignment="Top"
-                        MinWidth="200">
-                    <StackPanel x:Name="LegendPanel" Orientation="Vertical"/>
-                </Border>
-
-                <Border x:Name="ExpenseDetailsPanel" Grid.Row="0" Grid.Column="0"
-                        Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}"
-                        BorderThickness="1" CornerRadius="16" Padding="18,14" Margin="0,0,24,0"
-                        VerticalAlignment="Top" Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock x:Name="ExpenseDetailsTitle" FontSize="16" FontWeight="Bold"
-                                   Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,10"/>
-                        <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto">
-                            <StackPanel x:Name="ExpenseDetailsItems"/>
-                        </ScrollViewer>
-                    </StackPanel>
-                </Border>
-
-                <Border x:Name="IncomeChartPanel" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                        Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}"
-                        BorderThickness="1" CornerRadius="16" Padding="18,14" Margin="0,24,0,0">
-                    <StackPanel>
-                        <TextBlock Text="تحليل الدخل" FontSize="16" FontWeight="Bold"
-                                   Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
-                        <TextBlock Text="يومي داخل الشهر، أو شهري داخل السنة حسب الفترة المختارة"
-                                   FontSize="12" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right" Margin="0,2,0,8"/>
-                        <Canvas x:Name="IncomeChartCanvas" Height="260" MinWidth="600" FlowDirection="LeftToRight"/>
-                    </StackPanel>
+                        Width="360"
+                        HorizontalAlignment="Center">
+                    <StackPanel x:Name="LegendPanel" Orientation="Vertical" FlowDirection="RightToLeft"/>
                 </Border>
 
             </Grid>

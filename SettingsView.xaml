@@ -6,18 +6,26 @@
              Foreground="{DynamicResource AppTextPrimary}"
              FontFamily="Segoe UI"
              FontSize="14">
-
     <UserControl.Resources>
         <Style x:Key="PanelCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="CornerRadius" Value="18"/>
         </Style>
-
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+        </Style>
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
         <Style x:Key="InputBoxStyle" TargetType="TextBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="14,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
@@ -26,27 +34,35 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
-                            <ScrollViewer x:Name="PART_ContentHost" 
-                                          VerticalAlignment="Center"
-                                          Margin="12,0"/>
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="12,0"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Height" Value="40"/>
+            <Setter Property="Height" Value="44"/>
             <Setter Property="Padding" Value="12,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
+                        <Setter Property="Padding" Value="12,9"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -55,80 +71,58 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="10">
                             <Grid>
-                                <ToggleButton x:Name="ToggleButton" 
-                                              Background="Transparent"
+                                <ToggleButton Background="Transparent"
                                               BorderThickness="0"
-                                              IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                              Focusable="False"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                               ClickMode="Press"/>
-                                <ContentPresenter x:Name="ContentSite" 
-                                                  IsHitTestVisible="False" 
-                                                  Content="{TemplateBinding SelectionBoxItem}"
+                                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
                                                   ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                                  Margin="12,0"
+                                                  Margin="12,0,30,0"
                                                   VerticalAlignment="Center"
-                                                  HorizontalAlignment="Left"/>
-                                <Path x:Name="Arrow"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                <Path Fill="{DynamicResource AppTextSecondary}"
                                       Width="10"
                                       Height="6"
-                                      Fill="{DynamicResource AppTextSecondary}"
-                                      Stretch="Uniform"
                                       Margin="0,0,12,0"
                                       HorizontalAlignment="Right"
                                       VerticalAlignment="Center"
                                       Data="M 0 0 L 10 0 L 5 5 Z"/>
-                                <Popup x:Name="Popup" 
+                                <Popup IsOpen="{TemplateBinding IsDropDownOpen}"
                                        Placement="Bottom"
-                                       IsOpen="{TemplateBinding IsDropDownOpen}"
                                        AllowsTransparency="True"
-                                       Focusable="False"
-                                       PopupAnimation="Slide">
-                                    <Grid x:Name="DropDown" 
-                                          SnapsToDevicePixels="True" 
-                                          MinWidth="{TemplateBinding ActualWidth}"
-                                          MaxHeight="200">
-                                        <Border x:Name="DropDownBorder"
-                                                Background="{DynamicResource AppCardBg}"
-                                                BorderBrush="{DynamicResource AppBorder}"
-                                                BorderThickness="1"
-                                                CornerRadius="10">
-                                            <ScrollViewer Margin="4">
-                                                <ItemsPresenter/>
-                                            </ScrollViewer>
-                                        </Border>
-                                    </Grid>
+                                       Focusable="False">
+                                    <Border Background="{DynamicResource AppCardBg}"
+                                            BorderBrush="{DynamicResource AppBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            MinWidth="{TemplateBinding ActualWidth}">
+                                        <ScrollViewer MaxHeight="200" Margin="4">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Border>
                                 </Popup>
                             </Grid>
                         </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="HasItems" Value="False">
-                                <Setter Property="MinHeight" TargetName="DropDownBorder" Value="95"/>
-                            </Trigger>
-                            <Trigger Property="IsGrouping" Value="True">
-                                <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="42"/>
-            <Setter Property="Padding" Value="24,0"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Padding" Value="22,0"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="#2563EB"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12">
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
@@ -136,185 +130,194 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="DeleteButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Width" Value="38"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="#EF4444"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <TextBlock Text="✕" 
-                                       FontSize="18" 
-                                       FontWeight="Bold"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <TextBlock Text="✕" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsToggleSwitchStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" CornerRadius="12" Background="#CBD5E1" BorderThickness="2" BorderBrush="Transparent">
+                            <Ellipse x:Name="Knob" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#2563EB"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="30">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <!-- Header -->
-        <Border Grid.Row="0" 
-                Style="{StaticResource PanelCardStyle}" 
-                Padding="24,20" 
-                Margin="0,0,0,24">
-            <StackPanel>
-                <TextBlock Text="الإعدادات" 
-                           FontSize="24" 
-                           FontWeight="Bold"
-                           Margin="0,0,0,8"/>
-                <TextBlock Text="إدارة تكاليف العلاجات والخدمات" 
-                           FontSize="14" 
-                           Foreground="{DynamicResource AppTextSecondary}"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Treatment Costs Section -->
-        <Border Grid.Row="1" 
-                Style="{StaticResource PanelCardStyle}" 
-                Padding="24">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Add New Treatment -->
-                <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                    <TextBlock Text="إضافة علاج جديد" 
-                               FontSize="16" 
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,12"/>
-                    
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="100"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBox x:Name="TxtTreatmentName" 
-                                 Grid.Column="0"
-                                 Style="{StaticResource InputBoxStyle}"
-                                 Tag="اسم العلاج"
-                                 Margin="0,0,12,0"/>
-
-                        <TextBox x:Name="TxtTreatmentCost" 
-                                 Grid.Column="1"
-                                 Style="{StaticResource InputBoxStyle}"
-                                 Tag="التكلفة"
-                                 Margin="0,0,12,0"/>
-
-                        <ComboBox x:Name="CmbTreatmentCurrency" 
-                                  Grid.Column="2"
-                                  Width="90"
-                                  Style="{StaticResource ComboBoxStyle}"
-                                  Margin="0,0,12,0">
-                            <ComboBoxItem Content="SYP"/>
-                            <ComboBoxItem Content="USD"/>
-                        </ComboBox>
-
-                        <Button x:Name="BtnAddTreatment" 
-                                Grid.Column="3"
-                                Content="إضافة" 
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="100"
-                                Click="BtnAddTreatment_Click"/>
-                    </Grid>
-                </StackPanel>
-
-                <!-- Treatment List Header -->
-                <Grid Grid.Row="1" Margin="0,0,0,12">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,26,30,30">
+            <Border Style="{StaticResource PanelCardStyle}" Padding="26,22" Margin="0,0,0,20">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="120"/>
-                        <ColumnDefinition Width="100"/>
-                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" 
-                               Text="اسم العلاج" 
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource AppTextSecondary}"/>
-                    <TextBlock Grid.Column="1" 
-                               Text="التكلفة" 
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource AppTextSecondary}"
-                               HorizontalAlignment="Center"/>
-                    <TextBlock Grid.Column="2" 
-                               Text="العملة" 
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource AppTextSecondary}"
-                               HorizontalAlignment="Center"/>
-                    <TextBlock Grid.Column="3" 
-                               Text="" 
-                               FontWeight="SemiBold"/>
+                    <StackPanel>
+                        <TextBlock Text="الإعدادات" FontSize="28" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <TextBlock Text="اضبط القيم التي تؤثر على الحسابات وسير العمل في العيادة" Style="{StaticResource HintStyle}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="#142563EB" CornerRadius="12" Padding="14,10" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" FontSize="20" Foreground="#2563EB" Margin="0,0,8,0"/>
+                            <TextBlock Text="مركز التحكم" FontWeight="SemiBold" Foreground="#2563EB" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
+            </Border>
 
-                <!-- Treatment List -->
-                <ScrollViewer Grid.Row="2" 
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="TreatmentItemsControl">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{DynamicResource AppInputBg}"
-                                        BorderBrush="{DynamicResource AppBorder}"
-                                        BorderThickness="1"
-                                        CornerRadius="10"
-                                        Padding="16,12"
-                                        Margin="0,0,0,8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="60"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0" 
-                                                   Text="{Binding TreatmentName}"
-                                                   VerticalAlignment="Center"/>
-
-                                        <TextBlock Grid.Column="1" 
-                                                   Text="{Binding Cost, StringFormat={}{0:N0}}"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"/>
-
-                                        <TextBlock Grid.Column="2" 
-                                                   Text="{Binding Currency}"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"/>
-
-                                        <Button Grid.Column="3"
-                                                Style="{StaticResource DeleteButtonStyle}"
-                                                Tag="{Binding Id}"
-                                                Click="BtnDeleteTreatment_Click"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="المظهر" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="تفعيل الوضع الداكن للتطبيق." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <ToggleButton x:Name="ThemeToggle" Style="{StaticResource SettingsToggleSwitchStyle}" Checked="ThemeToggle_Checked" Unchecked="ThemeToggle_Unchecked" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="النسخ الاحتياطي" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="استعادة نسخة البيانات من Google Drive." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <Button x:Name="BtnRestoreDrive" Content="استعادة البيانات" Style="{StaticResource PrimaryButtonStyle}" Click="BtnRestoreDrive_Click" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
             </Grid>
-        </Border>
-    </Grid>
+
+            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="كيت الفايلات وسحب العصب" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="عدد الأقنية التي تم عملها بنفس كيت الفايلات في الزيارات المحفوظة." Style="{StaticResource HintStyle}" Margin="0,8,0,8"/>
+                        <TextBlock x:Name="TxtFileKitCanalCount" Text="0 قناة" FontSize="27" FontWeight="Bold" Foreground="#2563EB"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" x:Name="BtnResetFileKitCanals" Content="تصفير عند شراء كيت جديد" Style="{StaticResource PrimaryButtonStyle}" Click="BtnResetFileKitCanals_Click" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.05*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="1.55*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="سعر الصرف" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="القيمة المستخدمة لتحويل الدولار الأمريكي إلى الليرة السورية في الحسابات الجديدة." Style="{StaticResource HintStyle}" Margin="0,8,0,20"/>
+                        <Border Background="#142563EB" CornerRadius="12" Padding="14,12" Margin="0,0,0,18">
+                            <StackPanel>
+                                <TextBlock Text="سعر التحويل الحالي" Style="{StaticResource HintStyle}"/>
+                                <TextBlock x:Name="TxtCurrentExchangeRate" Text="—" FontSize="25" FontWeight="Bold" Foreground="#2563EB" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="1 USD يساوي" FontWeight="SemiBold" Margin="0,0,0,7"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtExchangeRate" Grid.Column="0" Style="{StaticResource InputBoxStyle}"/>
+                            <TextBlock Grid.Column="1" Text="ل.س" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </Grid>
+                        <Button x:Name="BtnSaveExchangeRate" Content="حفظ سعر الصرف" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveExchangeRate_Click" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+                        <TextBlock Text="سيتم تحديث التبويبات المرتبطة تلقائياً بعد الحفظ." Style="{StaticResource HintStyle}" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="تكاليف العلاجات" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Grid.Row="1" Text="أضف الخدمات العلاجية وأسعارها لتظهر بسرعة عند تسجيل الزيارات." Style="{StaticResource HintStyle}" Margin="0,8,0,18"/>
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="92"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtTreatmentName" Grid.Column="0" Style="{StaticResource InputBoxStyle}" ToolTip="اسم العلاج" Margin="0,0,10,0"/>
+                                <TextBox x:Name="TxtTreatmentCost" Grid.Column="1" Style="{StaticResource InputBoxStyle}" ToolTip="التكلفة" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="CmbTreatmentCurrency" Grid.Column="2" Style="{StaticResource ComboBoxStyle}" Margin="0,0,10,0">
+                                    <ComboBoxItem Content="SYP"/>
+                                    <ComboBoxItem Content="USD"/>
+                                </ComboBox>
+                                <Button x:Name="BtnAddTreatment" Grid.Column="3" Content="إضافة" Style="{StaticResource PrimaryButtonStyle}" Click="BtnAddTreatment_Click"/>
+                                <Button x:Name="BtnCancelTreatmentEdit" Grid.Column="4" Content="إلغاء" Style="{StaticResource PrimaryButtonStyle}" Margin="8,0,0,0" Click="BtnCancelTreatmentEdit_Click" Visibility="Collapsed"/>
+                            </Grid>
+                            <Border Grid.Row="2" Background="{DynamicResource AppInputBg}" CornerRadius="10" Padding="12,8">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="TreatmentItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="9" Padding="12,9" Margin="0,0,0,7">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="105"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="40"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding TreatmentName}" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Cost, StringFormat={}{0:N0}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Currency}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                        <Button Grid.Column="3" Content="تعديل السعر" Padding="10,4" Margin="8,0,8,0" Style="{StaticResource PrimaryButtonStyle}" Tag="{Binding Id}" Click="BtnEditTreatment_Click"/>
+                                                        <Button Grid.Column="4" Style="{StaticResource DeleteButtonStyle}" Tag="{Binding Id}" Click="BtnDeleteTreatment_Click"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+            <TextBlock Text="تلميح: غيّر سعر الصرف عند الحاجة فقط؛ القيم المسجلة سابقاً تحتفظ بسعرها وقت الحفظ." Style="{StaticResource HintStyle}" Margin="4,0,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

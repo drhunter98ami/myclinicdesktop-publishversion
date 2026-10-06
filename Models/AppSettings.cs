@@ -14,6 +14,8 @@ namespace MyClinic.Models
         [MaxLength(3)]
         public string DefaultCurrency { get; set; } = "SYP"; // Default currency: USD or SYP
 
+        public int FileKitCanalCount { get; set; }
+
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
     }
 }

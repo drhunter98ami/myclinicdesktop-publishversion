@@ -35,7 +35,7 @@ LocalApplicationData/
 
 # Google credentials
 credentials.json
-token.json
+token.json/
 GoogleDriveToken/
 
 # Output directory

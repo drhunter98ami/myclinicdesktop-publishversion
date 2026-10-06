@@ -37,8 +37,8 @@ namespace MyClinic
         private PatientCardModel? _selectedPatient;
         private bool _hasLoadedData;
         private bool _refreshRequested = true;
+        private long _refreshGeneration;
         private Task? _refreshTask;
-        private int _refreshVersion;
 
         // Debounce search to avoid filtering on every keystroke
         private DispatcherTimer? _searchDebounceTimer;
@@ -47,8 +47,6 @@ namespace MyClinic
         public PatientRecordsView()
         {
             InitializeComponent();
-
-            GlobalEvents.OnPatientRecordAdded += HandlePatientAdded;
 
             PatientsListBox.ItemsSource = _filteredPatients;
             VisitsListBox.ItemsSource = _selectedPatientVisits;
@@ -62,7 +60,6 @@ namespace MyClinic
             // --- الكود الجديد: الاشتراك في أحداث دورة حياة الواجهة ---
             this.Loaded += PatientRecordsView_Loaded;
             this.Unloaded += PatientRecordsView_Unloaded;
-            this.Unloaded += (s, e) => GlobalEvents.OnPatientRecordAdded -= HandlePatientAdded;
             this.IsVisibleChanged += PatientRecordsView_IsVisibleChanged;
             
         }
@@ -80,10 +77,8 @@ namespace MyClinic
         {
             if (this.IsVisible)
             {
-                // Always force the flag: a background task triggered by HandlePatientAdded
-                // may have cleared _refreshRequested while the view was hidden, so without
-                // this line EnsureDataCurrentAsync would skip loading and the new patient
-                // would not appear until the next app restart.
+                // Record a new generation so a load that started before this visibility
+                // change cannot clear the pending refresh request.
                 RequestRefresh();
                 _ = EnsureDataCurrentAsync();
             }
@@ -124,7 +119,7 @@ namespace MyClinic
         public void RequestRefresh()
         {
             _refreshRequested = true;
-            _refreshVersion++;
+            _refreshGeneration++;
         }
 
         public Task EnsureDataCurrentAsync()
@@ -140,7 +135,7 @@ namespace MyClinic
             // Assign _refreshTask BEFORE awaiting so any concurrent caller
             // (e.g. IsVisibleChanged firing while HandlePatientAdded already started
             // a refresh) returns the same task instead of spawning a duplicate.
-            _refreshTask = RefreshDataAsync();
+            _refreshTask = RefreshDataAsync(_refreshGeneration);
             return _refreshTask;
         }
 
@@ -193,23 +188,24 @@ namespace MyClinic
             if (sender is not FrameworkElement { Tag: VisitHistoryItem visit } || _selectedPatient is null)
                 return;
 
-            // Build the view model immediately with whatever is cached — show the modal right away
-            ObservableCollection<VisitAttachmentItem> attachmentCollection = new();
-
-            bool alreadyCached = _attachmentCache.TryGetValue(visit.VisitId, out IReadOnlyList<VisitAttachmentItem>? cachedItems);
-            if (alreadyCached && cachedItems is not null)
+            try
             {
-                foreach (VisitAttachmentItem item in cachedItems)
-                    attachmentCollection.Add(item);
-            }
+                // Build the view model immediately with whatever is cached — show the modal right away
+                ObservableCollection<VisitAttachmentItem> attachmentCollection = new();
 
-            VisitDetailsViewModel viewModel = new()
-            {
+                bool alreadyCached = _attachmentCache.TryGetValue(visit.VisitId, out IReadOnlyList<VisitAttachmentItem>? cachedItems);
+                if (alreadyCached && cachedItems is not null)
+                {
+                    foreach (VisitAttachmentItem item in cachedItems)
+                        attachmentCollection.Add(item);
+                }
+
+                VisitDetailsViewModel viewModel = new()
+                {
                 PatientName    = _selectedPatient.DisplayName,
                 DoctorName     = VisitDoctorName,
                 VisitDateTimeText      = visit.VisitDateTimeText,
                 BloodTypeText          = _selectedPatient.BloodType,
-                DiabetesText           = _selectedPatient.DiabetesLabel,
                 AllergiesText          = _selectedPatient.Allergies,
                 ChronicDiseasesText    = _selectedPatient.ChronicDiseases,
                 SmokingText            = _selectedPatient.SmokingSummary,
@@ -220,6 +216,7 @@ namespace MyClinic
                 RespiratoryRateText    = visit.RespiratoryRateText,
                 WeightText             = visit.WeightText,
                 HeightText             = visit.HeightText,
+                BloodSugarText         = visit.BloodSugarText,
                 BmiText                = visit.BmiText,
                 SymptomsText           = visit.SymptomsText,
                 DiagnosisText          = visit.DiagnosisText,
@@ -228,28 +225,73 @@ namespace MyClinic
                 TreatmentPlanText      = visit.TreatmentPlanText,
                 FinalTreatmentText     = visit.FinalTreatmentText,
                 PrescriptionItems      = visit.PrescriptionItems,
-                SelectedTreatments     = visit.SelectedTreatments,
+                SelectedTreatments     = CreateSafeTreatmentCopies(visit.SelectedTreatments),
                 AttachmentItems        = attachmentCollection
-            };
+                };
 
-            VisitDetailsModal.DataContext = viewModel;
-            ShowVisitDetailsOverlay();
+                VisitDetailsModal.DataContext = viewModel;
+                ShowVisitDetailsOverlay();
 
             // Load attachments on background only if not cached yet
-            if (!alreadyCached && visit.AttachmentPaths.Count > 0)
-            {
-                List<VisitAttachmentItem> items = await Task.Run(
-                    () => LoadAttachmentItems(visit.AttachmentPaths).ToList());
+                if (!alreadyCached && visit.AttachmentPaths.Count > 0)
+                {
+                    List<VisitAttachmentItem> items = await Task.Run(
+                        () => LoadAttachmentItems(visit.AttachmentPaths).ToList());
 
-                _attachmentCache[visit.VisitId] = items;
+                    _attachmentCache[visit.VisitId] = items;
 
                 // Only update if this modal is still the active one
-                if (ReferenceEquals(VisitDetailsModal.DataContext, viewModel))
-                {
-                    foreach (VisitAttachmentItem item in items)
-                        viewModel.AttachmentItems.Add(item);
+                    if (ReferenceEquals(VisitDetailsModal.DataContext, viewModel))
+                    {
+                        foreach (VisitAttachmentItem item in items)
+                            viewModel.AttachmentItems.Add(item);
+                    }
                 }
             }
+            catch (Exception)
+            {
+                HideVisitDetailsOverlay(immediate: true);
+                MessageBox.Show("تعذر فتح تفاصيل الزيارة حالياً. تم تجاهل البيانات غير المكتملة.", "تفاصيل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private static IReadOnlyList<SelectedTreatment> CreateSafeTreatmentCopies(IEnumerable<SelectedTreatment>? source)
+        {
+            if (source is null)
+                return Array.Empty<SelectedTreatment>();
+
+            return source
+                .Where(t => t is not null)
+                .Select(t => new SelectedTreatment
+                {
+                    TreatmentId = t.TreatmentId,
+                    TreatmentName = t.TreatmentName ?? string.Empty,
+                    Cost = t.Cost,
+                    Currency = t.Currency ?? "SYP",
+                    Quantity = t.Quantity,
+                    ToothId = t.ToothId,
+                    CanalCount = t.CanalCount,
+                    Canals = (t.Canals ?? new List<CanalMeasurement>())
+                        .Where(c => c is not null)
+                        .Select(c => new CanalMeasurement { Name = c.Name ?? string.Empty, WorkingLength = c.WorkingLength ?? string.Empty })
+                        .ToList(),
+                    ToothDetails = (t.ToothDetails ?? new List<TreatmentToothDetail>())
+                        .Where(d => d is not null)
+                        .Select(d =>
+                        {
+                            TreatmentToothDetail copy = new()
+                            {
+                                ToothId = d.ToothId,
+                                IsRootCanal = d.IsRootCanal,
+                                CanalCount = d.CanalCount
+                            };
+                            foreach (CanalMeasurement canal in (d.Canals ?? new()).Where(c => c is not null))
+                                copy.Canals.Add(new CanalMeasurement { Name = canal.Name ?? string.Empty, WorkingLength = canal.WorkingLength ?? string.Empty });
+                            return copy;
+                        }).ToList()
+                })
+                .Where(t => !string.IsNullOrWhiteSpace(t.TreatmentName))
+                .ToList();
         }
 
         private void CloseMedicalRecord_Click(object sender, RoutedEventArgs e)
@@ -293,10 +335,10 @@ namespace MyClinic
 
         // ── Data loading ──────────────────────────────────────────────────────────
 
-        private async Task RefreshDataAsync()
+        private async Task RefreshDataAsync(long requestGeneration)
         {
             SetLoadingState(true);
-            int refreshVersionAtStart = _refreshVersion;
+            bool refreshSucceeded = false;
 
             try
             {
@@ -305,12 +347,16 @@ namespace MyClinic
                 _allPatients.Clear();
                 _allPatients.AddRange(loaded);
                 _hasLoadedData     = true;
-                // A new request may have arrived while this query was running.
-                // Keep the flag set so the latest data is loaded once more.
-                _refreshRequested  = _refreshVersion != refreshVersionAtStart;
+                refreshSucceeded   = true;
 
                 ApplyFilters();
                 UpdateSelectedPatientState();
+
+                // Keep a newer request alive if it arrived while this load was running.
+                if (_refreshGeneration == requestGeneration)
+                {
+                    _refreshRequested = false;
+                }
             }
             catch
             {
@@ -320,17 +366,15 @@ namespace MyClinic
                 EmptyStateTitle.Text          = "تعذر تحميل السجلات";
                 EmptyStateDescription.Text    = "حدث خطأ أثناء تحميل بيانات المرضى. حاول فتح السجل مرة أخرى.";
                 EmptyStateCard.Visibility     = Visibility.Visible;
-                _refreshRequested = _refreshVersion != refreshVersionAtStart;
             }
             finally
             {
                 SetLoadingState(false);
                 _refreshTask = null;
 
-                // If the view was refreshed while the previous query was still in
-                // flight, immediately run the pending refresh instead of leaving
-                // the UI with the older result.
-                if (_refreshRequested && IsVisible)
+                // A save/navigation request can arrive while the previous load is in
+                // flight. Start one follow-up load instead of losing that request.
+                if (refreshSucceeded && _refreshRequested && IsVisible)
                 {
                     _ = EnsureDataCurrentAsync();
                 }
@@ -426,7 +470,6 @@ namespace MyClinic
                     Age              = p.Age,
                     Gender           = p.Gender,
                     BloodType        = p.BloodType,
-                    IsDiabetic       = p.IsDiabetic,
                     Allergies        = p.Allergies,
                     ChronicDiseases  = p.ChronicDiseases,
                     IsSmoker         = p.IsSmoker,
@@ -672,7 +715,6 @@ namespace MyClinic
                     existing.Age             ??= v.Patient.Age;
                     existing.Gender          ??= v.Patient.Gender;
                     existing.BloodType       ??= v.Patient.BloodType;
-                    existing.IsDiabetic      = existing.IsDiabetic || v.Patient.IsDiabetic;
                     existing.Allergies       ??= v.Patient.Allergies;
                     existing.ChronicDiseases ??= v.Patient.ChronicDiseases;
                     existing.IsSmoker        = existing.IsSmoker || v.Patient.IsSmoker;
@@ -689,7 +731,6 @@ namespace MyClinic
                     Age              = v.Patient.Age,
                     Gender           = v.Patient.Gender,
                     BloodType        = v.Patient.BloodType,
-                    IsDiabetic       = v.Patient.IsDiabetic,
                     Allergies        = v.Patient.Allergies,
                     ChronicDiseases  = v.Patient.ChronicDiseases,
                     IsSmoker         = v.Patient.IsSmoker,
@@ -711,7 +752,6 @@ namespace MyClinic
             AgeText         = p.Age?.ToString(CultureInfo.CurrentCulture) ?? "--",
             AgeWithUnit     = p.Age.HasValue ? $"{p.Age.Value} سنة" : "العمر غير محدد",
             GenderLabel     = string.IsNullOrWhiteSpace(p.Gender) ? "غير محدد" : p.Gender.Trim(),
-            DiabetesLabel   = p.IsDiabetic ? "مصاب بالسكري" : "غير مصاب بالسكري",
             VisitCount      = p.VisitCount,
             LatestVisitDate = p.LatestVisitDate ?? DateTime.MinValue,
             BloodType       = NormalizeOrFallback(p.BloodType,        "غير محدد"),
@@ -743,8 +783,9 @@ namespace MyClinic
                 FirstNonEmpty(
                     ToLabelValue("خطة العلاج", v.TreatmentPlanNotes),
                     toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الزيارة." : null,
-                    ToLabelValue("الأعراض", v.Symptoms),
+                    ToLabelValue("شكوى المريض", v.Symptoms),
                     ToLabelValue("الضغط", v.BloodPressure),
+                    ToLabelValue("سكر الدم", v.BloodSugar),
                     "لا توجد ملاحظات إضافية."),
                 120);
 
@@ -765,8 +806,9 @@ namespace MyClinic
                 RespiratoryRateText  = FormatMetric(v.RespiratoryRate, "/min"),
                 WeightText           = FormatMetric(v.Weight,         "كغ"),
                 HeightText           = FormatMetric(v.Height,         "سم"),
+                BloodSugarText       = FormatMetric(v.BloodSugar,     "mg/dL"),
                 BmiText              = ComputeBmiText(v.Weight, v.Height),
-                SymptomsText         = NormalizeOrFallback(v.Symptoms,          "لا توجد أعراض مسجلة"),
+                    SymptomsText         = NormalizeOrFallback(v.Symptoms,          "لا توجد شكوى مسجلة"),
                 DiagnosisText        = NormalizeOrFallback(v.Diagnosis,         "لا يوجد تشخيص مسجل"),
                 ChartModeText        = FormatChartMode(v.ChartMode),
                 ToothIds             = teeth,
@@ -785,10 +827,33 @@ namespace MyClinic
             try
             {
                 var items = JsonSerializer.Deserialize<List<SelectedTreatment>>(json);
-                return items?.Where(t => !string.IsNullOrWhiteSpace(t.TreatmentName)).ToList()
+                if (items is null)
+                    return Array.Empty<SelectedTreatment>();
+
+                // Older visits may contain null collection values. Normalize them
+                // before the details modal binds to computed display properties.
+                items.RemoveAll(t => t is null);
+                foreach (SelectedTreatment treatment in items)
+                {
+                    treatment.Canals ??= new List<CanalMeasurement>();
+                    treatment.ToothDetails ??= new List<TreatmentToothDetail>();
+                    treatment.Canals.RemoveAll(c => c is null);
+                    treatment.ToothDetails.RemoveAll(t => t is null);
+                    foreach (TreatmentToothDetail tooth in treatment.ToothDetails)
+                    {
+                        tooth.Canals ??= new ObservableCollection<CanalMeasurement>();
+                        for (int i = tooth.Canals.Count - 1; i >= 0; i--)
+                        {
+                            if (tooth.Canals[i] is null)
+                                tooth.Canals.RemoveAt(i);
+                        }
+                    }
+                }
+
+                return items.Where(t => !string.IsNullOrWhiteSpace(t.TreatmentName)).ToList()
                        ?? (IReadOnlyList<SelectedTreatment>)Array.Empty<SelectedTreatment>();
             }
-            catch (JsonException)
+            catch (Exception)
             {
                 return Array.Empty<SelectedTreatment>();
             }
@@ -985,7 +1050,6 @@ namespace MyClinic
             public int?     Age              { get; set; }
             public string?  Gender           { get; set; }
             public string?  BloodType        { get; set; }
-            public bool     IsDiabetic       { get; set; }
             public bool     IsSmoker         { get; set; }
             public string?  SmokingType      { get; set; }
             public string?  SmokingFrequency { get; set; }
@@ -1006,7 +1070,6 @@ namespace MyClinic
         public string   AgeText         { get; init; } = "--";
         public string   AgeWithUnit     { get; init; } = "العمر غير محدد";
         public string   GenderLabel     { get; init; } = "غير محدد";
-        public string   DiabetesLabel   { get; init; } = "غير مصاب بالسكري";
         public int      VisitCount      { get; init; }
         public DateTime LatestVisitDate { get; init; }
         public string   BloodType       { get; init; } = "غير محدد";
@@ -1035,8 +1098,9 @@ namespace MyClinic
         public string   RespiratoryRateText { get; init; } = "--";
         public string   WeightText          { get; init; } = "--";
         public string   HeightText          { get; init; } = "--";
+        public string   BloodSugarText      { get; init; } = "--";
         public string   BmiText             { get; init; } = "--";
-        public string   SymptomsText        { get; init; } = "لا توجد أعراض مسجلة";
+        public string   SymptomsText        { get; init; } = "لا توجد شكوى مسجلة";
         public string   DiagnosisText       { get; init; } = "لا يوجد تشخيص مسجل";
         public string   ChartModeText       { get; init; } = "بالغين (Adult)";
         public IReadOnlyList<string>                  ToothIds          { get; init; } = Array.Empty<string>();
@@ -1054,7 +1118,6 @@ namespace MyClinic
         public string DoctorName            { get; init; } = string.Empty;
         public string VisitDateTimeText     { get; init; } = string.Empty;
         public string BloodTypeText         { get; init; } = "غير محدد";
-        public string DiabetesText          { get; init; } = "غير مصاب بالسكري";
         public string AllergiesText         { get; init; } = "غير محددة";
         public string ChronicDiseasesText   { get; init; } = "غير محددة";
         public string SmokingText           { get; init; } = "غير مدخن";
@@ -1065,8 +1128,9 @@ namespace MyClinic
         public string RespiratoryRateText   { get; init; } = "--";
         public string WeightText            { get; init; } = "--";
         public string HeightText            { get; init; } = "--";
+        public string BloodSugarText        { get; init; } = "--";
         public string BmiText               { get; init; } = "--";
-        public string SymptomsText          { get; init; } = "لا توجد أعراض مسجلة";
+        public string SymptomsText          { get; init; } = "لا توجد شكوى مسجلة";
         public string DiagnosisText         { get; init; } = "لا يوجد تشخيص مسجل";
         public string DentalChartCategoryText { get; init; } = "بالغين (Adult)";
         public IReadOnlyList<string>                  Teeth             { get; init; } = Array.Empty<string>();

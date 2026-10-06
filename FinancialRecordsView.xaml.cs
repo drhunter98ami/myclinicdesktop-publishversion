@@ -143,6 +143,9 @@ namespace MyClinic
                         UsdToSypRateSnapshot = visit.UsdToSypRateSnapshot
                     }).ToList();
 
+                    foreach (var visit in visits)
+                        visit.SetCostAdjustment(CalculateAutomaticTreatmentCost(visit.SelectedTreatmentsJson, visit.UsdToSypRateSnapshot));
+
                     _allVisits.AddRange(visits);
 
                     List<ExpenseEntry> loadedExpenses = await context.Expenses
@@ -552,6 +555,9 @@ namespace MyClinic
                         allocations = AllocatePayment(queue, cumulativePaidBefore, visit.TodayPaid);
                     }
 
+                    if (allocations.Count > 0)
+                        allocations[0].SetAdjustment(visit.ForgivenessAmount);
+
                     return new IncomeRowModel
                     {
                         VisitId = visit.VisitId,
@@ -562,7 +568,8 @@ namespace MyClinic
                         RawAmount = visit.TodayPaid,
                         PaidAmountText = hasPaid
                             ? "+" + FormatMoneyCompact(visit.TodayPaid)
-                            : FormatMoneyCompact(visit.CurrentCost),
+                            : FormatMoneyCompact(visit.AutomaticCost > 0 ? visit.AutomaticCost : visit.CurrentCost),
+                        AdjustmentText = FormatCostAdjustment(visit.ForgivenessAmount),
                         PaidAmountBrush = hasPaid
                             ? MakeBrush("#10B981")   // green – payment received
                             : MakeBrush("#F59E0B"),  // amber – billed, not yet paid
@@ -702,8 +709,21 @@ namespace MyClinic
                     .GroupBy(v => v.PatientId)
                     .Select(g => {
                         var patient = g.First().Patient!;
-                        double totalPositiveCost = g.Where(v => v.CurrentCost > 0).Sum(v => v.CurrentCost);
-                        double totalForgiven = g.Where(v => v.CurrentCost < 0).Sum(v => Math.Abs(v.CurrentCost));
+                        var snapshots = g.Select(v =>
+                        {
+                            var snapshot = new VisitFinanceSnapshot
+                            {
+                                CurrentCost = v.CurrentCost,
+                                TodayPaid = v.TodayPaid,
+                                VisitDate = v.VisitDate,
+                                SelectedTreatmentsJson = v.SelectedTreatmentsJson,
+                                UsdToSypRateSnapshot = v.UsdToSypRateSnapshot
+                            };
+                            snapshot.SetCostAdjustment(CalculateAutomaticTreatmentCost(snapshot.SelectedTreatmentsJson, snapshot.UsdToSypRateSnapshot));
+                            return snapshot;
+                        }).ToList();
+                        double totalPositiveCost = snapshots.Sum(v => v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost));
+                        double totalForgiven = snapshots.Sum(v => v.ForgivenessAmount);
                         double totalPaid = g.Sum(v => v.TodayPaid);
                         
                         double remaining = Math.Round(totalPositiveCost - totalPaid - totalForgiven, 2);
@@ -711,9 +731,10 @@ namespace MyClinic
                         double runningBalance = 0;
                         DateTime? activeDebtStartDate = null;
 
-                        foreach (var v in g.OrderBy(visit => visit.VisitDate))
+                        foreach (var v in snapshots.OrderBy(visit => visit.VisitDate))
                         {
-                            double visitImpact = v.CurrentCost - v.TodayPaid;
+                            double visitImpact = (v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost))
+                                - v.ForgivenessAmount - v.TodayPaid;
                             runningBalance = Math.Round(runningBalance + visitImpact, 2);
 
                             if (runningBalance > 0)
@@ -758,6 +779,7 @@ namespace MyClinic
 
                 ReplaceCollection(_unpaidAccounts, unpaidList);
                 EmptyUnpaidText.Visibility = _unpaidAccounts.Any() ? Visibility.Collapsed : Visibility.Visible;
+                TxtUnpaidTotal.Text = $"الإجمالي: {_unpaidAccounts.Sum(u => u.RemainingAmount).ToString("N0", CultureInfo.CurrentCulture)} ل.س";
             }
             catch (Exception)
             {
@@ -856,8 +878,21 @@ namespace MyClinic
                     .OrderByDescending(v => v.VisitDate)
                     .ToListAsync();
 
-                double totalCost = dbVisits.Where(v => v.CurrentCost > 0).Sum(v => v.CurrentCost);
-                double totalForgiven = dbVisits.Where(v => v.CurrentCost < 0).Sum(v => Math.Abs(v.CurrentCost));
+                var visitAdjustments = dbVisits.Select(v =>
+                {
+                    var automaticCost = CalculateAutomaticTreatmentCost(v.SelectedTreatmentsJson, v.UsdToSypRateSnapshot);
+                    return new
+                    {
+                        Visit = v,
+                        AutomaticCost = automaticCost,
+                        Forgiveness = automaticCost > 0
+                            ? Math.Max(0, automaticCost - v.CurrentCost)
+                            : Math.Max(0, -v.CurrentCost),
+                    };
+                }).ToList();
+
+                double totalCost = visitAdjustments.Sum(x => x.AutomaticCost > 0 ? Math.Max(x.AutomaticCost, x.Visit.CurrentCost) : Math.Max(0, x.Visit.CurrentCost));
+                double totalForgiven = visitAdjustments.Sum(x => x.Forgiveness);
                 double totalPaid = dbVisits.Sum(v => v.TodayPaid);
                 double totalRemaining = totalCost - totalPaid - totalForgiven;
 
@@ -866,13 +901,24 @@ namespace MyClinic
                 TxtPatientTotalForgiven.Text = $"إجمالي المسامحة: {FormatMoneyCompact(totalForgiven)}";
                 TxtPatientTotalRemaining.Text = $"المتبقي: {FormatMoneyCompact(totalRemaining)}";
 
-                var history = dbVisits.Select(v => new PatientHistoryModel
+                // Use the same FIFO payment allocation as the income list. The
+                // patient-history details must describe the amount paid by this
+                // visit, not the full cost of every treatment in the visit.
+                var patientVisitsForAllocation = dbVisits
+                    .OrderBy(v => v.VisitDate)
+                    .ToList();
+
+                var history = visitAdjustments.Select(x => new PatientHistoryModel
                 {
-                    DateText = v.VisitDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                    TimeText = v.VisitDate.ToString("hh:mm tt", CultureInfo.InvariantCulture),
-                    CostText = v.CurrentCost < 0 ? $"مسامحة: {FormatMoneyCompact(Math.Abs(v.CurrentCost))}" : FormatMoney(v.CurrentCost),
-                    CostColor = v.CurrentCost < 0 ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")) : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444")),
-                    PaidText = FormatMoney(v.TodayPaid)
+                    VisitId = x.Visit.Id,
+                    DateText = x.Visit.VisitDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+                    TimeText = x.Visit.VisitDate.ToString("hh:mm tt", CultureInfo.InvariantCulture),
+                    CostText = FormatMoney(x.Visit.CurrentCost),
+                    CostColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444")),
+                    ForgivenessText = x.Forgiveness > 0.009 ? FormatMoneyCompact(x.Forgiveness) : string.Empty,
+                    ForgivenessColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
+                    PaidText = FormatMoney(x.Visit.TodayPaid),
+                    AllocatedTreatments = BuildPaymentDetails(patientVisitsForAllocation, x.Visit, x.Forgiveness)
                 }).ToList();
 
                 ReplaceCollection(_patientHistory, history);
@@ -989,6 +1035,20 @@ namespace MyClinic
             IncomeTreatmentsOverlay.Visibility = Visibility.Visible;
         }
 
+        private void BtnPatientHistoryDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: PatientHistoryModel row })
+                return;
+
+            TxtIncomeTreatmentsPatient.Text = TxtPatientSearchInput.Text;
+            TxtIncomeTreatmentsDate.Text = $"{row.DateText}  {row.TimeText}";
+
+            IncomeTreatmentsItemsControl.ItemsSource = row.AllocatedTreatments;
+            IncomeTreatmentsItemsControl.Visibility = row.HasAllocatedTreatments ? Visibility.Visible : Visibility.Collapsed;
+            EmptyIncomeTreatmentsText.Visibility = row.HasAllocatedTreatments ? Visibility.Collapsed : Visibility.Visible;
+            IncomeTreatmentsOverlay.Visibility = Visibility.Visible;
+        }
+
         private void BtnCloseIncomeTreatmentsOverlay_Click(object sender, RoutedEventArgs e)
         {
             IncomeTreatmentsOverlay.Visibility = Visibility.Collapsed;
@@ -1030,7 +1090,111 @@ namespace MyClinic
             return amount.ToString("0.##", CultureInfo.CurrentCulture);
         }
 
+        private static IReadOnlyList<AllocatedTreatmentLine> BuildPaymentDetails(
+            IReadOnlyList<Visit> patientVisits,
+            Visit visit,
+            double forgiveness)
+        {
+            List<AllocatedTreatmentLine> lines;
+
+            if (visit.TodayPaid > 0.009)
+            {
+                var queue = new List<(string Name, double TotalCostSyp)>();
+                foreach (var patientVisit in patientVisits)
+                {
+                    foreach (var treatment in ParseSelectedTreatments(patientVisit.SelectedTreatmentsJson))
+                    {
+                        double cost = (double)treatment.Cost;
+                        if (treatment.Currency == "USD")
+                            cost *= patientVisit.UsdToSypRateSnapshot > 0 ? patientVisit.UsdToSypRateSnapshot : 15000;
+                        cost *= Math.Max(1, treatment.Quantity);
+                        if (cost > 0.009)
+                            queue.Add((treatment.TreatmentName, cost));
+                    }
+                }
+
+                double cumulativePaidBefore = patientVisits
+                    .Where(v => v.VisitDate < visit.VisitDate)
+                    .Sum(v => v.TodayPaid);
+                double cumulativePaidAfter = cumulativePaidBefore + visit.TodayPaid;
+                double runningCost = 0;
+                lines = new List<AllocatedTreatmentLine>();
+
+                foreach (var (name, totalCost) in queue)
+                {
+                    double treatmentStart = runningCost;
+                    double treatmentEnd = runningCost + totalCost;
+                    runningCost = treatmentEnd;
+
+                    if (treatmentEnd <= cumulativePaidBefore) continue;
+                    if (treatmentStart >= cumulativePaidAfter) break;
+
+                    double allocated = Math.Min(treatmentEnd, cumulativePaidAfter)
+                                     - Math.Max(treatmentStart, cumulativePaidBefore);
+                    if (allocated > 0.009)
+                    {
+                        lines.Add(new AllocatedTreatmentLine
+                        {
+                            TreatmentName = name,
+                            Currency = "ل.س",
+                            AllocatedAmount = allocated,
+                            TreatmentTotal = totalCost
+                        });
+                    }
+                }
+            }
+            else
+            {
+                // Keep the same billing-only behavior as the income details.
+                lines = ParseSelectedTreatments(visit.SelectedTreatmentsJson)
+                    .Select(t =>
+                    {
+                        double cost = (double)t.Cost;
+                        if (t.Currency == "USD")
+                            cost *= visit.UsdToSypRateSnapshot > 0 ? visit.UsdToSypRateSnapshot : 15000;
+                        cost *= Math.Max(1, t.Quantity);
+                        return new AllocatedTreatmentLine
+                        {
+                            TreatmentName = t.TreatmentName,
+                            Currency = "ل.س",
+                            AllocatedAmount = cost,
+                            TreatmentTotal = cost
+                        };
+                    })
+                    .Where(line => line.TreatmentTotal > 0.009)
+                    .ToList();
+            }
+
+            if (lines.Count > 0)
+                lines[0].SetAdjustment(forgiveness);
+            return lines;
+        }
+
         private enum FinancialRangeMode { Day, Month, Year }
+
+        private static double CalculateAutomaticTreatmentCost(string? selectedTreatmentsJson, double usdToSypRate)
+        {
+            if (string.IsNullOrWhiteSpace(selectedTreatmentsJson)) return 0;
+
+            double total = 0;
+            foreach (var treatment in ParseSelectedTreatments(selectedTreatmentsJson))
+            {
+                double cost = (double)treatment.Cost;
+                if (treatment.Currency == "USD")
+                    cost *= usdToSypRate > 0 ? usdToSypRate : 15000;
+
+                total += cost * Math.Max(1, treatment.Quantity);
+            }
+
+            return Math.Round(total, 2);
+        }
+
+        private static string FormatCostAdjustment(double forgiveness)
+        {
+            if (forgiveness > 0.009)
+                return $"\nمسامحة: {FormatMoneyCompact(forgiveness)}";
+            return string.Empty;
+        }
 
         private sealed class VisitFinanceSnapshot
         {
@@ -1049,6 +1213,16 @@ namespace MyClinic
             /// not the current rate.
             /// </summary>
             public double UsdToSypRateSnapshot { get; init; } = 15000;
+            public double AutomaticCost { get; private set; }
+            public double ForgivenessAmount { get; private set; }
+
+            public void SetCostAdjustment(double automaticCost)
+            {
+                AutomaticCost = automaticCost;
+                ForgivenessAmount = automaticCost > 0
+                    ? Math.Max(0, automaticCost - CurrentCost)
+                    : Math.Max(0, -CurrentCost); // legacy standalone forgiveness entry
+            }
         }
 
         private sealed class ExpenseSnapshot
@@ -1068,6 +1242,17 @@ namespace MyClinic
             public string Currency        { get; init; } = string.Empty;
             public double AllocatedAmount { get; init; }   // amount this payment covers for this treatment
             public double TreatmentTotal  { get; init; }   // full cost of the treatment
+            public string AdjustmentText { get; private set; } = string.Empty;
+            public Brush AdjustmentBrush { get; private set; } = Brushes.Transparent;
+
+            public void SetAdjustment(double forgiveness)
+            {
+                if (forgiveness > 0.009)
+                {
+                    AdjustmentText = $"مسامحة\n{FormatMoneyCompact(forgiveness)}";
+                    AdjustmentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B"));
+                }
+            }
 
             /// <summary>
             /// "50,000 / 200,000 ل.س" when partial; "200,000 ل.س" when fully covered.
@@ -1086,6 +1271,7 @@ namespace MyClinic
             public string PatientName { get; init; } = string.Empty;
             public string PhoneNumber { get; init; } = string.Empty;
             public string PaidAmountText { get; init; } = string.Empty;
+            public string AdjustmentText { get; init; } = string.Empty;
             public Brush PaidAmountBrush { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
             public double RawAmount { get; init; }
             public IReadOnlyList<AllocatedTreatmentLine> AllocatedTreatments { get; init; } = Array.Empty<AllocatedTreatmentLine>();
@@ -1117,11 +1303,16 @@ namespace MyClinic
 
         public sealed class PatientHistoryModel
         {
+            public int VisitId { get; init; }
             public string DateText { get; init; } = string.Empty;
             public string TimeText { get; init; } = string.Empty;
             public string CostText { get; init; } = string.Empty;
             public SolidColorBrush CostColor { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
+            public string ForgivenessText { get; init; } = string.Empty;
+            public SolidColorBrush ForgivenessColor { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B"));
             public string PaidText { get; init; } = string.Empty;
+            public IReadOnlyList<AllocatedTreatmentLine> AllocatedTreatments { get; init; } = Array.Empty<AllocatedTreatmentLine>();
+            public bool HasAllocatedTreatments => AllocatedTreatments.Count > 0;
         }
 
         public sealed class UnpaidAccountModel

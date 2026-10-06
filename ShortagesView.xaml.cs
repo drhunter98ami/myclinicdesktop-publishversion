@@ -86,8 +86,8 @@ namespace MyClinic
 
         private void UpdateTotals()
         {
-            decimal urgentTotal = UrgentItems.Sum(i => ConvertToSyp(i.Price, i.Currency));
-            decimal nonUrgentTotal = NonUrgentItems.Sum(i => ConvertToSyp(i.Price, i.Currency));
+            decimal urgentTotal = UrgentItems.Sum(i => ConvertToSyp(i.Price, i.Currency) * i.Quantity);
+            decimal nonUrgentTotal = NonUrgentItems.Sum(i => ConvertToSyp(i.Price, i.Currency) * i.Quantity);
 
             TxtUrgentTotal.Text = $"{urgentTotal.ToString("N0", CultureInfo.CurrentCulture)} ل.س";
             TxtNonUrgentTotal.Text = $"{nonUrgentTotal.ToString("N0", CultureInfo.CurrentCulture)} ل.س";
@@ -95,7 +95,7 @@ namespace MyClinic
 
         private void BtnAddUrgent_Click(object sender, RoutedEventArgs e)
         {
-            if (TryAddShortage(TxtUrgentInput, TxtUrgentPrice, CmbUrgentCurrency, isUrgent: true, out ShortageRowModel? row))
+            if (TryAddShortage(TxtUrgentInput, TxtUrgentPrice, TxtUrgentQuantity, CmbUrgentCurrency, isUrgent: true, out ShortageRowModel? row))
             {
                 UrgentItems.Add(row);
             }
@@ -109,7 +109,7 @@ namespace MyClinic
 
         private void BtnAddNonUrgent_Click(object sender, RoutedEventArgs e)
         {
-            if (TryAddShortage(TxtNonUrgentInput, TxtNonUrgentPrice, CmbNonUrgentCurrency, isUrgent: false, out ShortageRowModel? row))
+            if (TryAddShortage(TxtNonUrgentInput, TxtNonUrgentPrice, TxtNonUrgentQuantity, CmbNonUrgentCurrency, isUrgent: false, out ShortageRowModel? row))
             {
                 NonUrgentItems.Add(row);
             }
@@ -121,7 +121,7 @@ namespace MyClinic
                 BtnAddNonUrgent_Click(sender, e);
         }
 
-        private bool TryAddShortage(TextBox input, TextBox priceInput, ComboBox currencyCombo, bool isUrgent, out ShortageRowModel? row)
+        private bool TryAddShortage(TextBox input, TextBox priceInput, TextBox quantityInput, ComboBox currencyCombo, bool isUrgent, out ShortageRowModel? row)
         {
             row = null;
 
@@ -138,6 +138,14 @@ namespace MyClinic
                 return false;
             }
 
+            int quantity = ParseQuantity(quantityInput.Text);
+            if (quantity < 1)
+            {
+                MessageBox.Show("يرجى إدخال عدد صحيح أكبر من صفر.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                quantityInput.Focus();
+                return false;
+            }
+
             string currency = (currencyCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "SYP";
 
             try
@@ -148,6 +156,7 @@ namespace MyClinic
                     Item = text,
                     IsUrgent = isUrgent,
                     Price = price,
+                    Quantity = quantity,
                     Currency = currency,
                     CreatedAt = DateTime.Now
                 };
@@ -158,6 +167,7 @@ namespace MyClinic
 
                 input.Clear();
                 priceInput.Clear();
+                quantityInput.Text = "1";
             }
             catch (Exception ex)
             {
@@ -205,6 +215,7 @@ namespace MyClinic
                 _editingItem = item;
                 TxtEditItemName.Text = item.Item;
                 TxtEditPrice.Text = item.Price.ToString("0.##", CultureInfo.CurrentCulture);
+                TxtEditQuantity.Text = item.Quantity.ToString(CultureInfo.CurrentCulture);
                 CmbEditCurrency.SelectedIndex = item.Currency == "USD" ? 0 : 1;
                 EditPriceDialogOverlay.Visibility = Visibility.Visible;
                 TxtEditPrice.Focus();
@@ -236,6 +247,14 @@ namespace MyClinic
                 return;
             }
 
+            int newQuantity = ParseQuantity(TxtEditQuantity.Text);
+            if (newQuantity < 1)
+            {
+                MessageBox.Show("يرجى إدخال عدد صحيح أكبر من صفر.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtEditQuantity.Focus();
+                return;
+            }
+
             string newCurrency = (CmbEditCurrency.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "SYP";
 
             try
@@ -245,6 +264,7 @@ namespace MyClinic
                 if (shortage != null)
                 {
                     shortage.Price = newPrice;
+                    shortage.Quantity = newQuantity;
                     shortage.Currency = newCurrency;
                     context.SaveChanges();
 
@@ -277,7 +297,7 @@ namespace MyClinic
         {
             if (sender is Button btn && btn.CommandParameter is ShortageRowModel item)
             {
-                decimal amountInSyp = ConvertToSyp(item.Price, item.Currency);
+                decimal amountInSyp = ConvertToSyp(item.Price, item.Currency) * item.Quantity;
 
                 try
                 {
@@ -346,19 +366,34 @@ namespace MyClinic
 
         private static ShortageRowModel MapRow(Shortage s)
         {
+            int quantity = Math.Max(1, s.Quantity);
             string priceText = s.Price == 0
-                ? "بدون سعر"
-                : $"{s.Price.ToString("0.##", CultureInfo.CurrentCulture)} {s.Currency}";
+                ? $"العدد: {quantity} • بدون سعر"
+                : $"{s.Price.ToString("0.##", CultureInfo.CurrentCulture)} {s.Currency} × {quantity} = {(s.Price * quantity).ToString("0.##", CultureInfo.CurrentCulture)} {s.Currency}";
 
             return new ShortageRowModel
             {
                 Id = s.Id,
                 Item = s.Item,
                 Price = s.Price,
+                Quantity = quantity,
                 Currency = s.Currency,
                 PriceText = priceText,
                 CurrencyBadge = s.Currency
             };
+        }
+
+        private static int ParseQuantity(string? text)
+        {
+            string value = text?.Trim() ?? string.Empty;
+            if (value.Length == 0)
+            {
+                return 1;
+            }
+
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out int quantity)
+                ? quantity
+                : 0;
         }
     }
 
@@ -369,6 +404,7 @@ namespace MyClinic
         public int Id { get; init; }
         public string Item { get; init; } = string.Empty;
         public decimal Price { get; init; }
+        public int Quantity { get; init; } = 1;
         public string Currency { get; init; } = "SYP";
         public string PriceText
         {

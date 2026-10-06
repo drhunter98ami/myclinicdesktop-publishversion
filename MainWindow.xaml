@@ -134,6 +134,10 @@
                                 </Image>
                                 <TextBlock Text="عيادتي" Foreground="White" FontSize="26" FontWeight="Bold" VerticalAlignment="Center"/>
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,0">
+                                <Ellipse x:Name="ConnectionStatusDot" Width="8" Height="8" Fill="#00D26A" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="TxtConnectionStatus" Text="جارٍ التحقق من الاتصال..." Foreground="#A0AAB5" FontSize="13" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <Button Name="BtnDashboard" Content="الرئيسية" Style="{StaticResource SidebarActiveButton}" Click="BtnDashboard_Click"/>
@@ -155,7 +159,6 @@
                         
                         <Border Margin="15,20,15,5" Height="1" Background="#334155"/>
                         <Button Name="BtnSyncDrive" Content="مزامنة مع Google Drive" Style="{StaticResource SidebarButton}" Click="BtnSyncDrive_Click"/>
-                        <Button Name="BtnRestoreDrive" Content="استعادة البيانات" Style="{StaticResource SidebarButton}" Click="BtnRestoreDrive_Click"/>
 
                         <Border Margin="15,10,15,5" Height="1" Background="#334155"/>
                         
@@ -178,44 +181,12 @@
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,20">
-                    <!-- Dark Mode Toggle -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
-                        <TextBlock Text="الوضع الداكن" Foreground="#A0AAB5" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <ToggleButton x:Name="ThemeToggle" Style="{StaticResource ToggleSwitchStyle}" Checked="ThemeToggle_Checked" Unchecked="ThemeToggle_Unchecked"/>
-                    </StackPanel>
-
                     <!-- App Version -->
                     <TextBlock x:Name="TxtCurrentVersion" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
-                    <TextBlock Text="للتواصل مع المطور (د. احمد خليف)" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-                    <TextBlock Text="واتساب: +963935606912" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" Margin="30">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Border x:Name="UpdateBanner" Grid.Row="0" Visibility="Collapsed" Background="#E8F1FF" BorderBrush="#93C5FD" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="يتوفر تحديث جديد" Foreground="#1E3A8A" FontSize="16" FontWeight="Bold"/>
-                        <TextBlock x:Name="TxtUpdateMessage" Foreground="#1E40AF" FontSize="13" Margin="0,4,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" FlowDirection="LeftToRight">
-                        <Button x:Name="BtnDownloadUpdate" Content="تحميل التحديث" Click="BtnDownloadUpdate_Click" Background="#2563EB" Foreground="White" BorderThickness="0" Padding="18,9" Margin="12,0,0,0" Style="{StaticResource RoundedButtonStyle}"/>
-                        <Button Content="إخفاء" Click="BtnDismissUpdate_Click" Background="Transparent" Foreground="#1E40AF" BorderThickness="0" Padding="10,9" Margin="4,0,0,0" Style="{StaticResource RoundedButtonStyle}"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <ContentControl x:Name="MainContent" Grid.Row="1"/>
-        </Grid>
+        <ContentControl x:Name="MainContent" Grid.Column="1" Margin="30"/>
     </Grid>
 </Window>

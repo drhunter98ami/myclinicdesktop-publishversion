@@ -238,15 +238,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="CalendarHeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-        </Style>
-
         <!-- ============================================== -->
         <!-- أنماط الأزرار والنصوص العامة -->
         <!-- ============================================== -->
@@ -322,14 +313,26 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtWelcome" Foreground="White" FontSize="30" FontWeight="Bold"/>
+                    <TextBlock x:Name="TxtWelcome" Text="أهلاً بك" Foreground="White" FontSize="30" FontWeight="Bold"/>
                     <TextBlock Text="رتّب المواعيد القادمة بسرعة واحفظ بيانات المراجعين في مكان واحد." Foreground="#DDE7FF" FontSize="15" Margin="0,8,0,0"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" Width="245" Margin="24,0,24,0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="عدد القنوات التي تم إنجازها بنفس كيت الفايلات" Foreground="White" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Right"/>
+                    <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Border Background="White" CornerRadius="8" Height="38" Width="95">
+                            <TextBox x:Name="TxtFileKitCanalCount" Text="0" TextAlignment="Center" VerticalContentAlignment="Center" Foreground="#13284A" FontSize="17" FontWeight="Bold" MaxLength="4" TextChanged="TxtFileKitCanalCount_TextChanged" PreviewMouseLeftButtonDown="TxtFileKitCanalCount_PreviewMouseLeftButtonDown"/>
+                        </Border>
+                        <Button Content="↺" Width="38" Height="38" Margin="8,0,0,0" Padding="0" FontSize="18" ToolTip="تصفير العداد عند شراء كيت جديد" Click="BtnResetFileKitCanalCount_Click" Style="{StaticResource RoundedButtonStyle}" Background="#153DA7" Foreground="White"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtFileKitWarning" Text="انتهت صلاحية كيت الفايلات، يرجى تغييرها" Foreground="#FEE2E2" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Right" Margin="0,6,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                     <Button Name="BtnAddPatient" Content="+ إضافة مريض" Width="150" Height="45" Background="White" Foreground="#235DF6" FontSize="16" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddPatient_Click"/>
                     <Button Name="BtnAddAppointment" Content="+ إضافة موعد جديد" Width="170" Height="45" Background="#153DA7" Foreground="White" FontSize="15" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointment_Click"/>
                 </StackPanel>
@@ -364,7 +367,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="المواعيد" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,5"/>
-                            <TextBlock Text="اعرض مواعيد الشهر كاملة أو راجع مواعيد يوم محدد." FontSize="13" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Text="بطاقات المواعيد تعرض الاسم، الهاتف، السبب، وتوقيت الحجز." FontSize="13" Foreground="{DynamicResource AppTextSecondary}"/>
                         </StackPanel>
 
                         <!-- البحث التلقائي -->
@@ -402,19 +405,6 @@
                             <DatePicker x:Name="DpAppointmentsFilter" Width="140" Height="32" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0" Background="Transparent" SelectedDateChanged="DpAppointmentsFilter_SelectedDateChanged" CalendarOpened="DpAppointmentsFilter_CalendarOpened" CalendarClosed="DpAppointmentsFilter_CalendarClosed"/>
                         </Border>
 
-                        <Border x:Name="MonthlyNavigationPanel" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Background="{DynamicResource AppInputBg}" Padding="4" Margin="0,0,12,0" Visibility="Collapsed">
-                            <Grid Width="190" Height="36">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="36"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="36"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="‹" FontSize="22" Background="Transparent" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0" Cursor="Hand" Click="BtnNextMonth_Click"/>
-                                <TextBlock x:Name="TxtCurrentMonth" Grid.Column="1" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
-                                <Button Grid.Column="2" Content="›" FontSize="22" Background="Transparent" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0" Cursor="Hand" Click="BtnPreviousMonth_Click"/>
-                            </Grid>
-                        </Border>
-
                         <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="2">
                             <StackPanel Orientation="Horizontal">
                                 <Button x:Name="BtnMonthlyView" Content="شهري" Style="{StaticResource RangeButtonStyle}" Width="70" Click="BtnMonthlyView_Click"/>
@@ -424,66 +414,11 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- التقويم الشهري وبطاقات العرض اليومي -->
+                <!-- شبكة البطاقات -->
                 <Grid Grid.Row="1">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer x:Name="DailyAppointmentsPanel" VerticalScrollBarVisibility="Auto">
                         <Grid>
-                            <Grid x:Name="MonthlyCalendarPanel" Visibility="Collapsed">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                <UniformGrid Grid.Row="0" Columns="7" Margin="0,0,0,8">
-                                    <TextBlock Text="الأحد" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="الإثنين" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="الثلاثاء" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="الأربعاء" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="الخميس" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="الجمعة" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                    <TextBlock Text="السبت" Style="{StaticResource CalendarHeaderTextStyle}"/>
-                                </UniformGrid>
-                                <ItemsControl x:Name="MonthlyCalendarItemsControl" Grid.Row="1">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <UniformGrid Columns="7"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Margin="0,0,6,6" MinHeight="132" Padding="10" Opacity="{Binding MonthOpacity}" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="10">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="*"/>
-                                                    </Grid.RowDefinitions>
-                                                    <TextBlock Text="{Binding DayNumber}" FontSize="18" FontWeight="Bold" Foreground="{Binding DayForeground}" HorizontalAlignment="Right"/>
-                                                    <ItemsControl Grid.Row="1" ItemsSource="{Binding Appointments}" Margin="0,8,0,0">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Border Background="{Binding ReasonBackground}" CornerRadius="6" Padding="6,4" Margin="0,0,0,4" Tag="{Binding}" Cursor="Hand" MouseLeftButtonDown="AppointmentDetails_MouseLeftButtonDown">
-                                                                    <Grid>
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*"/>
-                                                                            <ColumnDefinition Width="Auto"/>
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <StackPanel Grid.Column="0" HorizontalAlignment="Right">
-                                                                            <TextBlock Text="{Binding AppointmentTimeText}" FontSize="10" FontWeight="Bold" Foreground="{Binding ReasonForeground}" TextAlignment="Right"/>
-                                                                            <TextBlock Text="{Binding PatientName}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" TextTrimming="CharacterEllipsis" TextAlignment="Right"/>
-                                                                        </StackPanel>
-                                                                        <Button Grid.Column="1" Tag="{Binding}" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="11" Width="22" Height="22" Padding="0" Margin="5,0,0,0" Background="Transparent" Foreground="#DC2626" BorderThickness="0" Cursor="Hand" ToolTip="حذف الموعد" Click="BtnDeleteAppointment_Click" PreviewMouseLeftButtonDown="DeleteButton_PreviewMouseLeftButtonDown"/>
-                                                                    </Grid>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
-
-                            <ItemsControl x:Name="AppointmentsItemsControl" Visibility="Collapsed">
+                            <ItemsControl x:Name="AppointmentsItemsControl">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <UniformGrid Columns="4"/>
@@ -491,7 +426,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Margin="0,0,12,12" Padding="16" CornerRadius="18" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Background="{DynamicResource AppCardBg}" Tag="{Binding}" Cursor="Hand" MouseLeftButtonDown="AppointmentDetails_MouseLeftButtonDown">
+                                        <Border Margin="0,0,12,12" Padding="16" CornerRadius="18" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Background="{DynamicResource AppCardBg}">
                                             <Grid>
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto"/>
@@ -504,6 +439,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" HorizontalAlignment="Right">
                                                         <TextBlock Text="{Binding PatientName}" FontFamily="Traditional Arabic" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
@@ -512,6 +448,32 @@
                                                     <Border Grid.Column="1" Padding="8,5" CornerRadius="9" Background="{Binding ReasonBackground}" VerticalAlignment="Top">
                                                         <TextBlock Text="{Binding Reason}" Foreground="{Binding ReasonForeground}" FontWeight="Bold" FontSize="12"/>
                                                     </Border>
+                                                    <Button Grid.Column="2"
+                                                            Content="حذف"
+                                                            Tag="{Binding AppointmentId}"
+                                                            Click="BtnDeleteAppointment_Click"
+                                                            Background="#FEF2F2"
+                                                            Foreground="#DC2626"
+                                                            BorderBrush="#FECACA"
+                                                            BorderThickness="1"
+                                                            Padding="9,5"
+                                                            Margin="8,0,0,0"
+                                                            FontSize="11"
+                                                            FontWeight="SemiBold"
+                                                            Cursor="Hand"
+                                                            ToolTip="حذف الموعد">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="8"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
                                                 </Grid>
 
                                                 <Border Grid.Row="1" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,10">
@@ -536,14 +498,13 @@
                                                 </Border>
 
                                                 <TextBlock Grid.Row="3" Text="موعد محفوظ في جدول العيادة" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
-                                                <Button Grid.Row="3" Content="حذف الموعد" Tag="{Binding}" Click="BtnDeleteAppointment_Click" PreviewMouseLeftButtonDown="DeleteButton_PreviewMouseLeftButtonDown" HorizontalAlignment="Left" Background="Transparent" Foreground="#DC2626" BorderThickness="0" Cursor="Hand" FontSize="11"/>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <StackPanel x:Name="EmptyAppointmentsState" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0" Visibility="Collapsed">
+                            <StackPanel x:Name="EmptyAppointmentsState" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0">
                                 <Border Width="74" Height="74" CornerRadius="37" Background="{DynamicResource AppInputBg}" HorizontalAlignment="Center">
                                     <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="34" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -552,6 +513,77 @@
                             </StackPanel>
                         </Grid>
                     </ScrollViewer>
+
+                    <!-- التقويم الشهري -->
+                    <Grid x:Name="MonthlyCalendarPanel" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,0,0,18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="&#x2039;"
+                                    Width="42"
+                                    Height="38"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Background="{DynamicResource AppInputBg}"
+                                    Foreground="{DynamicResource AppTextPrimary}"
+                                    BorderBrush="{DynamicResource AppBorder}"
+                                    BorderThickness="1"
+                                    FontSize="24"
+                                    Click="BtnCalendarPreviousMonth_Click"
+                                    ToolTip="الشهر السابق"/>
+                            <TextBlock x:Name="CalendarMonthLabel"
+                                       Grid.Column="1"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource AppTextPrimary}"/>
+                            <Button Grid.Column="2"
+                                    Content="&#x203A;"
+                                    Width="42"
+                                    Height="38"
+                                    Style="{StaticResource RoundedButtonStyle}"
+                                    Background="{DynamicResource AppInputBg}"
+                                    Foreground="{DynamicResource AppTextPrimary}"
+                                    BorderBrush="{DynamicResource AppBorder}"
+                                    BorderThickness="1"
+                                    FontSize="24"
+                                    Click="BtnCalendarNextMonth_Click"
+                                    ToolTip="الشهر التالي"/>
+                        </Grid>
+
+                        <Grid Grid.Row="1" x:Name="CalendarWeekHeader" FlowDirection="LeftToRight" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="الأحد" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="1" Text="الإثنين" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="2" Text="الثلاثاء" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="3" Text="الأربعاء" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="4" Text="الخميس" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="5" Text="الجمعة" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="6" Text="السبت" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <Grid x:Name="CalendarDaysGrid" FlowDirection="LeftToRight"/>
+                        </ScrollViewer>
+                    </Grid>
 
                     <Border x:Name="LoadingOverlay" Background="#A00F172A" Visibility="Collapsed">
                         <Border Width="260" Height="120" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -564,6 +596,87 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <!-- تفاصيل اليوم المحدد -->
+        <Grid x:Name="DayDetailsOverlay" Grid.RowSpan="2" Panel.ZIndex="25" Visibility="Collapsed">
+            <Border Background="#A00F172A" MouseLeftButtonDown="DayDetailsBackdrop_MouseLeftButtonDown"/>
+            <Border Width="720" MaxHeight="640" Padding="28" Background="{DynamicResource AppCardBg}" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid FlowDirection="RightToLeft">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Width="38" Height="38" Background="{DynamicResource AppInputBg}" BorderThickness="0" Click="BtnCloseDayDetails_Click" Cursor="Hand">
+                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+                        <StackPanel Grid.Column="1" Margin="0,0,14,0">
+                            <TextBlock Text="مواعيد اليوم" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
+                            <TextBlock x:Name="TxtDayDetailsDate" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Grid.Row="1" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="14" Padding="10" MinHeight="180">
+                        <Grid>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="DayDetailsItemsControl">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="16,14" Margin="0,0,0,8" Background="{DynamicResource AppInputBg}" CornerRadius="10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding DisplayTime}" FontSize="16" FontWeight="Bold" Foreground="#235DF6" Margin="0,0,18,0" VerticalAlignment="Center"/>
+                                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                                        <TextBlock Text="{Binding Reason}" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                        <TextBlock Text="{Binding PatientName}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Content="حذف الموعد" Tag="{Binding Id}" Width="104" Height="36" Margin="16,0,0,0" Background="#FEE2E2" Foreground="#991B1B" BorderThickness="0" FontSize="14" FontWeight="Bold" Cursor="Hand" Click="BtnDeleteAppointmentFromDay_Click">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="Button">
+                                                                            <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                            </Border>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsVisitRecord}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock x:Name="TxtDayDetailsEmpty" Text="لا توجد مواعيد في هذا اليوم." FontSize="16" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Left" Margin="0,18,0,0">
+                        <Button Content="إضافة موعد لهذا اليوم" Width="190" Height="44" Background="#235DF6" Foreground="White" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointmentForDay_Click"/>
+                        <Button Content="إغلاق" Width="100" Height="44" Margin="12,0,0,0" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Style="{StaticResource RoundedButtonStyle}" Click="BtnCloseDayDetails_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
 
         <!-- نافذة إضافة موعد جديد -->
         <Grid x:Name="AppointmentDialogOverlay" Grid.RowSpan="2" Panel.ZIndex="20" Visibility="Collapsed">
@@ -629,6 +742,7 @@
                                     <ComboBox x:Name="CmbAppointmentPatientName"
                                               Height="44" Padding="8,0" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}"
                                               VerticalContentAlignment="Center" IsEditable="True" IsTextSearchEnabled="False"
+                                       TextBoxBase.TextChanged="CmbAppointmentPatientName_TextChanged"
                                               SelectionChanged="CmbAppointmentPatientName_SelectionChanged"/>
                                 </DockPanel>
                             </Border>
@@ -642,6 +756,7 @@
                                     <ComboBox x:Name="CmbAppointmentPhoneNumber"
                                               Height="44" Padding="8,0" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}"
                                               VerticalContentAlignment="Center" IsEditable="True" IsTextSearchEnabled="False"
+                                       TextBoxBase.TextChanged="CmbAppointmentPhoneNumber_TextChanged"
                                               SelectionChanged="CmbAppointmentPhoneNumber_SelectionChanged"/>
                                 </DockPanel>
                             </Border>
@@ -703,85 +818,6 @@
                     <StackPanel Grid.Row="4" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Left">
                         <Button Content="حفظ الموعد" Width="140" Height="48" Background="#235DF6" Foreground="White" BorderThickness="0" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnSaveAppointment_Click"/>
                         <Button Content="إلغاء الأمر" Width="110" Height="48" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Style="{StaticResource RoundedButtonStyle}" Click="BtnCloseAppointmentDialog_Click"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <!-- نافذة تفاصيل الموعد -->
-        <Grid x:Name="AppointmentDetailsOverlay" Grid.RowSpan="2" Panel.ZIndex="21" Visibility="Collapsed">
-            <Border Background="#A00F172A" MouseLeftButtonDown="AppointmentDetailsBackdrop_MouseLeftButtonDown"/>
-            <Border Width="500" Padding="30" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Border.Effect>
-                    <DropShadowEffect Color="#0F172A" BlurRadius="40" ShadowDepth="10" Opacity="0.18"/>
-                </Border.Effect>
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,24">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Width="36" Height="36" Background="{DynamicResource AppInputBg}" BorderThickness="0" Click="BtnCloseAppointmentDetails_Click" Cursor="Hand">
-                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" CornerRadius="18">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock Text="تفاصيل الموعد" FontFamily="Traditional Arabic" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,10,0"/>
-                                <Border Width="38" Height="38" Background="#1A235DF6" CornerRadius="12">
-                                    <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#235DF6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </StackPanel>
-                            <TextBlock Text="بيانات الموعد المسجلة في جدول العيادة" FontSize="13" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Grid.Row="1" Background="#1A235DF6" CornerRadius="16" Padding="16" Margin="0,0,0,12">
-                        <StackPanel HorizontalAlignment="Right">
-                            <TextBlock Text="اسم المريض" FontSize="12" Foreground="#6E8DFF" TextAlignment="Right"/>
-                            <TextBlock x:Name="TxtAppointmentDetailsPatient" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Row="2" Background="{DynamicResource AppInputBg}" CornerRadius="12" Padding="14" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" HorizontalAlignment="Right">
-                                <TextBlock Text="الوقت" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
-                                <TextBlock x:Name="TxtAppointmentDetailsTime" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
-                            </StackPanel>
-                            <TextBlock Grid.Column="1" Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#235DF6" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        </Grid>
-                    </Border>
-                    <Border Grid.Row="3" Background="{DynamicResource AppInputBg}" CornerRadius="12" Padding="14" Margin="0,0,0,10">
-                        <StackPanel HorizontalAlignment="Right">
-                            <TextBlock Text="التاريخ" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
-                            <TextBlock x:Name="TxtAppointmentDetailsDate" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Row="4" Background="{DynamicResource AppInputBg}" CornerRadius="12" Padding="14" Margin="0,0,0,10">
-                        <StackPanel HorizontalAlignment="Right">
-                            <TextBlock Text="رقم الهاتف وسبب الموعد" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
-                            <TextBlock x:Name="TxtAppointmentDetailsContact" FontSize="14" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                    <StackPanel Grid.Row="5" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Left">
-                        <Button Content="حذف الموعد" Width="125" Height="44" Margin="0,0,10,0" Background="#FEE2E2" Foreground="#B91C1C" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnDeleteAppointmentFromDetails_Click"/>
-                        <Button Content="إغلاق" Width="110" Height="44" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Style="{StaticResource RoundedButtonStyle}" Click="BtnCloseAppointmentDetails_Click"/>
                     </StackPanel>
                 </Grid>
             </Border>

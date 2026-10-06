@@ -391,9 +391,9 @@
                 <!-- Income and Expenses Grid -->
                 <Grid Grid.Row="3" Margin="0,0,0,18">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="1.25*"/>
                         <ColumnDefinition Width="20"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="0.75*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Income Section -->
@@ -422,8 +422,8 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="150"/>
                                         <ColumnDefinition Width="90"/>
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
@@ -446,8 +446,8 @@
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="100"/>
                                                             <ColumnDefinition Width="110"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="80"/>
+                                                            <ColumnDefinition Width="110"/>
+                                                            <ColumnDefinition Width="150"/>
                                                             <ColumnDefinition Width="90"/>
                                                             <ColumnDefinition Width="80"/>
                                                         </Grid.ColumnDefinitions>
@@ -455,7 +455,9 @@
                                                         <TextBlock Grid.Column="4" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
                                                         <TextBlock Grid.Column="3" Text="{Binding PatientName}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold"/>
                                                         <TextBlock Grid.Column="2" Text="{Binding PhoneNumber}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding PaidAmountText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding PaidAmountBrush}" FontWeight="Bold" FontSize="16"/>
+                                                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding PaidAmountText}" HorizontalAlignment="Center" Foreground="{Binding PaidAmountBrush}" FontWeight="Bold" FontSize="16"/>
+                                                        </StackPanel>
                                                         <Button Grid.Column="0" Tag="{Binding}" Click="BtnIncomeDetails_Click"
                                                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                 Width="36" Height="36" Cursor="Hand"
@@ -749,9 +751,11 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="170"/>
                                 <ColumnDefinition Width="200"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="1" Text="العلاج" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Column="2" Text="العلاج" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Right"/>
+                            <TextBlock Grid.Column="1" Text="المسامحة" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
                             <TextBlock Grid.Column="0" Text="المبلغ المدفوع" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -766,10 +770,13 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="170"/>
                                                     <ColumnDefinition Width="200"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="1" Text="{Binding TreatmentName}" FontSize="16" FontWeight="SemiBold"
+                                                <TextBlock Grid.Column="2" Text="{Binding TreatmentName}" FontSize="16" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding AdjustmentText}" FontSize="14" Foreground="{Binding AdjustmentBrush}" FontWeight="Bold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                                                 <TextBlock Grid.Column="0" Text="{Binding CostText}" FontSize="15" Foreground="#15803D" FontWeight="Bold"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                                             </Grid>
@@ -814,7 +821,10 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="2" Text="حسابات لم تسدد (الديون)" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="حسابات لم تسدد (الديون)" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+                            <TextBlock x:Name="TxtUnpaidTotal" Text="الإجمالي: 0 ل.س" FontSize="16" FontWeight="SemiBold" Foreground="#EF4444" Margin="18,4,0,0"/>
+                        </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0" VerticalAlignment="Center">
                             <TextBlock Text="ترتيب حسب:" Margin="10,0" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
                             <ComboBox x:Name="CmbUnpaidSort" Width="150" Height="36" SelectionChanged="CmbUnpaidSort_SelectionChanged" FlowDirection="RightToLeft">
@@ -879,7 +889,7 @@
 
         <!-- Patient Search History Overlay -->
         <Border x:Name="PatientSearchOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
-            <Border Width="800" MaxHeight="600" Background="{DynamicResource AppCardBg}" CornerRadius="22" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="1050" MaxHeight="650" Background="{DynamicResource AppCardBg}" CornerRadius="22" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -925,15 +935,19 @@
                             <Border Grid.Row="0" Background="{DynamicResource AppInputBg}" Padding="16,12" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,0,0,1">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="130"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="3" Text="التاريخ" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="2" Text="الوقت" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="1" Text="التكلفة/المسامحة" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="0" Text="المدفوع" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="5" Text="التاريخ" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="4" Text="الوقت" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="3" Text="التكلفة" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="2" Text="المسامحة" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="1" Text="المدفوع" Style="{StaticResource TableHeaderTextStyle}"/>
+                                    <TextBlock Grid.Column="0" Text="التفاصيل" Style="{StaticResource TableHeaderTextStyle}"/>
                                 </Grid>
                             </Border>
 
@@ -944,15 +958,31 @@
                                             <Border Padding="16,12" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,0,0,1">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="100"/>
-                                                        <ColumnDefinition Width="100"/>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="110"/>
+                                                        <ColumnDefinition Width="130"/>
+                                                        <ColumnDefinition Width="130"/>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="3" Text="{Binding DateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding CostText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding CostColor}" FontWeight="SemiBold"/>
-                                                    <TextBlock Grid.Column="0" Text="{Binding PaidText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#10B981" FontWeight="Bold"/>
+                                                    <TextBlock Grid.Column="5" Text="{Binding DateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                    <TextBlock Grid.Column="4" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                    <TextBlock Grid.Column="3" Text="{Binding CostText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding CostColor}" FontWeight="SemiBold"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding ForgivenessText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding ForgivenessColor}" FontWeight="Bold"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding PaidText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#10B981" FontWeight="Bold"/>
+                                                    <Button Grid.Column="0" Tag="{Binding}" Click="BtnPatientHistoryDetails_Click"
+                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                            Width="36" Height="36" Cursor="Hand"
+                                                            Background="#0EA5A8" BorderThickness="0" ToolTip="عرض تفاصيل العلاجات">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="10">
+                                                                    <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="White"
+                                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
@@ -982,7 +1012,7 @@
                                         </Button>
 
                                         <TextBox x:Name="TxtAddPaymentAmount" Width="100" Height="40" Margin="10,0,0,0" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="الدفعة"/>
-                                        <TextBox x:Name="TxtAddForgivenessAmount" Width="100" Height="40" Margin="10,0,0,0" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="مسامحة"/>
+                                        <TextBox x:Name="TxtAddForgivenessAmount" Width="150" Height="40" Margin="10,0,0,0" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="مسامحة"/>
                                     </StackPanel>
 
                                     <!-- Summary Values -->

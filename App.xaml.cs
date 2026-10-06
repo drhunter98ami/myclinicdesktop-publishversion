@@ -18,7 +18,6 @@ public partial class App : Application
         using var context = new AppDbContext();
 
         // Creates the database if it does not already exist.
-        // This is safer than Migrate() for existing production databases
         context.Database.EnsureCreated();
 
         // Backfill the newer clinic tables when an older local database already exists.
@@ -37,15 +36,10 @@ public partial class App : Application
                 ChronicDiseases TEXT NULL
             );");
 
-        // Phone numbers are searchable but are not unique: family members may
-        // share one number. Recreate the old unique index as a normal index.
         context.Database.ExecuteSqlRaw(
             @"DROP INDEX IF EXISTS IX_Patients_PhoneNumber;
               CREATE INDEX IF NOT EXISTS IX_Patients_PhoneNumber
               ON Patients (PhoneNumber);");
-
-        // Add newer patient fields to databases created by older releases.
-        EnsureColumnExists(context, "Patients", "IsDiabetic", "INTEGER NOT NULL DEFAULT 0");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Appointments (
@@ -74,6 +68,7 @@ public partial class App : Application
                 RespiratoryRate TEXT NULL,
                 Weight TEXT NULL,
                 Height TEXT NULL,
+                BloodSugar TEXT NULL,
                 Symptoms TEXT NULL,
                 Diagnosis TEXT NULL,
                 CurrentCost REAL NOT NULL DEFAULT 0,
@@ -122,17 +117,26 @@ public partial class App : Application
         EnsureColumnExists(context, "Visits", "RemainingAmount", "REAL NOT NULL DEFAULT 0");
         EnsureColumnExists(context, "Visits", "SelectedTreatmentsJson", "TEXT NULL");
         EnsureColumnExists(context, "Visits", "UsdToSypRateSnapshot", "REAL NOT NULL DEFAULT 15000");
+        EnsureColumnExists(context, "Visits", "BloodSugar", "TEXT NULL");
+        EnsureColumnExists(context, "AppSettings", "DefaultCurrency", "TEXT NOT NULL DEFAULT 'SYP'");
+        EnsureColumnExists(context, "ToothRecords", "TreatmentId", "INTEGER NULL");
+        EnsureColumnExists(context, "ToothRecords", "TreatmentName", "TEXT NULL");
+        EnsureColumnExists(context, "ToothRecords", "CanalCount", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumnExists(context, "ToothRecords", "CanalsJson", "TEXT NULL");
+
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Shortages (
                 Id INTEGER NOT NULL CONSTRAINT PK_Shortages PRIMARY KEY AUTOINCREMENT,
                 Item TEXT NOT NULL,
                 IsUrgent INTEGER NOT NULL DEFAULT 0,
                 Price REAL NOT NULL DEFAULT 0,
+                Quantity INTEGER NOT NULL DEFAULT 1,
                 Currency TEXT NOT NULL DEFAULT 'SYP',
                 CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
             );");
 
         EnsureColumnExists(context, "Shortages", "Price", "REAL NOT NULL DEFAULT 0");
+        EnsureColumnExists(context, "Shortages", "Quantity", "INTEGER NOT NULL DEFAULT 1");
         EnsureColumnExists(context, "Shortages", "Currency", "TEXT NOT NULL DEFAULT 'SYP'");
 
         context.Database.ExecuteSqlRaw(
@@ -157,7 +161,6 @@ public partial class App : Application
                 CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
             );");
 
-        // AppSettings must exist before checking/adding columns to it.
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS AppSettings (
                 Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY AUTOINCREMENT,
@@ -166,6 +169,8 @@ public partial class App : Application
             );");
 
         EnsureColumnExists(context, "AppSettings", "DefaultCurrency", "TEXT NOT NULL DEFAULT 'SYP'");
+
+        EnsureColumnExists(context, "AppSettings", "FileKitCanalCount", "INTEGER NOT NULL DEFAULT 0");
 
         EnsureColumnExists(context, "LabWorks", "LabName", "TEXT NULL");
 

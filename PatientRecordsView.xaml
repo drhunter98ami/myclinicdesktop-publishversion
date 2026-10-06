@@ -317,11 +317,6 @@
                                                    Foreground="#D8F3EE"
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <TextBlock Text="{Binding DiabetesLabel}"
-                                               FontSize="13"
-                                               Foreground="#FDE68A"
-                                               HorizontalAlignment="Right"
-                                               Margin="0,4,0,0"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2"
@@ -978,11 +973,6 @@
                                         </Border>
                                     </Grid>
 
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                                        <TextBlock Text="السكري:" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="{Binding DiabetesText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                    </StackPanel>
-
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -1064,6 +1054,12 @@
                                         </Border>
                                         <Border Style="{StaticResource MetricCardStyle}">
                                             <StackPanel HorizontalAlignment="Right">
+                                                <TextBlock Text="سكر الدم" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding BloodSugarText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,6,0,0" HorizontalAlignment="Right"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource MetricCardStyle}">
+                                            <StackPanel HorizontalAlignment="Right">
                                                 <TextBlock Text="BMI" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
                                                 <TextBlock Text="{Binding BmiText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,6,0,0" HorizontalAlignment="Right"/>
                                             </StackPanel>
@@ -1084,7 +1080,7 @@
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,14">
                                             <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#B45309" Margin="0,0,10,0"/>
-                                            <TextBlock Text="الأعراض (Symptoms)" FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+                                            <TextBlock Text="شكوى المريض" FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                         </StackPanel>
                                         <TextBlock Text="{Binding SymptomsText}" FontSize="18" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" TextAlignment="Right"/>
                                     </StackPanel>
@@ -1200,8 +1196,13 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="{Binding TreatmentName}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center" TextAlignment="Right"/>
-                                                        <Border Grid.Column="1" Padding="10,4" CornerRadius="8" Background="#E0F2FE" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="{Binding TreatmentName}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
+                                                            <Border Background="#E0F2FE" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,6,0,0">
+                                                                <TextBlock Text="{Binding DetailsDisplay}" FontSize="14" FontWeight="SemiBold" Foreground="#075985" TextWrapping="Wrap" TextAlignment="Right"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="1" Padding="12,6" CornerRadius="10" Background="#DBEAFE" BorderBrush="#93C5FD" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Center">
                                                             <TextBlock FontSize="14" Foreground="#0369A1">
                                                                 <Run Text="×"/>
                                                                 <Run Text="{Binding Quantity}"/>

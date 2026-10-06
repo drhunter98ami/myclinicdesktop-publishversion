@@ -31,5 +31,10 @@ namespace MyClinic.Models
 
         /// <summary>Optional free-text note for this specific tooth.</summary>
         public string? Notes { get; set; }
+
+        public int? TreatmentId { get; set; }
+        public string? TreatmentName { get; set; }
+        public int CanalCount { get; set; }
+        public string? CanalsJson { get; set; }
     }
 }

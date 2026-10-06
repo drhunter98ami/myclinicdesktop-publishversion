@@ -25,5 +25,8 @@ namespace MyClinic
         {
             OnExchangeRateChanged?.Invoke();
         }
+
+        public static event Action? OnFileKitCanalCountChanged;
+        public static void NotifyFileKitCanalCountChanged() => OnFileKitCanalCountChanged?.Invoke();
     }
 }

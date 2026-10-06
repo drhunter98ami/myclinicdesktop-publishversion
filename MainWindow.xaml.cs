@@ -6,6 +6,9 @@ using System.IO;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Net.Http;
+using System.Net.NetworkInformation;
+using System.Threading;
 using MyClinic.Services;
 
 namespace MyClinic
@@ -23,9 +26,13 @@ namespace MyClinic
         // متغيرات المزامنة التلقائية والساعة
         private DispatcherTimer _clockTimer;
         private bool _isAutoSyncEnabled = false;
+        private bool _isDarkTheme;
         private int _lastSyncedHour = -1;
         private readonly string _syncSettingsPath;
         private readonly string _themeSettingsPath;
+        private static readonly HttpClient _internetClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+        private DateTime _lastInternetCheckUtc = DateTime.MinValue;
+        private int _internetCheckVersion;
         private UpdateInfo? _availableUpdate;
 
         public MainWindow()
@@ -33,7 +40,7 @@ namespace MyClinic
             // 1. تحديد المسار الآمن الجديد (AppData)
             string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string clinicFolder = Path.Combine(appDataFolder, "MyClinicApp");
-            
+
             // التأكد من وجود المجلد
             if (!Directory.Exists(clinicFolder))
             {
@@ -48,13 +55,17 @@ namespace MyClinic
             ApplyPendingRestore();
 
             InitializeComponent();
-            
+
             // تحميل الثيم المحفوظ
             LoadThemeSettings();
             
             // تهيئة إعدادات المزامنة التلقائية والساعة
             LoadSyncSettings();
             InitializeAppClock();
+            NetworkChange.NetworkAvailabilityChanged += NetworkAvailabilityChanged;
+            NetworkChange.NetworkAddressChanged += NetworkAddressChanged;
+
+            _ = UpdateInternetStatusAsync();
 
             ShowDashboard();
             TxtCurrentVersion.Text = $"الإصدار {UpdateService.CurrentVersion.ToString(3)}";
@@ -89,12 +100,19 @@ namespace MyClinic
                 }
 
                 _availableUpdate = update;
-                TxtUpdateMessage.Text = $"الإصدار {update.Version} متاح الآن — حجم الملف: {update.SizeText}";
-                UpdateBanner.Visibility = Visibility.Visible;
+                MessageBoxResult result = MessageBox.Show(
+                    $"تتوفر نسخة جديدة: {update.Version}\nحجم الملف: {update.SizeText}\n\nهل تريد فتح صفحة التحميل؟",
+                    "تحديث جديد متاح",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
 
-                if (showResult)
+                if (result == MessageBoxResult.Yes)
                 {
-                    MessageBox.Show($"تتوفر نسخة جديدة: {update.Version}. يمكنك تحميلها من الشريط العلوي.", "تحديث جديد", MessageBoxButton.OK, MessageBoxImage.Information);
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = update.DownloadUrl,
+                        UseShellExecute = true
+                    });
                 }
             }
             catch
@@ -111,23 +129,6 @@ namespace MyClinic
             }
         }
 
-        private void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)
-        {
-            if (_availableUpdate is null)
-                return;
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = _availableUpdate.DownloadUrl,
-                UseShellExecute = true
-            });
-        }
-
-        private void BtnDismissUpdate_Click(object sender, RoutedEventArgs e)
-        {
-            UpdateBanner.Visibility = Visibility.Collapsed;
-        }
-
         private void InitializeAppClock()
         {
             _clockTimer = new DispatcherTimer();
@@ -139,7 +140,7 @@ namespace MyClinic
         private async void ClockTimer_Tick(object? sender, EventArgs e)
         {
             DateTime appTime = DateTime.Now.AddHours(7);
-            
+
             TxtAppTime.Text = appTime.ToString("hh:mm:ss tt", new System.Globalization.CultureInfo("ar-SY"));
             TxtAppDate.Text = appTime.ToString("yyyy/MM/dd");
             TxtAppDay.Text = appTime.ToString("dddd", new System.Globalization.CultureInfo("ar-SY"));
@@ -161,6 +162,72 @@ namespace MyClinic
 
                 UpdateNextSyncUI();
             }
+
+            if ((DateTime.UtcNow - _lastInternetCheckUtc).TotalSeconds >= 5)
+            {
+                _ = UpdateInternetStatusAsync();
+            }
+        }
+
+        private void NetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+        {
+            if (!e.IsAvailable)
+            {
+                ApplyInternetStatus(false);
+            }
+
+            _ = UpdateInternetStatusAsync();
+        }
+
+        private void NetworkAddressChanged(object? sender, EventArgs e)
+        {
+            _ = UpdateInternetStatusAsync();
+        }
+
+        private async Task UpdateInternetStatusAsync()
+        {
+            int checkVersion = Interlocked.Increment(ref _internetCheckVersion);
+            _lastInternetCheckUtc = DateTime.UtcNow;
+            bool isConnected = NetworkInterface.GetIsNetworkAvailable();
+
+            if (isConnected)
+            {
+                try
+                {
+                    using HttpResponseMessage response = await _internetClient.GetAsync("https://www.google.com/generate_204");
+                    isConnected = (int)response.StatusCode >= 200 && (int)response.StatusCode < 400;
+                }
+                catch
+                {
+                    isConnected = false;
+                }
+            }
+
+            if (checkVersion != Volatile.Read(ref _internetCheckVersion))
+            {
+                return;
+            }
+
+            if (!Dispatcher.CheckAccess())
+            {
+                await Dispatcher.InvokeAsync(() => ApplyInternetStatus(isConnected));
+                return;
+            }
+
+            ApplyInternetStatus(isConnected);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            NetworkChange.NetworkAvailabilityChanged -= NetworkAvailabilityChanged;
+            NetworkChange.NetworkAddressChanged -= NetworkAddressChanged;
+            base.OnClosed(e);
+        }
+
+        private void ApplyInternetStatus(bool isConnected)
+        {
+            TxtConnectionStatus.Text = isConnected ? "متصل بالإنترنت" : "غير متصل بالإنترنت";
+            ConnectionStatusDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isConnected ? "#00D26A" : "#EF4444"));
         }
 
         private async Task ExecuteAutoSyncAsync(DateTime appTime)
@@ -296,7 +363,7 @@ namespace MyClinic
                 bool.TryParse(content, out isDark);
             }
             
-            ThemeToggle.IsChecked = isDark;
+            _isDarkTheme = isDark;
             SetTheme(isDark);
         }
 
@@ -309,18 +376,13 @@ namespace MyClinic
             catch { }
         }
 
-        private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!IsLoaded) return;
-            SetTheme(true);
-            SaveThemeSettings(true);
-        }
+        public bool IsDarkTheme => _isDarkTheme;
 
-        private void ThemeToggle_Unchecked(object sender, RoutedEventArgs e)
+        public void SetDarkTheme(bool isDark)
         {
-            if (!IsLoaded) return;
-            SetTheme(false);
-            SaveThemeSettings(false);
+            _isDarkTheme = isDark;
+            SetTheme(isDark);
+            SaveThemeSettings(isDark);
         }
 
         private void SetTheme(bool isDark)
@@ -387,7 +449,7 @@ namespace MyClinic
             BtnSyncDrive.IsEnabled = true;
         }
 
-        private async void BtnRestoreDrive_Click(object sender, RoutedEventArgs e)
+        public async Task RestoreDatabaseFromDriveAsync()
         {
             MessageBoxResult confirmResult = MessageBox.Show(
                 "تحذير: استعادة البيانات ستؤدي إلى حذف البيانات الحالية واستبدالها بالنسخة الموجودة على Google Drive. هل أنت متأكد أنك تريد المتابعة؟",
@@ -399,9 +461,6 @@ namespace MyClinic
 
             if (confirmResult == MessageBoxResult.Yes)
             {
-                BtnRestoreDrive.IsEnabled = false;
-                BtnRestoreDrive.Content = "جاري الاستعادة...";
-
                 var result = await GoogleDriveSyncService.RestoreDatabaseAsync();
 
                 if (result.Success)
@@ -418,8 +477,6 @@ namespace MyClinic
                 else
                 {
                     MessageBox.Show($"فشلت عملية الاستعادة. السبب:\n{result.ErrorMessage}", "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
-                    BtnRestoreDrive.Content = "استعادة البيانات";
-                    BtnRestoreDrive.IsEnabled = true;
                 }
             }
         }
@@ -429,7 +486,7 @@ namespace MyClinic
             _dashboardView ??= new DashboardView();
             MainContent.Content = _dashboardView;
             _dashboardView.RequestRefresh();
-            _ = _dashboardView.EnsureDataCurrentAsync();
+            _ = _dashboardView.RefreshNowAsync();
             SetActiveNavigation(BtnDashboard);
         }
 
@@ -441,9 +498,7 @@ namespace MyClinic
 
         public void ShowPatientRecords()
         {
-            // Create a fresh records view whenever the tab is opened so it never
-            // displays a stale in-memory list after a patient was added.
-            _patientRecordsView = new PatientRecordsView();
+            _patientRecordsView ??= new PatientRecordsView();
             MainContent.Content = _patientRecordsView;
             _patientRecordsView.RequestRefresh();
             _ = _patientRecordsView.EnsureDataCurrentAsync();
@@ -493,6 +548,12 @@ namespace MyClinic
 
         public void InvalidatePatientRecords() => _patientRecordsView?.RequestRefresh();
         public void InvalidateFinancialRecords() => _financialRecordsView?.RequestRefresh();
+
+        public void AddSavedVisitToDashboard(string patientName, string phoneNumber, string reason, DateTime visitDateTime, int visitId)
+        {
+            _dashboardView ??= new DashboardView();
+            _dashboardView.AddSavedVisitImmediately(patientName, phoneNumber, reason, visitDateTime, visitId);
+        }
 
         private void SetActiveNavigation(Button activeButton)
         {

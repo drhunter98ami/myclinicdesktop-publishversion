@@ -47,6 +47,7 @@ namespace MyClinic
                 RespiratoryRate = source.RespiratoryRate,
                 Weight = source.Weight,
                 Height = source.Height,
+                BloodSugar = source.BloodSugar,
                 Symptoms = source.Symptoms,
                 Diagnosis = source.Diagnosis,
                 PrescriptionJson = source.PrescriptionJson,

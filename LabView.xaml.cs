@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,6 +21,7 @@ namespace MyClinic
         {
             InitializeComponent();
             LoadExchangeRate();
+            GlobalEvents.OnExchangeRateChanged += OnExchangeRateChanged;
             LoadLabNames();
             LoadLabWorks();
             UpdateSummary();
@@ -31,6 +31,13 @@ namespace MyClinic
             DpFilterDate.SelectedDate = DateTime.Now;
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
+            ApplyFilters();
+        }
+
+        private void OnExchangeRateChanged()
+        {
+            LoadExchangeRate();
+            UpdateSummary();
             ApplyFilters();
         }
 
@@ -81,47 +88,10 @@ namespace MyClinic
                     context.SaveChanges();
                     _usdToSypRate = 15000;
                 }
-                TxtExchangeRate.Text = _usdToSypRate.ToString("N0", CultureInfo.CurrentCulture);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"خطأ في تحميل سعر الصرف: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                TxtExchangeRate.Text = "15000";
-            }
-        }
-
-        private void BtnSaveExchangeRate_Click(object sender, RoutedEventArgs e)
-        {
-            if (decimal.TryParse(TxtExchangeRate.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out decimal rate) && rate > 0)
-            {
-                try
-                {
-                    using var context = new AppDbContext();
-                    var settings = context.AppSettings.FirstOrDefault();
-                    if (settings != null)
-                    {
-                        settings.UsdToSypRate = rate;
-                        settings.UpdatedAt = DateTime.Now;
-                    }
-                    else
-                    {
-                        settings = new AppSettings { UsdToSypRate = rate };
-                        context.AppSettings.Add(settings);
-                    }
-                    context.SaveChanges();
-                    _usdToSypRate = rate;
-                    UpdateSummary();
-                    GlobalEvents.NotifyExchangeRateChanged();
-                    MessageBox.Show("تم حفظ سعر الصرف بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"خطأ في حفظ سعر الصرف: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-            else
-            {
-                MessageBox.Show("يرجى إدخال سعر صرف صحيح", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

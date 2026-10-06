@@ -22,6 +22,7 @@ namespace MyClinic
 {
     public partial class AddPatientView : UserControl
     {
+        public IReadOnlyList<string> ToothOptions { get; } = BuildToothOptions();
         private const int MaxVisitImages = 5;
         private static string VisitDoctorName => string.IsNullOrWhiteSpace(LoginSessionStore.CurrentUsername)
             ? "د."
@@ -197,7 +198,95 @@ namespace MyClinic
 
         private void TreatmentCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            if (sender is CheckBox { DataContext: TreatmentSelectionItem item } && item.IsSelected && item.IsRootCanal)
+            {
+                foreach (var detail in item.ToothDetails.Where(d => !string.IsNullOrWhiteSpace(d.ToothId)))
+                    ConfigureCanalsForTooth(detail);
+            }
             CalculateTotalCost();
+        }
+
+        private void TreatmentTooth_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplySelectedTooth(sender);
+        }
+
+        private void TreatmentTooth_DropDownClosed(object sender, EventArgs e)
+        {
+            ApplySelectedTooth(sender);
+        }
+
+        private static void ApplySelectedTooth(object sender)
+        {
+            if (sender is not ComboBox combo)
+                return;
+
+            var detail = combo.Tag as TreatmentToothDetail ?? combo.DataContext as TreatmentToothDetail;
+            if (detail is null)
+                return;
+
+            if (combo.SelectedItem is string tooth && int.TryParse(tooth, out _))
+            {
+                detail.ToothId = tooth;
+                if (detail.IsRootCanal)
+                    ConfigureCanalsForTooth(detail);
+            }
+        }
+
+        private void CanalCount_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox { DataContext: TreatmentToothDetail detail }
+                && int.TryParse(sender is TextBox box ? box.Text : null, out int count))
+            {
+                detail.CanalCount = Math.Max(0, count);
+                ResizeCanals(detail);
+            }
+        }
+
+        private static List<string> BuildToothOptions()
+        {
+            var teeth = new List<string> { "— اختر السن —" };
+            teeth.AddRange(Enumerable.Range(11, 8).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(21, 8).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(31, 8).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(41, 8).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(51, 5).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(61, 5).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(71, 5).Select(i => i.ToString()));
+            teeth.AddRange(Enumerable.Range(81, 5).Select(i => i.ToString()));
+            return teeth;
+        }
+
+        private static void ConfigureCanalsForTooth(TreatmentToothDetail detail)
+        {
+            var tooth = int.TryParse(detail.ToothId, out var id) ? id : 0;
+            IReadOnlyList<string> names = GetDefaultCanalNames(tooth);
+            detail.CanalCount = names.Count;
+            detail.Canals.Clear();
+            foreach (var name in names)
+                detail.Canals.Add(new CanalMeasurement { Name = name, IsExtraCanal = false });
+        }
+
+        private static void ResizeCanals(TreatmentToothDetail detail)
+        {
+            while (detail.Canals.Count < detail.CanalCount)
+                detail.Canals.Add(new CanalMeasurement { Name = $"قناة {detail.Canals.Count + 1}", IsExtraCanal = true });
+            while (detail.Canals.Count > detail.CanalCount)
+                detail.Canals.RemoveAt(detail.Canals.Count - 1);
+        }
+
+        private static IReadOnlyList<string> GetDefaultCanalNames(int tooth)
+        {
+            int number = tooth % 10;
+            bool upper = tooth is >= 11 and <= 28;
+            bool lower = tooth is >= 31 and <= 48;
+            bool molar = number is 6 or 7 or 8;
+            bool premolar = number is 4 or 5;
+
+            if (upper && molar) return new[] { "MB", "DB", "P" };
+            if (lower && molar) return new[] { "MB", "ML", "D" };
+            if (upper && premolar) return new[] { "B", "L" };
+            return new[] { "" };
         }
 
         private void TreatmentQuantity_TextChanged(object sender, TextChangedEventArgs e)
@@ -254,11 +343,66 @@ namespace MyClinic
                         TreatmentName = item.TreatmentName,
                         Cost = item.Cost,
                         Currency = item.Currency,
-                        Quantity = item.Quantity > 0 ? item.Quantity : 1
+                        Quantity = item.Quantity > 0 ? item.Quantity : 1,
+                        ToothId = item.ToothDetails.FirstOrDefault()?.ToothId ?? item.ToothId,
+                        CanalCount = item.ToothDetails.FirstOrDefault()?.CanalCount ?? (item.IsRootCanal ? item.CanalCount : 0),
+                        Canals = item.Canals.Select(c => new CanalMeasurement
+                        {
+                            Name = c.Name,
+                            WorkingLength = c.WorkingLength
+                        }).ToList()
                     });
+
+                    var selectedItem = selected[^1];
+                    selectedItem.ToothDetails = item.ToothDetails.Select(detail =>
+                    {
+                        var copy = new TreatmentToothDetail
+                        {
+                            ToothId = detail.ToothId,
+                            IsRootCanal = detail.IsRootCanal,
+                            CanalCount = detail.CanalCount
+                        };
+                        foreach (var canal in detail.Canals)
+                            copy.Canals.Add(new CanalMeasurement { Name = canal.Name, WorkingLength = canal.WorkingLength, IsExtraCanal = canal.IsExtraCanal });
+                        return copy;
+                    }).ToList();
                 }
             }
             return selected;
+        }
+
+        private static void ApplyManualCostToSelectedTreatments(
+            List<SelectedTreatment> selectedTreatments,
+            decimal manualCost,
+            decimal usdToSypRate)
+        {
+            if (selectedTreatments.Count == 0 || manualCost <= 0)
+                return;
+
+            decimal automaticCost = selectedTreatments.Sum(t =>
+            {
+                decimal cost = t.Cost;
+                if (t.Currency == "USD")
+                    cost *= usdToSypRate;
+                return cost * Math.Max(1, t.Quantity);
+            });
+
+            // A higher manual value is the actual negotiated cost for this visit.
+            // Store the difference evenly in the selected treatment prices so the
+            // finance details and payment allocation use that real cost.
+            if (manualCost <= automaticCost)
+                return;
+
+            decimal extraPerTreatment = (manualCost - automaticCost) / selectedTreatments.Count;
+            foreach (var treatment in selectedTreatments)
+            {
+                decimal costInSyp = treatment.Cost;
+                if (treatment.Currency == "USD")
+                    costInSyp *= usdToSypRate;
+
+                treatment.Cost = costInSyp + extraPerTreatment / Math.Max(1, treatment.Quantity);
+                treatment.Currency = "SYP";
+            }
         }
 
         #endregion
@@ -273,10 +417,14 @@ namespace MyClinic
 
         private void TextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is TextBox textBox && !textBox.IsKeyboardFocusWithin)
+            if (sender is TextBox textBox)
             {
-                e.Handled = true;
-                textBox.Focus();
+                if (!textBox.IsKeyboardFocusWithin)
+                {
+                    e.Handled = true;
+                    textBox.Focus();
+                }
+                textBox.SelectAll();
             }
         }
 
@@ -374,12 +522,14 @@ namespace MyClinic
                 RespiratoryRateText = visit.RespiratoryRateText,
                 WeightText = visit.WeightText,
                 HeightText = visit.HeightText,
+                BloodSugarText = visit.BloodSugarText,
                 BmiText = visit.BmiText,
                 SymptomsText = visit.SymptomsText,
                 DiagnosisText = visit.DiagnosisText,
                 ChartModeText = visit.ChartModeText,
                 Teeth = visit.ToothIds,
                 TreatmentPlanText = visit.TreatmentPlanText,
+                FinalTreatmentText = visit.FinalTreatmentText,
                 PrescriptionItems = visit.PrescriptionItems,
                 SelectedTreatments = visit.SelectedTreatments,
                 AttachmentItems = attachmentCollection
@@ -476,7 +626,6 @@ namespace MyClinic
                     Age = patient.Age,
                     Gender = patient.Gender,
                     BloodType = patient.BloodType,
-                    IsDiabetic = patient.IsDiabetic,
                     IsSmoker = patient.IsSmoker,
                     SmokingType = patient.SmokingType,
                     SmokingFrequency = patient.SmokingFrequency,
@@ -539,7 +688,6 @@ namespace MyClinic
 
                 TxtAllergies.Text = snapshot.Allergies ?? string.Empty;
                 TxtChronicDiseases.Text = snapshot.ChronicDiseases ?? string.Empty;
-                ChkDiabetic.IsChecked = snapshot.IsDiabetic;
 
                 ChkSmoker.IsChecked = snapshot.IsSmoker;
                 TxtSmokingType.Text = snapshot.SmokingType ?? string.Empty;
@@ -807,6 +955,8 @@ namespace MyClinic
                     patient = db.Patients.FirstOrDefault(existingPatient => existingPatient.Id == _selectedPatientLookup.Id);
                 }
 
+                bool isExistingPatient = patient is not null;
+
                 // إنشاء مريض جديد إذا لم يتم اختيار أحد (يسمح بإضافة أفراد العائلة بنفس رقم الهاتف)
                 if (patient is null)
                 {
@@ -827,7 +977,6 @@ namespace MyClinic
                 patient.Age = age;
                 patient.Gender = GetSelectedComboBoxText(CmbGender);
                 patient.BloodType = NormalizeBloodType(GetSelectedComboBoxText(CmbBloodType));
-                patient.IsDiabetic = ChkDiabetic.IsChecked == true;
                 patient.IsSmoker = ChkSmoker.IsChecked == true;
                 patient.SmokingType = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingType.Text) : null;
                 patient.SmokingFrequency = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingFrequency.Text) : null;
@@ -841,10 +990,32 @@ namespace MyClinic
                 if (appSettings != null)
                     usdToSypRateSnapshot = (double)appSettings.UsdToSypRate;
 
+                var selectedTreatments = GetSelectedTreatments();
+                ApplyManualCostToSelectedTreatments(
+                    selectedTreatments,
+                    currentCost,
+                    (decimal)usdToSypRateSnapshot);
+
+                if (appSettings == null)
+                {
+                    appSettings = new AppSettings { UsdToSypRate = (decimal)usdToSypRateSnapshot };
+                    db.AppSettings.Add(appSettings);
+                }
+
+                int completedCanals = selectedTreatments
+                .Where(t => IsRootCanalTreatment(t.TreatmentName))
+                    .Sum(t => t.ToothDetails.Count > 0
+                        ? t.ToothDetails.Where(d => int.TryParse(d.ToothId, out _)).Sum(d => d.CanalCount > 0 ? d.CanalCount : GetDefaultCanalNames(int.Parse(d.ToothId!)).Count)
+                        : (!string.IsNullOrWhiteSpace(t.ToothId) ? Math.Max(1, t.CanalCount) : 0));
+                appSettings.FileKitCanalCount += completedCanals;
+                appSettings.UpdatedAt = DateTime.Now;
+
+                DateTime savedVisitDateTime = DateTime.Now.AddHours(7);
+
                 Visit visit = new()
                 {
                     Patient = patient,
-                    VisitDate = DateTime.Now.AddHours(7),
+                    VisitDate = savedVisitDateTime,
                     IsPregnant = isPregnant,
                     IsNursing = isFemale && ChkNursing.IsChecked == true,
                     PregnancyMonth = isPregnant ? CmbPregnancyMonth.SelectedIndex + 1 : null,
@@ -854,11 +1025,12 @@ namespace MyClinic
                     RespiratoryRate = NullIfWhiteSpace(TxtRespiratoryRate.Text),
                     Weight = NullIfWhiteSpace(TxtWeight.Text),
                     Height = NullIfWhiteSpace(TxtHeight.Text),
+                    BloodSugar = NullIfWhiteSpace(TxtBloodSugar.Text),
                     Symptoms = NullIfWhiteSpace(TxtSymptoms.Text),
                     Diagnosis = NullIfWhiteSpace(TxtDiagnosis.Text),
                     PrescriptionJson = _prescriptionItems.Count > 0 ? JsonSerializer.Serialize(_prescriptionItems) : null,
                     TreatmentPlanNotes = NullIfWhiteSpace(TxtTreatmentPlanNotes.Text),
-                    SelectedTreatmentsJson = GetSelectedTreatments().Count > 0 ? JsonSerializer.Serialize(GetSelectedTreatments()) : null,
+                    SelectedTreatmentsJson = selectedTreatments.Count > 0 ? JsonSerializer.Serialize(selectedTreatments) : null,
                     CurrentCost = (double)currentCost,
                     TodayPaid = (double)todayPaid,
                     RemainingAmount = (double)remainingAmount,
@@ -869,10 +1041,18 @@ namespace MyClinic
                         {
                             ToothId = toothId
                         })
+                        .Concat(BuildTreatmentToothRecords(selectedTreatments))
                         .ToList()
                 };
 
                 db.Visits.Add(visit);
+                db.Appointments.Add(new AppointmentEntry
+                {
+                    PatientName = patient.FullName ?? "بدون اسم",
+                    PhoneNumber = patient.PhoneNumber ?? phoneNumber,
+                    Reason = isExistingPatient ? "مراجعة" : "معاينة جديدة",
+                    AppointmentDateTime = savedVisitDateTime
+                });
                 await db.SaveChangesAsync(); // أو db.SaveChanges();
                 
 
@@ -898,11 +1078,12 @@ namespace MyClinic
 
                 // --- الكود الجديد: إرسال تنبيه لتحديث سجل المرضى ---
                 GlobalEvents.NotifyPatientRecordAdded(); 
+                GlobalEvents.NotifyFileKitCanalCountChanged();
 
                 // ... باقي كود تفريغ الحقول وإظهار رسالة النجاح ...
                 MessageBox.Show("تم حفظ المريض والزيارة بنجاح.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
                 ResetForm();
-                NavigateToDashboard();
+                NavigateToDashboard(visit, patient, isExistingPatient, savedVisitDateTime);
             }
             catch (Exception ex)
             {
@@ -973,6 +1154,27 @@ namespace MyClinic
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
         }
+
+        private static IEnumerable<ToothRecord> BuildTreatmentToothRecords(IEnumerable<SelectedTreatment> treatments)
+        {
+            return treatments
+                .SelectMany(t => (t.ToothDetails.Count > 0
+                    ? (IEnumerable<TreatmentToothDetail>)t.ToothDetails
+                    : new List<TreatmentToothDetail> { new() { ToothId = t.ToothId, CanalCount = t.CanalCount } })
+                .Where(detail => !string.IsNullOrWhiteSpace(detail.ToothId))
+                .Select(detail => new ToothRecord
+                {
+                    ToothId = detail.ToothId!.Trim(),
+                    Condition = t.TreatmentName,
+                    TreatmentId = t.TreatmentId,
+                    TreatmentName = t.TreatmentName,
+                    CanalCount = detail.CanalCount,
+                    CanalsJson = detail.Canals.Count > 0 ? JsonSerializer.Serialize(detail.Canals) : null
+                }));
+        }
+
+        private static bool IsRootCanalTreatment(string? name) =>
+            (name ?? string.Empty).Replace(" ", string.Empty).Contains("سحبعصب", StringComparison.OrdinalIgnoreCase);
 
         private static string? GetSelectedComboBoxText(ComboBox comboBox)
         {
@@ -1273,7 +1475,7 @@ namespace MyClinic
                 FirstNonEmpty(
                     ToLabelValue("خطة العلاج", visit.TreatmentPlanNotes),
                     toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الز الزيارة." : null,
-                    ToLabelValue("الأعراض", visit.Symptoms),
+                            ToLabelValue("شكوى المريض", visit.Symptoms),
                     ToLabelValue("الضغط", visit.BloodPressure),
                     "لا توجد ملاحظات إضافية."),
                 120);
@@ -1295,12 +1497,14 @@ namespace MyClinic
                 RespiratoryRateText = FormatMetric(visit.RespiratoryRate, "/min"),
                 WeightText = FormatMetric(visit.Weight, "كغ"),
                 HeightText = FormatMetric(visit.Height, "سم"),
+                BloodSugarText = FormatMetric(visit.BloodSugar, "mg/dL"),
                 BmiText = ComputeBmiText(visit.Weight, visit.Height),
-                SymptomsText = NormalizeOrFallback(visit.Symptoms, "لا توجد أعراض مسجلة"),
+                SymptomsText = NormalizeOrFallback(visit.Symptoms, "لا توجد شكوى مسجلة"),
                 DiagnosisText = NormalizeOrFallback(visit.Diagnosis, "لا يوجد تشخيص مسجل"),
                 ChartModeText = FormatChartMode(visit.ChartMode),
                 ToothIds = toothIds,
                 TreatmentPlanText = NormalizeOrFallback(visit.TreatmentPlanNotes, "لا توجد خطة علاج أو ملاحظات إضافية."),
+                FinalTreatmentText = NormalizeOrFallback(visit.FinalTreatment, "لا يوجد إجراء نهائي مسجل."),
                 PrescriptionItems = prescriptionItems,
                 AttachmentPaths = attachmentPaths,
                 SelectedTreatments = ParseSelectedTreatments(visit.SelectedTreatmentsJson)
@@ -1620,10 +1824,21 @@ namespace MyClinic
             TxtRespiratoryRate.Clear();
             TxtWeight.Clear();
             TxtHeight.Clear();
+            TxtBloodSugar.Clear();
 
             TxtSymptoms.Clear();
             TxtDiagnosis.Clear();
             TxtTreatmentPlanNotes.Clear();
+
+            foreach (var treatment in _treatmentSelectionItems)
+            {
+                treatment.IsSelected = false;
+                treatment.ToothId = null;
+                treatment.CanalCount = 0;
+                treatment.Canals.Clear();
+                treatment.ToothDetails.Clear();
+                treatment.Quantity = 1;
+            }
 
             TxtPrescriptionMedicine.Clear();
             TxtPrescriptionDosage.Clear();
@@ -1656,7 +1871,6 @@ namespace MyClinic
             public int? Age { get; init; }
             public string? Gender { get; init; }
             public string? BloodType { get; init; }
-            public bool IsDiabetic { get; init; }
             public bool IsSmoker { get; init; }
             public string? SmokingType { get; init; }
             public string? SmokingFrequency { get; init; }
@@ -1684,14 +1898,31 @@ namespace MyClinic
             public string MatchReason { get; init; } = "مطابقة";
         }
 
-        private void NavigateToDashboard()
+        private void NavigateToDashboard(Visit? savedVisit = null, Patient? savedPatient = null, bool isExistingPatient = false, DateTime savedVisitDateTime = default)
         {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-            {
-                mainWindow.InvalidatePatientRecords();
-                mainWindow.InvalidateFinancialRecords();
-                mainWindow.ShowDashboard();
-            }
+            // Let the save context finish disposing before the dashboard opens a
+            // second context to reload the calendar. This avoids a transient
+            // SQLite read/lock race immediately after saving a visit.
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    if (Window.GetWindow(this) is not MainWindow mainWindow)
+                        return;
+
+                    mainWindow.InvalidatePatientRecords();
+                    mainWindow.InvalidateFinancialRecords();
+                    mainWindow.ShowDashboard();
+                    if (savedVisit is not null && savedPatient is not null)
+                    {
+                        mainWindow.AddSavedVisitToDashboard(
+                            savedPatient.FullName ?? "بدون اسم",
+                            savedPatient.PhoneNumber ?? string.Empty,
+                            isExistingPatient ? "مراجعة" : "معاينة جديدة",
+                            savedVisitDateTime,
+                            savedVisit.Id);
+                    }
+                }));
         }
     }
 }

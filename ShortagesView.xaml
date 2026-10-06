@@ -133,26 +133,35 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Item}" Foreground="{DynamicResource AppTextPrimary}" FontSize="15" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding PriceText}" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,2,0,0"/>
+                        <TextBlock Text="{Binding PriceText}" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,2,0,0"
+                                   FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Right"/>
                     </StackPanel>
 
-                    <Border Grid.Column="1" CornerRadius="6" Padding="10,4" Margin="10,0,10,0" Background="#1A10B981" VerticalAlignment="Center">
+                    <Border Grid.Column="1" CornerRadius="6" Padding="8,4" Margin="10,0,6,0" Background="#1A2563EB" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
+                            <TextBlock Text="العدد" Foreground="#2563EB" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Quantity}" Foreground="#2563EB" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" CornerRadius="6" Padding="10,4" Margin="4,0,10,0" Background="#1A10B981" VerticalAlignment="Center">
                         <TextBlock Text="{Binding CurrencyBadge}" Foreground="#10B981" FontSize="11" FontWeight="SemiBold"/>
                     </Border>
 
-                    <Button Grid.Column="2" Content="تعديل" Background="#F59E0B" Foreground="White" Width="60" Height="30" Margin="0,0,8,0"
+                    <Button Grid.Column="3" Content="تعديل" Background="#F59E0B" Foreground="White" Width="60" Height="30" Margin="0,0,8,0"
                             CommandParameter="{Binding}" Click="BtnEdit_Click"
                             Style="{StaticResource RoundedButtonStyle}"/>
 
-                    <Button Grid.Column="3" Content="تم الشراء" Background="#10B981" Foreground="White" Width="80" Height="30" Margin="0,0,8,0"
+                    <Button Grid.Column="4" Content="تم الشراء" Background="#10B981" Foreground="White" Width="80" Height="30" Margin="0,0,8,0"
                             CommandParameter="{Binding}" Click="BtnPurchased_Click"
                             Style="{StaticResource RoundedButtonStyle}"/>
 
-                    <Button Grid.Column="4" Content="حذف" Background="#EF4444" Foreground="White" Width="60" Height="30"
+                    <Button Grid.Column="5" Content="حذف" Background="#EF4444" Foreground="White" Width="60" Height="30"
                             CommandParameter="{Binding}" Click="BtnDelete_Click"
                             Style="{StaticResource RoundedButtonStyle}"/>
                 </Grid>
@@ -191,6 +200,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="70"/>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="80"/>
                         </Grid.ColumnDefinitions>
@@ -200,14 +210,17 @@
                         <TextBox Grid.Column="1" x:Name="TxtUrgentPrice" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
                                  Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
                                  BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="السعر"/>
-                        <ComboBox Grid.Column="2" x:Name="CmbUrgentCurrency" Height="40" Margin="8,0,0,0"
+                        <TextBox Grid.Column="2" x:Name="TxtUrgentQuantity" Text="1" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="العدد"/>
+                        <ComboBox Grid.Column="3" x:Name="CmbUrgentCurrency" Height="40" Margin="8,0,0,0"
                                   Style="{StaticResource ShortageComboBoxStyle}"
                                   ItemContainerStyle="{StaticResource ShortageComboBoxItemStyle}"
                                   SelectedIndex="0">
                             <ComboBoxItem Content="USD"/>
                             <ComboBoxItem Content="SYP"/>
                         </ComboBox>
-                        <Button Grid.Column="3" Content="إضافة" Height="40" Margin="8,0,0,0"
+                        <Button Grid.Column="4" Content="إضافة" Height="40" Margin="8,0,0,0"
                                 Background="#10B981" Foreground="White" Style="{StaticResource RoundedButtonStyle}"
                                 Click="BtnAddUrgent_Click"/>
                     </Grid>
@@ -245,6 +258,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="70"/>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="80"/>
                         </Grid.ColumnDefinitions>
@@ -254,14 +268,17 @@
                         <TextBox Grid.Column="1" x:Name="TxtNonUrgentPrice" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
                                  Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
                                  BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="السعر"/>
-                        <ComboBox Grid.Column="2" x:Name="CmbNonUrgentCurrency" Height="40" Margin="8,0,0,0"
+                        <TextBox Grid.Column="2" x:Name="TxtNonUrgentQuantity" Text="1" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="العدد"/>
+                        <ComboBox Grid.Column="3" x:Name="CmbNonUrgentCurrency" Height="40" Margin="8,0,0,0"
                                   Style="{StaticResource ShortageComboBoxStyle}"
                                   ItemContainerStyle="{StaticResource ShortageComboBoxItemStyle}"
                                   SelectedIndex="0">
                             <ComboBoxItem Content="USD"/>
                             <ComboBoxItem Content="SYP"/>
                         </ComboBox>
-                        <Button Grid.Column="3" Content="إضافة" Height="40" Margin="8,0,0,0"
+                        <Button Grid.Column="4" Content="إضافة" Height="40" Margin="8,0,0,0"
                                 Background="#F59E0B" Foreground="White" Style="{StaticResource RoundedButtonStyle}"
                                 Click="BtnAddNonUrgent_Click"/>
                     </Grid>
@@ -329,6 +346,9 @@
 
                     <TextBlock Text="السعر" Style="{StaticResource FormLabel}"/>
                     <TextBox x:Name="TxtEditPrice" Margin="0,0,0,15"/>
+
+                    <TextBlock Text="العدد" Style="{StaticResource FormLabel}"/>
+                    <TextBox x:Name="TxtEditQuantity" Margin="0,0,0,15"/>
 
                     <TextBlock Text="العملة" Style="{StaticResource FormLabel}"/>
                     <ComboBox x:Name="CmbEditCurrency" Style="{StaticResource ShortageComboBoxStyle}"

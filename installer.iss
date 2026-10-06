@@ -1,5 +1,5 @@
 #define MyAppName "My Clinic"
-#define MyAppVersion "1.3.2"
+#define MyAppVersion "1.3.3"
 #define MyAppPublisher "Dr. Ahmed Khalif"
 #define MyAppExeName "MyClinic.exe"
 ; Notice the path is updated to match your .NET 9 Windows target framework
@@ -14,15 +14,11 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputBaseFilename=Install_MyClinic
-OutputDir=Output
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
-; Keep the same AppId and installation directory so installing a newer version
-; upgrades the existing installation instead of creating a second one.
-VersionInfoVersion={#MyAppVersion}
-VersionInfoProductVersion={#MyAppVersion}
 CloseApplications=yes
+RestartApplications=no
 
 ; This will use your app's logo for the setup wizard icon itself!
 SetupIconFile=Assets\logo.ico
@@ -50,6 +46,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
-; The application database is stored outside the install directory at:
-; %LOCALAPPDATA%\MyClinicApp\ClinicData.db
-; This installer does not include, copy, overwrite, or delete that database.
+
+[Dirs]
+; Database folder in AppData - never remove it during an update or uninstall.
+; The application owns the database files and performs any requested restore itself.
+Name: "{localappdata}\MyClinicApp"; Flags: uninsneveruninstall

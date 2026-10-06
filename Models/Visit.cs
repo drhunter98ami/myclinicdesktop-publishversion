@@ -35,6 +35,7 @@ namespace MyClinic.Models
         public string? RespiratoryRate { get; set; }  // e.g. "16"
         public string? Weight { get; set; }           // e.g. "70"
         public string? Height { get; set; }           // e.g. "170"
+        public string? BloodSugar { get; set; }       // e.g. "95"
 
         // ── Clinical Notes ─────────────────────────────────────────────
         public string? Symptoms { get; set; }

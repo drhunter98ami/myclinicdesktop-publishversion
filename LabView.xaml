@@ -503,21 +503,6 @@
                 </StackPanel>
             </Border>
 
-            <!-- Exchange Rate Section -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,25">
-                <StackPanel>
-                    <TextBlock Text="سعر الصرف" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,15"/>
-
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="1 USD =" Style="{StaticResource FormLabel}" VerticalAlignment="Center"/>
-                        <TextBox x:Name="TxtExchangeRate" Width="150" Margin="10,0,10,0"/>
-                        <TextBlock Text="ل.س" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}"/>
-                    </StackPanel>
-
-                    <Button x:Name="BtnSaveExchangeRate" Content="حفظ سعر الصرف" Style="{StaticResource PrimaryButton}" Click="BtnSaveExchangeRate_Click" HorizontalAlignment="Left" Margin="0,15,0,0"/>
-                </StackPanel>
-            </Border>
-
             <!-- Date Filter Section -->
             <Border Style="{StaticResource CardStyle}" Margin="0,0,0,25">
                 <StackPanel>
