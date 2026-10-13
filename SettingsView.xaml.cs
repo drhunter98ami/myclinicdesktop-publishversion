@@ -160,7 +160,7 @@ namespace MyClinic
         private void BtnWhatsNew_Click(object sender, RoutedEventArgs e)
         {
             const string updates =
-                "الإصدار 1.7.0\n\n" +
+                "الإصدار 2.0.0\n\n" +
                 "التحديثات الجديدة:\n" +
                 "1- تم تحسين التقارير الشهرية لتظهر تفاصيل أدق وتعطي إحصائيات احترافية.\n\n" +
                 "2- تم إصلاح خلل ظهور عدد الأقنية في المعالجات التي لا تتضمن سحب عصب.\n\n" +
