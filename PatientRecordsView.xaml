@@ -9,6 +9,7 @@
              RenderOptions.ClearTypeHint="Enabled">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <Style x:Key="FilterShellStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
             <Setter Property="CornerRadius" Value="18"/>
@@ -672,18 +673,18 @@
                                         <Button Style="{StaticResource VisitEntryButtonStyle}"
                                                 Tag="{Binding}"
                                                 Click="OpenVisitDetails_Click">
-                                            <Border Margin="0,0,0,14"
-                                                    Padding="16"
-                                                    CornerRadius="14"
-                                                    Background="{DynamicResource AppCardBg}"
-                                                    BorderBrush="{DynamicResource AppBorder}"
-                                                    BorderThickness="1">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                    </Grid.RowDefinitions>
+                                        <Border Margin="0,0,0,14"
+                                                Padding="16"
+                                                CornerRadius="14"
+                                                Background="{DynamicResource AppCardBg}"
+                                                BorderBrush="{DynamicResource AppBorder}"
+                                                BorderThickness="1">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
 
                                                     <Grid Grid.Row="0"
                                                           FlowDirection="LeftToRight">
@@ -764,8 +765,9 @@
                                                                    TextWrapping="Wrap"
                                                                    TextAlignment="Right"/>
                                                     </Grid>
-                                                </Grid>
-                                            </Border>
+
+                                            </Grid>
+                                        </Border>
                                         </Button>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -1364,27 +1366,48 @@
                             Padding="16"
                             BorderBrush="{DynamicResource AppBorder}"
                             BorderThickness="0,1,0,0">
-                        <Button Content="إغلاق"
-                                Width="96"
-                                Height="42"
-                                Background="{DynamicResource AppInputBg}"
-                                BorderBrush="{DynamicResource AppBorder}"
-                                Foreground="{DynamicResource AppTextPrimary}"
-                                FontWeight="SemiBold"
-                                Cursor="Hand"
-                                HorizontalAlignment="Left"
-                                Click="CloseVisitDetails_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="12">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Content="تعديل الزيارة"
+                                    Tag="{Binding VisitId}"
+                                    Click="EditVisit_Click"
+                                    Padding="16,8"
+                                    Margin="0,0,8,0"
+                                    Background="#0D9488"
+                                    Foreground="White"
+                                    BorderThickness="0"
+                                    Cursor="Hand"/>
+                            <Button Content="سجل التعديل"
+                                    Tag="{Binding VisitId}"
+                                    Click="OpenVisitEditHistory_Click"
+                                    Padding="16,8"
+                                    Margin="0,0,8,0"
+                                    Background="Transparent"
+                                    Foreground="#0D9488"
+                                    BorderBrush="#0D9488"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    Visibility="{Binding HasEditHistory, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <Button Content="إغلاق"
+                                    Width="96"
+                                    Height="42"
+                                    Background="{DynamicResource AppInputBg}"
+                                    BorderBrush="{DynamicResource AppBorder}"
+                                    Foreground="{DynamicResource AppTextPrimary}"
+                                    FontWeight="SemiBold"
+                                    Cursor="Hand"
+                                    Click="CloseVisitDetails_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="12">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

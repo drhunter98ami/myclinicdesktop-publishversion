@@ -16,6 +16,6 @@ namespace MyClinic.Models
 
         public int FileKitCanalCount { get; set; }
 
-        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public DateTime UpdatedAt { get; set; } = AppClock.Now;
     }
 }

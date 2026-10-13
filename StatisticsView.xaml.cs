@@ -3,10 +3,7 @@ using MyClinic.Models;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
@@ -14,12 +11,11 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using Microsoft.Win32;
 
 namespace MyClinic
 {
+    // NOTE: the combined PDF report lives in StatisticsView.Report.cs (same partial class).
     public partial class StatisticsView : UserControl
     {
         // ── State ─────────────────────────────────────────────────────────────
@@ -28,14 +24,16 @@ namespace MyClinic
         private enum PieMetric { Money, Count }
         private enum IncomeChartType { Area, Columns }
 
+        private const string OtherLabel = ExpenseCategories.OtherLabel;
+
         private MainTab _mainTab   = MainTab.Income;
         private SubTab  _subTab    = SubTab.Monthly;
         private PieMetric _pieMetric = PieMetric.Money;
         private IncomeChartType _incomeChartType = IncomeChartType.Area;
 
-        private DateTime _selectedDay   = DateTime.Today;
-        private int      _selectedMonth = DateTime.Today.Month;
-        private int      _selectedYear  = DateTime.Today.Year;
+        private DateTime _selectedDay   = AppClock.Today;
+        private int      _selectedMonth = AppClock.Today.Month;
+        private int      _selectedYear  = AppClock.Today.Year;
 
         // ── Pie colours ───────────────────────────────────────────────────────
         private static readonly string[] SliceColors =
@@ -44,20 +42,6 @@ namespace MyClinic
             "#06B6D4","#F97316","#EC4899","#84CC16","#6366F1",
             "#14B8A6","#FB923C","#A855F7","#22C55E","#E11D48"
         };
-
-        // Expense keyword → display label (order matters: first match wins)
-        private static readonly (string Keyword, string Label)[] ExpenseKeywords =
-        {
-            ("مخبر",   "مخبر"),
-            ("نواقص",  "نواقص"),
-            ("خزان",   "خزان"),
-            ("صيانة",  "صيانة"),
-            ("أجار",   "أجار"),
-            ("أمبير",  "أمبير"),
-            ("كهربا",  "كهربا"),
-            ("ممرضة",  "ممرضة"),
-        };
-        private const string OtherLabel = "أخرى";
 
         // ── Constructor ───────────────────────────────────────────────────────
         public StatisticsView()
@@ -137,9 +121,30 @@ namespace MyClinic
 
         private async void BtnNow_Click(object sender, RoutedEventArgs e)
         {
-            _selectedDay   = DateTime.Today;
-            _selectedMonth = DateTime.Today.Month;
-            _selectedYear  = DateTime.Today.Year;
+            _selectedDay   = AppClock.Today;
+            _selectedMonth = AppClock.Today.Month;
+            _selectedYear  = AppClock.Today.Year;
+            await RefreshAsync();
+        }
+
+        public async Task RefreshForAppTimeChangeAsync(DateTime previousAppTime)
+        {
+            DateTime previousDate = previousAppTime.Date;
+            DateTime currentDate = AppClock.Today;
+
+            if (_selectedDay.Date == previousDate)
+                _selectedDay = currentDate;
+
+            if (_selectedMonth == previousDate.Month && _selectedYear == previousDate.Year)
+            {
+                _selectedMonth = currentDate.Month;
+                _selectedYear = currentDate.Year;
+            }
+            else if (_selectedYear == previousDate.Year)
+            {
+                _selectedYear = currentDate.Year;
+            }
+
             await RefreshAsync();
         }
 
@@ -157,129 +162,6 @@ namespace MyClinic
             UpdateIncomeChartStyles();
             if (_mainTab == MainTab.Income)
                 await RefreshAsync();
-        }
-
-        private async void BtnExportExpensesPdf_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                List<ExpenseEntry> expenses;
-                using (var ctx = new AppDbContext())
-                {
-                    expenses = await ApplyDateFilterExpenses(ctx.Expenses.AsNoTracking().AsQueryable())
-                        .OrderBy(e => e.ExpenseDate)
-                        .ToListAsync();
-                }
-
-                SaveFileDialog dialog = new()
-                {
-                    Title = "تصدير تفاصيل المصاريف",
-                    Filter = "ملف PDF (*.pdf)|*.pdf",
-                    FileName = $"المصاريف-{PeriodFileLabel()}.pdf",
-                    AddExtension = true,
-                    OverwritePrompt = true
-                };
-                if (dialog.ShowDialog() != true) return;
-
-                File.WriteAllBytes(dialog.FileName, BuildImagePdf(BuildExpensePdfPages(expenses)));
-                MessageBox.Show("تم تصدير تفاصيل المصاريف بنجاح.", "التصدير", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"تعذر تصدير المصاريف حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void BtnExportIncomeExcel_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                DateTime start = SelectedPeriodStart();
-                DateTime end = SelectedPeriodEnd();
-                List<IncomeExportDetail> details;
-                List<IncomeExportSummary> summary;
-                List<TreatmentIncomeExportRow> treatmentSummary;
-
-                using (var ctx = new AppDbContext())
-                {
-                    List<Visit> allVisits = await ctx.Visits.AsNoTracking().ToListAsync();
-                    List<Visit> visits = allVisits
-                        .Where(v => v.VisitDate >= start && v.VisitDate < end.AddDays(1))
-                        .Where(v => v.CurrentCost != 0 || v.TodayPaid > 0)
-                        .ToList();
-                    var expenses = await ctx.Expenses.AsNoTracking()
-                        .Where(e => e.ExpenseDate >= start && e.ExpenseDate < end.AddDays(1))
-                        .Select(e => new { e.ExpenseDate, e.Description, e.Amount })
-                        .ToListAsync();
-
-                    details = visits.Select(v => new IncomeExportDetail(v.VisitDate, "دخل", $"زيارة رقم {v.Id}", v.TodayPaid, "الدخل"))
-                        .Concat(expenses.Select(e => new IncomeExportDetail(e.ExpenseDate, "مصروف", e.Description, e.Amount, ClassifyExpense(e.Description))))
-                        .OrderBy(d => d.Date)
-                        .ToList();
-
-                    summary = BuildIncomeSummary(start, end, visits.Select(v => (v.VisitDate, v.TodayPaid)), expenses.Select(e => (e.ExpenseDate, e.Amount)));
-                    treatmentSummary = BuildTreatmentIncomeExportRows(allVisits, visits);
-                }
-
-                SaveFileDialog dialog = new()
-                {
-                    Title = "تصدير إجمالي الدخل",
-                    Filter = "ملف Excel (*.xlsx)|*.xlsx",
-                    FileName = $"الدخل-{PeriodFileLabel()}.xlsx",
-                    AddExtension = true,
-                    OverwritePrompt = true
-                };
-                if (dialog.ShowDialog() != true) return;
-
-                File.WriteAllBytes(dialog.FileName, BuildIncomeWorkbook(summary, details, treatmentSummary));
-                MessageBox.Show("تم تصدير إجمالي الدخل بنجاح.", "التصدير", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"تعذر تصدير الدخل حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void BtnExportTreatmentsExcel_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                DateTime start = SelectedPeriodStart();
-                DateTime end = SelectedPeriodEnd();
-                List<TreatmentIncomeExportRow> treatmentSummary;
-
-                using (var ctx = new AppDbContext())
-                {
-                    List<Visit> allVisits = await ctx.Visits.AsNoTracking().ToListAsync();
-                    List<Visit> selectedVisits = allVisits
-                        .Where(v => v.VisitDate >= start && v.VisitDate < end.AddDays(1))
-                        .ToList();
-                    List<string> knownTreatments = await ctx.TreatmentCosts
-                        .AsNoTracking()
-                        .Select(t => t.TreatmentName)
-                        .Where(name => !string.IsNullOrWhiteSpace(name))
-                        .Distinct()
-                        .ToListAsync();
-                    treatmentSummary = BuildTreatmentIncomeExportRows(allVisits, selectedVisits, knownTreatments);
-                }
-
-                SaveFileDialog dialog = new()
-                {
-                    Title = "تصدير إحصائيات العلاجات",
-                    Filter = "ملف Excel (*.xlsx)|*.xlsx",
-                    FileName = $"العلاجات-{PeriodFileLabel()}.xlsx",
-                    AddExtension = true,
-                    OverwritePrompt = true
-                };
-                if (dialog.ShowDialog() != true) return;
-
-                File.WriteAllBytes(dialog.FileName, BuildTreatmentWorkbook(treatmentSummary));
-                MessageBox.Show("تم تصدير إحصائيات العلاجات بنجاح.", "التصدير", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"تعذر تصدير إحصائيات العلاجات حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
         private void StepDate(int delta)
@@ -609,8 +491,7 @@ namespace MyClinic
 
             // Build slices: fixed category order, then أخرى last
             var slices = new List<PieSlice>();
-            var fixedOrder = ExpenseKeywords.Select(k => k.Label).ToList();
-            fixedOrder.Add(OtherLabel);
+            var fixedOrder = ExpenseCategories.Labels;
 
             int colorIdx = 0;
             foreach (var label in fixedOrder)
@@ -1075,11 +956,7 @@ namespace MyClinic
         // Classify an expense description into a category label
         private static string ClassifyExpense(string description)
         {
-            if (string.IsNullOrWhiteSpace(description)) return OtherLabel;
-            foreach (var (keyword, label) in ExpenseKeywords)
-                if (description.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-                    return label;
-            return OtherLabel;
+            return ExpenseCategories.Classify(description);
         }
 
         private DateTime SelectedPeriodStart() => _subTab switch
@@ -1106,316 +983,14 @@ namespace MyClinic
             _ => "الفترة"
         };
 
-        private List<byte[]> BuildExpensePdfPages(List<ExpenseEntry> expenses)
-        {
-            List<string> categories = ExpenseKeywords.Select(k => k.Label).Append(OtherLabel).ToList();
-            List<ExpensePdfPage> pageData = new();
-            bool showGlobalHeader = true;
-            for (int categoryIndex = 0; categoryIndex < categories.Count; categoryIndex++)
-            {
-                string category = categories[categoryIndex];
-                List<ExpenseEntry> rows = expenses.Where(e => ClassifyExpense(e.Description) == category).ToList();
-                double categoryTotal = rows.Sum(e => e.Amount);
-                if (rows.Count == 0)
-                    pageData.Add(new ExpensePdfPage(category, rows, categoryIndex, categoryTotal, showGlobalHeader));
-                else
-                    for (int offset = 0; offset < rows.Count; offset += 16)
-                    {
-                        pageData.Add(new ExpensePdfPage(category, rows.Skip(offset).Take(16).ToList(), categoryIndex, categoryTotal, showGlobalHeader));
-                        showGlobalHeader = false;
-                    }
-                showGlobalHeader = false;
-            }
-
-            List<byte[]> pages = new();
-            for (int i = 0; i < pageData.Count; i++)
-                pages.Add(RenderExpensePdfPage(pageData[i], i + 1, pageData.Count, expenses.Sum(e => e.Amount)));
-            return pages;
-        }
-
-        private byte[] RenderExpensePdfPage(ExpensePdfPage page, int pageNumber, int pageCount, double grandTotal)
-        {
-            const int width = 1200;
-            const int height = 850;
-            DrawingVisual visual = new();
-            using (DrawingContext dc = visual.RenderOpen())
-            {
-                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
-                double y = 48;
-                if (page.ShowGlobalHeader)
-                {
-                    DrawExportText(dc, "تفاصيل المصاريف", 60, y, 30, Brushes.Black, true);
-                    DrawExportText(dc, $"الفترة: {CurrentPeriodLabel()}", 60, y + 44, 18, Brushes.DimGray, false);
-                    DrawExportText(dc, $"إجمالي المصاريف: {grandTotal:N0} ل.س", 60, y + 77, 18, Brushes.DarkSlateBlue, true);
-                    y += 145;
-                }
-
-                Brush categoryBrush = HexBrush(SliceColors[page.CategoryIndex % SliceColors.Length]);
-                DrawExportText(dc, $"فئة: {page.Category}", 60, y, 23, categoryBrush, true);
-                DrawExportText(dc, $"مجموع الفئة: {page.CategoryTotal:N0} ل.س", 60, y + 36, 18, categoryBrush, true);
-                DrawExportText(dc, "التاريخ    -    التفاصيل    -    المبلغ", 60, y + 78, 18, Brushes.Black, true);
-
-                if (page.Rows.Count == 0)
-                    DrawExportText(dc, "لا توجد مصاريف في هذه الفئة", 60, y + 123, 18, Brushes.Gray, false);
-                else
-                {
-                    for (int i = 0; i < page.Rows.Count; i++)
-                    {
-                        ExpenseEntry expense = page.Rows[i];
-                        string line = $"{expense.ExpenseDate:dd/MM/yyyy}    -    {TruncateExport(expense.Description, 72)}    -    {expense.Amount:N0} ل.س";
-                        DrawExportText(dc, line, 60, y + 123 + i * 28, 16, Brushes.Black, false);
-                    }
-                }
-
-                DrawExportText(dc, $"صفحة {pageNumber} من {pageCount}", 60, 795, 14, Brushes.Gray, false);
-            }
-
-            RenderTargetBitmap bitmap = new(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(visual);
-            JpegBitmapEncoder encoder = new() { QualityLevel = 92 };
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using MemoryStream stream = new();
-            encoder.Save(stream);
-            return stream.ToArray();
-        }
-
-        private static void DrawExportText(DrawingContext dc, string text, double x, double y, double size, Brush brush, bool bold)
-        {
-            FormattedText formatted = new(
-                text,
-                CultureInfo.CurrentCulture,
-                FlowDirection.RightToLeft,
-                new Typeface(new FontFamily("Arial"), FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
-                size,
-                brush,
-                1.0);
-            // With right-to-left text, WPF treats the origin as the right edge.
-            // Keep that edge inside the A4 raster page so the text is not clipped.
-            dc.DrawText(formatted, new Point(1140, y));
-        }
-
-        private byte[] BuildIncomeWorkbook(List<(DateTime Day, double Amount)> dailyIncome)
-        {
-            const string mainNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-            int lastDataRow = 4 + dailyIncome.Count;
-            StringBuilder sheet = new();
-            sheet.Append($"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"{mainNs}\"><sheetViews><sheetView workbookViewId=\"0\" rightToLeft=\"1\"/></sheetViews><sheetData>");
-            sheet.Append($"<row r=\"1\">{InlineCell("A1", "إجمالي الدخل اليومي")}</row>");
-            sheet.Append($"<row r=\"2\">{InlineCell("A2", $"الفترة: {CurrentPeriodLabel()}")}</row>");
-            sheet.Append($"<row r=\"3\"><c r=\"A3\" s=\"2\" t=\"inlineStr\"><is><t>الإجمالي</t></is></c><c r=\"C3\" s=\"3\"><f>SUM(C5:C{lastDataRow})</f></c></row>");
-            sheet.Append($"<row r=\"4\">{InlineCell("A4", "اليوم", 2)}{InlineCell("B4", "التاريخ", 2)}{InlineCell("C4", "الدخل (ل.س)", 2)}</row>");
-            for (int i = 0; i < dailyIncome.Count; i++)
-            {
-                int row = i + 5;
-                double serial = (dailyIncome[i].Day.Date - new DateTime(1899, 12, 30)).TotalDays;
-                sheet.Append($"<row r=\"{row}\">{InlineCell($"A{row}", dailyIncome[i].Day.ToString("dddd", CultureInfo.CurrentCulture))}<c r=\"B{row}\" s=\"4\"><v>{serial:0}</v></c><c r=\"C{row}\" s=\"3\"><v>{dailyIncome[i].Amount.ToString(CultureInfo.InvariantCulture)}</v></c></row>");
-            }
-            sheet.Append("</sheetData><cols><col min=\"1\" max=\"1\" width=\"20\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"15\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"20\" customWidth=\"1\"/></cols><autoFilter ref=\"A4:C" + lastDataRow + "\"/></worksheet>");
-
-            using MemoryStream output = new();
-            using (ZipArchive zip = new(output, ZipArchiveMode.Create, true))
-            {
-                AddZipEntry(zip, "[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>");
-                AddZipEntry(zip, "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><calcPr fullCalcOnLoad=\"1\"/><sheets><sheet name=\"الدخل اليومي\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>");
-                AddZipEntry(zip, "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Arial\"/></font><font><b/><sz val=\"12\"/><name val=\"Arial\"/></font></fonts><fills count=\"2\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFDDEBF7\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellXfs count=\"5\"><xf/><xf fontId=\"1\" fillId=\"1\"/><xf fontId=\"1\"/><xf numFmtId=\"4\"/><xf numFmtId=\"14\"/></cellXfs></styleSheet>");
-                AddZipEntry(zip, "xl/worksheets/sheet1.xml", sheet.ToString());
-            }
-            return output.ToArray();
-        }
-
-        private List<IncomeExportSummary> BuildIncomeSummary(
-            DateTime start,
-            DateTime end,
-            IEnumerable<(DateTime Date, double Amount)> incomes,
-            IEnumerable<(DateTime Date, double Amount)> expenses)
-        {
-            List<IncomeExportSummary> result = new();
-            if (_subTab == SubTab.Yearly)
-            {
-                for (int month = 1; month <= 12; month++)
-                {
-                    result.Add(new IncomeExportSummary(
-                        $"{ArabicMonth(month)} {_selectedYear}",
-                        incomes.Where(x => x.Date.Year == _selectedYear && x.Date.Month == month).Sum(x => x.Amount),
-                        expenses.Where(x => x.Date.Year == _selectedYear && x.Date.Month == month).Sum(x => x.Amount)));
-                }
-            }
-            else
-            {
-                for (DateTime day = start; day <= end; day = day.AddDays(1))
-                {
-                    result.Add(new IncomeExportSummary(
-                        day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                        incomes.Where(x => x.Date.Date == day.Date).Sum(x => x.Amount),
-                        expenses.Where(x => x.Date.Date == day.Date).Sum(x => x.Amount)));
-                }
-            }
-            return result;
-        }
-
-        private byte[] BuildIncomeWorkbook(
-            List<IncomeExportSummary> summary,
-            List<IncomeExportDetail> details,
-            List<TreatmentIncomeExportRow> treatmentSummary)
-        {
-            string summarySheet = BuildSummarySheet(summary);
-            string detailSheet = BuildDetailSheet(details);
-            string treatmentSheet = BuildTreatmentSummarySheet(treatmentSummary);
-            using MemoryStream output = new();
-            using (ZipArchive zip = new(output, ZipArchiveMode.Create, true))
-            {
-                AddZipEntry(zip, "[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/worksheets/sheet2.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/worksheets/sheet3.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>");
-                AddZipEntry(zip, "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"الملخص\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"التفاصيل\" sheetId=\"2\" r:id=\"rId2\"/><sheet name=\"العلاجات\" sheetId=\"3\" r:id=\"rId3\"/></sheets></workbook>");
-                AddZipEntry(zip, "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/><Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet3.xml\"/><Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/styles.xml", ExcelStylesXml());
-                AddZipEntry(zip, "xl/worksheets/sheet1.xml", summarySheet);
-                AddZipEntry(zip, "xl/worksheets/sheet2.xml", detailSheet);
-                AddZipEntry(zip, "xl/worksheets/sheet3.xml", treatmentSheet);
-            }
-            return output.ToArray();
-        }
-
-        private string BuildTreatmentSummarySheet(List<TreatmentIncomeExportRow> rows)
-        {
-            int totalRow = rows.Count + 4;
-            StringBuilder sheet = new("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheetViews><sheetView workbookViewId=\"0\" rightToLeft=\"1\"/></sheetViews><cols><col min=\"1\" max=\"1\" width=\"36\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"16\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"20\" customWidth=\"1\"/></cols><sheetData>");
-            sheet.Append($"<row r=\"1\">{InlineCell("A1", "ملخص العلاجات", 1)}</row><row r=\"2\">{InlineCell("A2", $"الفترة: {CurrentPeriodLabel()}")}</row>");
-            sheet.Append($"<row r=\"3\">{InlineCell("A3", "اسم العلاج", 2)}{InlineCell("B3", "العدد", 2)}{InlineCell("C3", "الدخل (ل.س)", 2)}</row>");
-            for (int i = 0; i < rows.Count; i++)
-            {
-                int row = i + 4;
-                sheet.Append($"<row r=\"{row}\">{InlineCell($"A{row}", rows[i].Name)}{NumberCell($"B{row}", rows[i].Count, 3)}{NumberCell($"C{row}", rows[i].Income, 5)}</row>");
-            }
-            sheet.Append($"<row r=\"{totalRow}\">{InlineCell($"A{totalRow}", "الإجمالي", 3)}{NumberCell($"B{totalRow}", rows.Sum(r => r.Count), 3)}{NumberCell($"C{totalRow}", rows.Sum(r => r.Income), 5)}</row>");
-            sheet.Append($"</sheetData><autoFilter ref=\"A3:C{totalRow - 1}\"/><mergeCells count=\"1\"><mergeCell ref=\"A1:C1\"/></mergeCells></worksheet>");
-            return sheet.ToString();
-        }
-
-        private byte[] BuildTreatmentWorkbook(List<TreatmentIncomeExportRow> rows)
-        {
-            using MemoryStream output = new();
-            using (ZipArchive zip = new(output, ZipArchiveMode.Create, true))
-            {
-                AddZipEntry(zip, "[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>");
-                AddZipEntry(zip, "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"العلاجات\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>");
-                AddZipEntry(zip, "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
-                AddZipEntry(zip, "xl/styles.xml", ExcelStylesXml());
-                AddZipEntry(zip, "xl/worksheets/sheet1.xml", BuildTreatmentSummarySheet(rows));
-            }
-            return output.ToArray();
-        }
-
-        private string BuildSummarySheet(List<IncomeExportSummary> rows)
-        {
-            int totalRow = rows.Count + 4;
-            StringBuilder sheet = new("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><cols><col min=\"1\" max=\"1\" width=\"24\" customWidth=\"1\"/><col min=\"2\" max=\"4\" width=\"18\" customWidth=\"1\"/></cols><sheetData>");
-            sheet.Append($"<row r=\"1\">{InlineCell("A1", "ملخص الدخل والمصاريف", 1)}</row><row r=\"2\">{InlineCell("A2", $"الفترة: {CurrentPeriodLabel()}")}</row>");
-            sheet.Append($"<row r=\"3\">{InlineCell("A3", "الفترة", 2)}{InlineCell("B3", "الدخل", 2)}{InlineCell("C3", "المصاريف", 2)}{InlineCell("D3", "الصافي", 2)}</row>");
-            for (int i = 0; i < rows.Count; i++)
-            {
-                int row = i + 4;
-                sheet.Append($"<row r=\"{row}\">{InlineCell($"A{row}", rows[i].Period)}{NumberCell($"B{row}", rows[i].Income, 5)}{NumberCell($"C{row}", rows[i].Expenses, 5)}{NumberCell($"D{row}", rows[i].Income - rows[i].Expenses, 5)}</row>");
-            }
-            sheet.Append($"<row r=\"{totalRow}\">{InlineCell($"A{totalRow}", "الإجمالي", 3)}{NumberCell($"B{totalRow}", rows.Sum(r => r.Income), 5)}{NumberCell($"C{totalRow}", rows.Sum(r => r.Expenses), 5)}{NumberCell($"D{totalRow}", rows.Sum(r => r.Income - r.Expenses), 5)}</row>");
-            sheet.Append($"</sheetData><mergeCells count=\"1\"><mergeCell ref=\"A1:D1\"/></mergeCells></worksheet>");
-            return sheet.ToString();
-        }
-
-        private string BuildDetailSheet(List<IncomeExportDetail> rows)
-        {
-            int totalRow = rows.Count + 4;
-            StringBuilder sheet = new("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><cols><col min=\"1\" max=\"1\" width=\"16\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"14\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"38\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"18\" customWidth=\"1\"/><col min=\"5\" max=\"5\" width=\"18\" customWidth=\"1\"/></cols><sheetData>");
-            sheet.Append($"<row r=\"1\">{InlineCell("A1", "تفاصيل الدخل والمصاريف", 1)}</row><row r=\"2\">{InlineCell("A2", $"الفترة: {CurrentPeriodLabel()}")}</row>");
-            sheet.Append($"<row r=\"3\">{InlineCell("A3", "التاريخ", 2)}{InlineCell("B3", "النوع", 2)}{InlineCell("C3", "الوصف", 2)}{InlineCell("D3", "المبلغ", 2)}{InlineCell("E3", "التصنيف", 2)}</row>");
-            for (int i = 0; i < rows.Count; i++)
-            {
-                int row = i + 4;
-                double serial = (rows[i].Date - new DateTime(1899, 12, 30)).TotalDays;
-                sheet.Append($"<row r=\"{row}\">{NumberCell($"A{row}", serial, 4)}{InlineCell($"B{row}", rows[i].Type)}{InlineCell($"C{row}", rows[i].Description)}{NumberCell($"D{row}", rows[i].Amount, 5)}{InlineCell($"E{row}", rows[i].Category)}</row>");
-            }
-            sheet.Append($"<row r=\"{totalRow}\">{InlineCell($"C{totalRow}", "الإجمالي", 3)}{NumberCell($"D{totalRow}", rows.Sum(r => r.Amount), 5)}</row>");
-            sheet.Append($"</sheetData><mergeCells count=\"1\"><mergeCell ref=\"A1:E1\"/></mergeCells></worksheet>");
-            return sheet.ToString();
-        }
-
-        private static string NumberCell(string reference, double value, int style) =>
-            $"<c r=\"{reference}\" s=\"{style}\"><v>{value.ToString(CultureInfo.InvariantCulture)}</v></c>";
-
-        private static string ExcelStylesXml() => "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Arial\"/></font><font><b/><sz val=\"14\"/><name val=\"Arial\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFD9EAF7\"/></patternFill></fill></fills><borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellXfs count=\"6\"><xf/><xf fontId=\"1\"/><xf fillId=\"2\" fontId=\"1\"/><xf fillId=\"2\" fontId=\"0\"/><xf numFmtId=\"14\"/><xf numFmtId=\"4\"/></cellXfs></styleSheet>";
-
-        private static string InlineCell(string reference, string value, int style = 0) =>
-            $"<c r=\"{reference}\"{(style > 0 ? $" s=\"{style}\"" : "")} t=\"inlineStr\"><is><t xml:space=\"preserve\">{XmlEscape(value)}</t></is></c>";
-
-        private static string XmlEscape(string value) => System.Security.SecurityElement.Escape(value) ?? string.Empty;
-
-        private static void AddZipEntry(ZipArchive zip, string name, string content)
-        {
-            ZipArchiveEntry entry = zip.CreateEntry(name, CompressionLevel.Fastest);
-            using StreamWriter writer = new(entry.Open(), new UTF8Encoding(false));
-            writer.Write(content);
-        }
-
-        private static byte[] BuildImagePdf(List<byte[]> images)
-        {
-            using MemoryStream pdf = new();
-            WriteAscii(pdf, "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
-            List<long> offsets = new() { 0 };
-            int pageCount = images.Count;
-            int catalog = 1, pages = 2;
-            List<int> pageObjects = Enumerable.Range(0, pageCount).Select(i => 3 + i * 3).ToList();
-            List<string> objects = new() { "", $"<< /Type /Catalog /Pages {pages} 0 R >>", $"<< /Type /Pages /Kids [{string.Join(" ", pageObjects.Select(n => $"{n} 0 R"))}] /Count {pageCount} >>" };
-            foreach (int i in Enumerable.Range(0, pageCount))
-            {
-                int page = pageObjects[i], content = page + 1, image = page + 2;
-                objects.Add($"<< /Type /Page /Parent {pages} 0 R /MediaBox [0 0 842 595] /Resources << /XObject << /Im0 {image} 0 R >> >> /Contents {content} 0 R >>");
-                string stream = "q\n842 0 0 595 0 0 cm\n/Im0 Do\nQ\n";
-                objects.Add($"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}endstream");
-                objects.Add(string.Empty);
-            }
-            for (int i = 1; i < objects.Count; i++)
-            {
-                offsets.Add(pdf.Position);
-                WriteAscii(pdf, $"{i} 0 obj\n");
-                if (objects[i].Length > 0) WriteAscii(pdf, objects[i] + "\nendobj\n");
-                else
-                {
-                    byte[] image = images[(i - 5) / 3];
-                    WriteAscii(pdf, $"<< /Type /XObject /Subtype /Image /Width 1200 /Height 850 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {image.Length} >>\nstream\n");
-                    pdf.Write(image, 0, image.Length);
-                    WriteAscii(pdf, "\nendstream\nendobj\n");
-                }
-            }
-            long xref = pdf.Position;
-            WriteAscii(pdf, $"xref\n0 {objects.Count}\n0000000000 65535 f \n");
-            for (int i = 1; i < objects.Count; i++) WriteAscii(pdf, $"{offsets[i]:D10} 00000 n \n");
-            WriteAscii(pdf, $"trailer\n<< /Size {objects.Count} /Root {catalog} 0 R >>\nstartxref\n{xref}\n%%EOF");
-            return pdf.ToArray();
-        }
-
-        private static void WriteAscii(Stream stream, string value)
-        {
-            byte[] bytes = Encoding.ASCII.GetBytes(value);
-            stream.Write(bytes, 0, bytes.Length);
-        }
-
         private string CurrentPeriodLabel() => _subTab switch
         {
-            SubTab.Daily => _selectedDay.ToString("dd/MM/yyyy", CultureInfo.CurrentCulture),
-            SubTab.Monthly => $"{ArabicMonth(_selectedMonth)} {_selectedYear}",
-            SubTab.Yearly => _selectedYear.ToString(CultureInfo.CurrentCulture),
+            SubTab.Daily => _selectedDay.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+            SubTab.Monthly => $"{ArabicMonth(_selectedMonth)} {_selectedYear.ToString(CultureInfo.InvariantCulture)}",
+            SubTab.Yearly => _selectedYear.ToString(CultureInfo.InvariantCulture),
             _ => string.Empty
         };
 
-        private static string TruncateExport(string value, int max) =>
-            string.IsNullOrWhiteSpace(value) ? "بدون تفاصيل" : value.Length <= max ? value : value[..max] + "...";
-
-        private sealed record ExpensePdfPage(string Category, List<ExpenseEntry> Rows, int CategoryIndex, double CategoryTotal, bool ShowGlobalHeader);
-        private sealed record IncomeExportSummary(string Period, double Income, double Expenses);
-        private sealed record IncomeExportDetail(DateTime Date, string Type, string Description, double Amount, string Category);
         private sealed record TreatmentIncomeExportRow(string Name, int Count, double Income);
 
         private sealed class ExpenseDetailRow
@@ -1565,9 +1140,7 @@ namespace MyClinic
             BtnTabTreatments.Style = _mainTab == MainTab.Treatments ? active : inactive;
             BtnIncomeArea.Visibility = _mainTab == MainTab.Income ? Visibility.Visible : Visibility.Collapsed;
             BtnIncomeColumns.Visibility = _mainTab == MainTab.Income ? Visibility.Visible : Visibility.Collapsed;
-            BtnExportTreatmentsExcel.Visibility = _mainTab == MainTab.Treatments ? Visibility.Visible : Visibility.Collapsed;
-            BtnExportExpensesPdf.Visibility = _mainTab == MainTab.Expenses ? Visibility.Visible : Visibility.Collapsed;
-            BtnExportIncomeExcel.Visibility = _mainTab == MainTab.Income ? Visibility.Visible : Visibility.Collapsed;
+            // BtnExportPdf (combined report) is visible on every tab.
         }
 
         private void UpdateIncomeChartStyles()
@@ -1590,7 +1163,7 @@ namespace MyClinic
             BtnYearly.Style  = _subTab == SubTab.Yearly  ? active : inactive;
         }
 
-        // Hex colour string → SolidColorBrush
+        // Hex colour string → SolidColorBrush (also accepts #AARRGGBB)
         private static SolidColorBrush HexBrush(string hex)
         {
             try

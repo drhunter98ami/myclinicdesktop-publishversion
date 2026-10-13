@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -26,62 +27,48 @@ namespace MyClinic.Services
         private static readonly HttpClient HttpClient = CreateHttpClient();
 
         public static Version CurrentVersion =>
-            Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 3);
+            Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 7, 0);
 
         public static async Task<UpdateInfo?> GetLatestUpdateAsync(CancellationToken cancellationToken = default)
         {
-            try
-            {
-                using HttpResponseMessage response = await HttpClient.GetAsync(LatestReleaseUrl, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                    return null;
+            using HttpResponseMessage response = await HttpClient.GetAsync(LatestReleaseUrl, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            GitHubRelease? release = await JsonSerializer.DeserializeAsync<GitHubRelease>(
+                responseStream,
+                cancellationToken: cancellationToken);
 
-                await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                GitHubRelease? release = await JsonSerializer.DeserializeAsync<GitHubRelease>(
-                    responseStream,
-                    cancellationToken: cancellationToken);
+            if (release is null)
+                throw new JsonException("GitHub returned an empty release response.");
 
-                if (release is null || release.Draft || release.Prerelease ||
-                    !TryParseVersion(release.TagName, out Version latestVersion) ||
-                    latestVersion <= CurrentVersion)
-                {
-                    return null;
-                }
-
-                GitHubAsset? asset = release.Assets
-                    .Where(candidate => candidate.State.Equals("uploaded", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(candidate => IsInstallerAsset(candidate.Name))
-                    .ThenByDescending(candidate => candidate.Size)
-                    .FirstOrDefault();
-
-                if (asset is null || string.IsNullOrWhiteSpace(asset.BrowserDownloadUrl) || asset.Size <= 0)
-                    return null;
-
-                return new UpdateInfo
-                {
-                    Version = latestVersion.ToString(),
-                    SizeText = FormatFileSize(asset.Size),
-                    DownloadUrl = asset.BrowserDownloadUrl,
-                    AssetName = asset.Name
-                };
-            }
-            catch (OperationCanceledException)
-            {
+            if (release.Draft || release.Prerelease)
                 return null;
-            }
-            catch (HttpRequestException)
-            {
+
+            if (!TryParseVersion(release.TagName, out Version latestVersion))
+                throw new JsonException("GitHub returned a release with an invalid version tag.");
+
+            if (latestVersion <= CurrentVersion)
                 return null;
-            }
-            catch (JsonException)
+
+            GitHubAsset? asset = release.Assets
+                .Where(candidate => candidate.State.Equals("uploaded", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(candidate => IsInstallerAsset(candidate.Name))
+                .ThenByDescending(candidate => candidate.Size)
+                .FirstOrDefault();
+
+            if (asset is null || string.IsNullOrWhiteSpace(asset.BrowserDownloadUrl) || asset.Size <= 0)
             {
-                return null;
+                throw new InvalidDataException(
+                    $"GitHub release {release.TagName} is newer, but it does not have a downloadable installer asset.");
             }
-            catch
+
+            return new UpdateInfo
             {
-                // Update checks are optional. Ignore any unexpected API or parsing issue.
-                return null;
-            }
+                Version = latestVersion.ToString(),
+                SizeText = FormatFileSize(asset.Size),
+                DownloadUrl = asset.BrowserDownloadUrl,
+                AssetName = asset.Name
+            };
         }
 
         private static HttpClient CreateHttpClient()

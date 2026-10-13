@@ -508,6 +508,8 @@ namespace MyClinic
 
             VisitDetailsViewModel viewModel = new()
             {
+                VisitId = visit.VisitId,
+                HasEditHistory = visit.HasEditHistory,
                 PatientName = _selectedPatientLookup.DisplayName,
                 DoctorName = VisitDoctorName,
                 VisitDateTimeText = visit.VisitDateTimeText,
@@ -552,6 +554,50 @@ namespace MyClinic
                         viewModel.AttachmentItems.Add(item);
                     }
                 }
+            }
+        }
+
+        private void EditVisit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int visitId } || _selectedPatientLookup is null)
+                return;
+
+            try
+            {
+                VisitEditWindow editor = new(visitId) { Owner = Window.GetWindow(this) };
+                if (editor.ShowDialog() != true)
+                    return;
+
+                HideVisitDetailsOverlay();
+                _attachmentCache.Remove(visitId);
+                LoadPreviousVisits(_selectedPatientLookup);
+                GlobalEvents.NotifyPatientRecordAdded();
+                GlobalEvents.NotifyFinancialRecordAdded();
+                if (Window.GetWindow(this) is MainWindow mainWindow)
+                {
+                    mainWindow.InvalidatePatientRecords();
+                    mainWindow.InvalidateFinancialRecords();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenVisitEditHistory_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int visitId })
+                return;
+
+            try
+            {
+                VisitEditHistoryWindow history = new(visitId) { Owner = Window.GetWindow(this) };
+                history.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -704,72 +750,79 @@ namespace MyClinic
 
         private async void LoadPreviousVisits(PatientLookupSnapshot snapshot)
         {
-            using var db = new AppDbContext();
-
-            // 1. جلب الزيارات الخاصة بالمريض
-            var rawVisits = db.Visits
-                .AsNoTracking()
-                .Where(visit => visit.PatientId == snapshot.Id)
-                .Include(visit => visit.ToothRecords)
-                .OrderByDescending(visit => visit.VisitDate)
-                .ToList();
-
-            // 2. حساب الإجماليات المالية السابقة
-            decimal totalCost = rawVisits.Sum(v => (decimal)v.CurrentCost);
-            decimal totalPaid = rawVisits.Sum(v => (decimal)v.TodayPaid);
-            decimal totalRemaining = totalCost - totalPaid;
-
-            // 3. تحديث وإظهار شريط الإجماليات
-            if (TxtTotalPatientCost != null) TxtTotalPatientCost.Text = totalCost.ToString("0.##", CultureInfo.CurrentCulture);
-            if (TxtTotalPatientPaid != null) TxtTotalPatientPaid.Text = totalPaid.ToString("0.##", CultureInfo.CurrentCulture);
-            if (TxtTotalPatientRemaining != null) TxtTotalPatientRemaining.Text = totalRemaining.ToString("0.##", CultureInfo.CurrentCulture);
-            if (PatientFinancialHistoryPanel != null) PatientFinancialHistoryPanel.Visibility = Visibility.Visible;
-
-            // 4. إكمال الكود الأصلي
-            List<VisitHistoryItem> visits = rawVisits.Select(MapVisit).ToList();
-
-            _previousVisits.Clear();
-            foreach (VisitHistoryItem visit in visits)
+            try
             {
-                _previousVisits.Add(visit);
-            }
+                using var db = new AppDbContext();
 
-            if (visits.Count == 0)
+                var rawVisits = db.Visits
+                    .AsNoTracking()
+                    .Where(visit => visit.PatientId == snapshot.Id)
+                    .Include(visit => visit.ToothRecords)
+                    .Include(visit => visit.EditHistories)
+                    .OrderByDescending(visit => visit.VisitDate)
+                    .ToList();
+
+                decimal totalCost = rawVisits.Sum(v => (decimal)v.CurrentCost);
+                decimal totalPaid = rawVisits.Sum(v => (decimal)v.TodayPaid);
+                decimal totalRemaining = totalCost - totalPaid;
+
+                if (TxtTotalPatientCost != null) TxtTotalPatientCost.Text = totalCost.ToString("0.##", CultureInfo.CurrentCulture);
+                if (TxtTotalPatientPaid != null) TxtTotalPatientPaid.Text = totalPaid.ToString("0.##", CultureInfo.CurrentCulture);
+                if (TxtTotalPatientRemaining != null) TxtTotalPatientRemaining.Text = totalRemaining.ToString("0.##", CultureInfo.CurrentCulture);
+                if (PatientFinancialHistoryPanel != null) PatientFinancialHistoryPanel.Visibility = Visibility.Visible;
+
+                List<VisitHistoryItem> visits = rawVisits.Select(MapVisit).ToList();
+
+                _previousVisits.Clear();
+                foreach (VisitHistoryItem visit in visits)
+                    _previousVisits.Add(visit);
+
+                if (visits.Count == 0)
+                {
+                    ClearPreviousVisits();
+                    return;
+                }
+
+                if (PreviousVisitsPanel != null) PreviousVisitsPanel.Visibility = Visibility.Visible;
+                if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = visits.Count.ToString(CultureInfo.CurrentCulture);
+                if (TxtPreviousVisitsHint != null)
+                {
+                    TxtPreviousVisitsHint.Text = visits.Count == 1
+                        ? "تم العثور على زيارة سابقة واحدة. اضغط عليها لعرض التفاصيل."
+                        : $"تم العثور على {visits.Count} زيارات سابقة. اضغط على أي زيارة لعرض التفاصيل.";
+                }
+
+                List<VisitHistoryItem> needsLoad = visits
+                    .Where(v => v.AttachmentPaths.Count > 0 && !_attachmentCache.ContainsKey(v.VisitId))
+                    .ToList();
+
+                if (needsLoad.Count > 0)
+                {
+                    using SemaphoreSlim sem = new(3);
+                    await Task.WhenAll(needsLoad.Select(async v =>
+                    {
+                        await sem.WaitAsync();
+                        try
+                        {
+                            IReadOnlyList<VisitAttachmentItem> items =
+                                await Task.Run(() => LoadAttachmentItems(v.AttachmentPaths));
+                            _attachmentCache[v.VisitId] = items;
+                        }
+                        finally
+                        {
+                            sem.Release();
+                        }
+                    }));
+                }
+            }
+            catch (Exception ex)
             {
                 ClearPreviousVisits();
-                return;
-            }
-
-            if (PreviousVisitsPanel != null) PreviousVisitsPanel.Visibility = Visibility.Visible;
-            if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = visits.Count.ToString(CultureInfo.CurrentCulture);
-            if (TxtPreviousVisitsHint != null)
-            {
-                TxtPreviousVisitsHint.Text = visits.Count == 1
-                    ? "تم العثور على زيارة سابقة واحدة. اضغط عليها لعرض التفاصيل."
-                    : $"تم العثور على {visits.Count} زيارات سابقة. اضغط على أي زيارة لعرض التفاصيل.";
-            }
-
-            List<VisitHistoryItem> needsLoad = visits
-                .Where(v => v.AttachmentPaths.Count > 0 && !_attachmentCache.ContainsKey(v.VisitId))
-                .ToList();
-
-            if (needsLoad.Count > 0)
-            {
-                using SemaphoreSlim sem = new(3);
-                await Task.WhenAll(needsLoad.Select(async v =>
-                {
-                    await sem.WaitAsync();
-                    try
-                    {
-                        IReadOnlyList<VisitAttachmentItem> items =
-                            await Task.Run(() => LoadAttachmentItems(v.AttachmentPaths));
-                        _attachmentCache[v.VisitId] = items;
-                    }
-                    finally
-                    {
-                        sem.Release();
-                    }
-                }));
+                MessageBox.Show(
+                    $"تعذر تحميل زيارات المريض:\n{ex.Message}",
+                    "سجل الزيارات",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -1008,9 +1061,9 @@ namespace MyClinic
                         ? t.ToothDetails.Where(d => int.TryParse(d.ToothId, out _)).Sum(d => d.CanalCount > 0 ? d.CanalCount : GetDefaultCanalNames(int.Parse(d.ToothId!)).Count)
                         : (!string.IsNullOrWhiteSpace(t.ToothId) ? Math.Max(1, t.CanalCount) : 0));
                 appSettings.FileKitCanalCount += completedCanals;
-                appSettings.UpdatedAt = DateTime.Now;
+                appSettings.UpdatedAt = AppClock.Now;
 
-                DateTime savedVisitDateTime = DateTime.Now.AddHours(7);
+                DateTime savedVisitDateTime = AppClock.Now;
 
                 Visit visit = new()
                 {
@@ -1051,7 +1104,9 @@ namespace MyClinic
                     PatientName = patient.FullName ?? "بدون اسم",
                     PhoneNumber = patient.PhoneNumber ?? phoneNumber,
                     Reason = isExistingPatient ? "مراجعة" : "معاينة جديدة",
-                    AppointmentDateTime = savedVisitDateTime
+                    AppointmentDateTime = savedVisitDateTime,
+                    PatientId = patient.Id > 0 ? patient.Id : null,
+                    IsAutomaticallyGenerated = true
                 });
                 await db.SaveChangesAsync(); // أو db.SaveChanges();
                 
@@ -1174,7 +1229,7 @@ namespace MyClinic
         }
 
         private static bool IsRootCanalTreatment(string? name) =>
-            (name ?? string.Empty).Replace(" ", string.Empty).Contains("سحبعصب", StringComparison.OrdinalIgnoreCase);
+            TreatmentNameMatcher.IsRootCanal(name);
 
         private static string? GetSelectedComboBoxText(ComboBox comboBox)
         {
@@ -1400,7 +1455,7 @@ namespace MyClinic
             
             // استخدام اسم المريض بدلاً من رقم الهاتف لاسم المجلد
             string sanitizedName = SanitizePathSegment(patientName);
-            string visitFolderName = $"{sanitizedName}_visit_{visitId}_{DateTime.Now.AddHours(7):yyyyMMdd_HHmmss}";
+            string visitFolderName = $"{sanitizedName}_visit_{visitId}_{AppClock.Now:yyyyMMdd_HHmmss}";
             string visitFolderPath = Path.Combine(storageRoot, visitFolderName);
             Directory.CreateDirectory(visitFolderPath);
 
@@ -1412,7 +1467,7 @@ namespace MyClinic
                 string extension = Path.GetExtension(sourcePath);
                 
                 // استخدام التاريخ/الوقت مع أجزاء الثانية (_fff) ورقم تسلسلي لضمان عدم وجود أسماء مكررة أبداً
-                string timestamp = DateTime.Now.AddHours(7).ToString("yyyyMMdd_HHmmss_fff");
+                string timestamp = AppClock.Now.ToString("yyyyMMdd_HHmmss_fff");
                 string destinationFileName = $"{timestamp}_{sequence:00}{extension}";
                 string destinationPath = Path.Combine(visitFolderPath, destinationFileName);
 
@@ -1507,7 +1562,8 @@ namespace MyClinic
                 FinalTreatmentText = NormalizeOrFallback(visit.FinalTreatment, "لا يوجد إجراء نهائي مسجل."),
                 PrescriptionItems = prescriptionItems,
                 AttachmentPaths = attachmentPaths,
-                SelectedTreatments = ParseSelectedTreatments(visit.SelectedTreatmentsJson)
+                SelectedTreatments = ParseSelectedTreatments(visit.SelectedTreatmentsJson),
+                HasEditHistory = visit.EditHistories?.Count > 0
             };
         }
 
@@ -1920,7 +1976,8 @@ namespace MyClinic
                             savedPatient.PhoneNumber ?? string.Empty,
                             isExistingPatient ? "مراجعة" : "معاينة جديدة",
                             savedVisitDateTime,
-                            savedVisit.Id);
+                            savedVisit.Id,
+                            savedVisit.PatientId);
                     }
                 }));
         }

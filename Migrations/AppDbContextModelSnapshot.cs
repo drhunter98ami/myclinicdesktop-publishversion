@@ -48,9 +48,18 @@ namespace MyClinic.Migrations
                     b.Property<DateTime>("AppointmentDateTime")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsAutomaticallyGenerated")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("PatientName")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("PatientId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()

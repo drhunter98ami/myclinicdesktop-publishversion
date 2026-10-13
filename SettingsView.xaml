@@ -191,6 +191,27 @@
                 </Grid>
             </Border>
 
+            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="ضبط وقت التطبيق" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="حدد التاريخ والوقت اللذين سيستخدمهما التطبيق في الشاشات والسجلات، دون تغيير ساعة الكمبيوتر." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <DatePicker x:Name="DpAppDate" Grid.Column="0" Height="44" VerticalContentAlignment="Center"/>
+                        <TextBox x:Name="TxtAppClockTime" Grid.Column="2" Style="{StaticResource InputBoxStyle}" ToolTip="الوقت بصيغة ساعة:دقيقة (مثال 14:30)"/>
+                        <Button Grid.Column="3" Content="حفظ الوقت" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveAppTime_Click" Margin="12,0,0,0"/>
+                        <Button Grid.Column="4" Content="الوقت الافتراضي" Style="{StaticResource PrimaryButtonStyle}" Click="BtnResetAppTime_Click" Margin="8,0,0,0"/>
+                    </Grid>
+                    <TextBlock Text="سيُحفظ الضبط ويُطبّق على التواريخ والأوقات الجديدة في جميع أقسام التطبيق. يعيد زر الوقت الافتراضي إلى ساعة التطبيق الأساسية دون تغيير ساعة الكمبيوتر." Style="{StaticResource HintStyle}" Margin="0,12,0,0"/>
+                </StackPanel>
+            </Border>
+
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -213,17 +234,29 @@
                 </Border>
             </Grid>
 
-            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,0,0,20">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
                     <StackPanel>
-                        <TextBlock Text="كيت الفايلات وسحب العصب" Style="{StaticResource SectionTitleStyle}"/>
-                        <TextBlock Text="عدد الأقنية التي تم عملها بنفس كيت الفايلات في الزيارات المحفوظة." Style="{StaticResource HintStyle}" Margin="0,8,0,8"/>
-                        <TextBlock x:Name="TxtFileKitCanalCount" Text="0 قناة" FontSize="27" FontWeight="Bold" Foreground="#2563EB"/>
+                        <TextBlock Text="اسم المستخدم" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="غيّر الاسم المستخدم لتسجيل الدخول والظاهر في الشاشة الرئيسية." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <TextBox x:Name="TxtUsername" Style="{StaticResource InputBoxStyle}"/>
+                        <Button x:Name="BtnSaveUsername" Content="حفظ اسم المستخدم" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveUsername_Click" HorizontalAlignment="Left" Margin="0,14,0,0"/>
                     </StackPanel>
-                    <Button Grid.Column="1" x:Name="BtnResetFileKitCanals" Content="تصفير عند شراء كيت جديد" Style="{StaticResource PrimaryButtonStyle}" Click="BtnResetFileKitCanals_Click" VerticalAlignment="Center"/>
-                </Grid>
-            </Border>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="التحديثات" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="تحقق من توفر نسخة جديدة من التطبيق." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <Button x:Name="BtnCheckForUpdates" Content="تفقد وجود نسخة جديدة" Style="{StaticResource PrimaryButtonStyle}" Click="BtnCheckForUpdates_Click" HorizontalAlignment="Left"/>
+                        <Button x:Name="BtnWhatsNew" Content="لمحة عن التحديث الجديد" Background="#16A34A" Foreground="White" Padding="16,9" BorderThickness="0" Cursor="Hand" Click="BtnWhatsNew_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions>
@@ -260,11 +293,19 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <TextBlock Text="تكاليف العلاجات" Style="{StaticResource SectionTitleStyle}"/>
                         <TextBlock Grid.Row="1" Text="أضف الخدمات العلاجية وأسعارها لتظهر بسرعة عند تسجيل الزيارات." Style="{StaticResource HintStyle}" Margin="0,8,0,18"/>
-                        <Grid Grid.Row="2">
+                        <Border Grid.Row="2" Background="#142563EB" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
+                            <TextBlock Text="يجب أن يكون (سحب عصب) من ضمن المعالجات ويجب أن تكتب تماماً كما هي مكتوبة هنا لضمان ظهور خيار عدد الأقنية/أطوال الأقنية عند إضافة مريض واختيار سحب عصب من المعالجات."
+                                       Foreground="{DynamicResource AppTextPrimary}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                        <Grid Grid.Row="3">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="12"/>
@@ -318,6 +359,27 @@
                 </Border>
             </Grid>
             <TextBlock Text="تلميح: غيّر سعر الصرف عند الحاجة فقط؛ القيم المسجلة سابقاً تحتفظ بسعرها وقت الحفظ." Style="{StaticResource HintStyle}" Margin="4,0,0,0"/>
+
+            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,20,0,0">
+                <StackPanel>
+                    <TextBlock Text="تواصل مع المطور" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="إذا كان لديك أي اقتراحات أو استفسارات أو أخطاء في التطبيق يمكنك التواصل مع المطور على الواتس أب" Style="{StaticResource HintStyle}" Margin="0,8,0,14"/>
+                    <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Click="BtnContactDeveloper_Click" Background="#25D366">
+                            <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight">
+                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Fill="White" Data="M12,1 C5.93,1 1,5.93 1,12 C1,14.13 1.61,16.12 2.67,17.8 L1.5,23 L6.83,21.88 C8.4,22.74 10.16,23.2 12,23.2 C18.07,23.2 23,18.27 23,12.2 C23,6.13 18.07,1.2 12,1.2 Z M12,3.2 C16.97,3.2 21,7.23 21,12.2 C21,17.17 16.97,21.2 12,21.2 C10.34,21.2 8.75,20.75 7.38,19.91 L7,19.68 L4.25,20.26 L4.85,17.59 L4.6,17.2 C3.55,15.74 3,14.01 3,12.2 C3,7.23 7.03,3.2 12,3.2 Z"/>
+                                        <Path Fill="White" Data="M9.05,7.1 C8.78,6.5 8.49,6.49 8.23,6.48 C8.02,6.47 7.77,6.47 7.52,6.47 C7.27,6.47 6.86,6.56 6.51,6.94 C6.16,7.32 5.17,8.24 5.17,10.12 C5.17,12 6.54,13.82 6.73,14.07 C6.92,14.32 9.38,18.31 13.28,19.85 C16.52,21.13 17.18,20.88 17.88,20.82 C18.58,20.76 20.14,19.9 20.46,19 C20.78,18.1 20.78,17.33 20.68,17.17 C20.58,17.01 20.32,17.01 19.94,16.72 C19.56,16.53 17.68,15.61 17.33,15.48 C16.98,15.35 16.73,15.29 16.48,15.67 C16.23,16.05 15.52,16.88 15.3,17.13 C15.08,17.38 14.86,17.41 14.48,17.22 C14.1,17.03 12.88,16.61 11.43,15.31 C10.3,14.3 9.54,13.05 9.32,12.67 C9.1,12.29 9.3,12.14 9.49,11.95 C9.66,11.78 9.87,11.51 10.06,11.29 C10.25,11.07 10.31,10.91 10.44,10.66 C10.57,10.41 10.5,10.19 10.4,10 C10.3,9.81 9.56,7.93 9.21,7.18 Z"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <TextBlock Text="تواصل عبر واتساب" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="د.أحمد خليف  •  +963935606912" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

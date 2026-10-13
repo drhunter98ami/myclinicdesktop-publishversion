@@ -23,7 +23,7 @@ namespace MyClinic.Models
             set { _toothId = value; OnPropertyChanged(nameof(ToothId)); }
         }
 
-        public bool IsRootCanal => TreatmentName.Replace(" ", string.Empty).Contains("سحبعصب", System.StringComparison.OrdinalIgnoreCase);
+        public bool IsRootCanal => TreatmentNameMatcher.IsRootCanal(TreatmentName);
 
         public int CanalCount
         {
@@ -113,6 +113,7 @@ namespace MyClinic.Models
         public int Quantity { get; set; }
         public string? ToothId { get; set; }
         public int CanalCount { get; set; }
+        public bool IsRootCanal => TreatmentNameMatcher.IsRootCanal(TreatmentName);
         public List<CanalMeasurement> Canals
         {
             get => _canals;
@@ -139,6 +140,9 @@ namespace MyClinic.Models
                 return string.Join(Environment.NewLine + Environment.NewLine, teeth.Select(tooth =>
                 {
                     string label = string.IsNullOrWhiteSpace(tooth.ToothId) ? "السن غير محدد" : $"السن {tooth.ToothId}";
+                    if (!IsRootCanal)
+                        return label;
+
                     string count = $"عدد الأقنية: {tooth.CanalCount}";
                     string canals = tooth.CanalDisplay;
                     return string.IsNullOrWhiteSpace(canals)

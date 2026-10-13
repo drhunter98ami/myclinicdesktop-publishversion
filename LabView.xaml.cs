@@ -24,20 +24,26 @@ namespace MyClinic
             GlobalEvents.OnExchangeRateChanged += OnExchangeRateChanged;
             LoadLabNames();
             LoadLabWorks();
-            UpdateSummary();
             
             // Set default filter to monthly
             _currentDateFilter = "month";
-            DpFilterDate.SelectedDate = DateTime.Now;
+            DpFilterDate.SelectedDate = AppClock.Today;
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
+            ApplyFilters();
+        }
+
+        public void RefreshDateForAppTimeChange(DateTime previousAppTime)
+        {
+            if (DpFilterDate.SelectedDate?.Date == previousAppTime.Date)
+                DpFilterDate.SelectedDate = AppClock.Today;
+
             ApplyFilters();
         }
 
         private void OnExchangeRateChanged()
         {
             LoadExchangeRate();
-            UpdateSummary();
             ApplyFilters();
         }
 
@@ -99,8 +105,7 @@ namespace MyClinic
         {
             try
             {
-                using var context = new AppDbContext();
-                var labWorks = context.LabWorks.ToList();
+                var labWorks = _allLabWorks.Where(IsInSelectedPeriod);
 
                 // Total paid includes both "تم الدفع" and "تم الدفع ولم يتم الاستلام"
                 decimal totalPaid = labWorks.Where(l => l.Status == "تم الدفع" || l.Status == "تم الدفع ولم يتم الاستلام").Sum(l => l.Cost);
@@ -205,7 +210,7 @@ namespace MyClinic
                     Cost = cost,
                     Teeth = TxtTeeth.Text?.Trim(),
                     Status = "تم الإرسال",
-                    DateSent = DateTime.Now,
+                    DateSent = AppClock.Now,
                     Notes = TxtNotes.Text?.Trim()
                 };
 
@@ -220,7 +225,7 @@ namespace MyClinic
                 CmbLabName.SelectedIndex = -1;
 
                 LoadLabWorks();
-                UpdateSummary();
+                ApplyFilters();
 
                 MessageBox.Show("تم إضافة العمل بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -250,10 +255,10 @@ namespace MyClinic
                             labWork.Status = "تم الإستلام";
                         }
                         
-                        labWork.DateReceived = DateTime.Now;
+                        labWork.DateReceived = AppClock.Now;
                         context.SaveChanges();
                         LoadLabWorks();
-                        UpdateSummary();
+                        ApplyFilters();
                     }
                 }
                 catch (Exception ex)
@@ -283,14 +288,14 @@ namespace MyClinic
                             labWork.Status = "تم الدفع ولم يتم الاستلام";
                         }
                         
-                        labWork.DatePaid = DateTime.Now;
+                        labWork.DatePaid = AppClock.Now;
                         labWork.AmountPaid = labWork.Cost;
                         
                         // add new expense
                         decimal costInSyp = labWork.Cost * _usdToSypRate;
                         var newExpense = new ExpenseEntry
                         {
-                            ExpenseDate = DateTime.Now,
+                            ExpenseDate = AppClock.Now,
                             Description = $"تكلفة عمل مخبر - {labWork.LabName}",
                             Amount = (double)costInSyp
                         };
@@ -302,7 +307,7 @@ namespace MyClinic
                         GlobalEvents.NotifyFinancialRecordAdded();
                         
                         LoadLabWorks();
-                        UpdateSummary();
+                        ApplyFilters();
                     }
                 }
                 catch (Exception ex)
@@ -336,7 +341,7 @@ namespace MyClinic
                 }
             }
 
-            var filtered = _allLabWorks.AsEnumerable();
+            var filtered = _allLabWorks.Where(IsInSelectedPeriod);
 
             if (!string.IsNullOrEmpty(searchTerm))
             {
@@ -348,31 +353,29 @@ namespace MyClinic
                 filtered = filtered.Where(l => l.Status == statusFilter);
             }
 
-            // Apply date filter
-            if (_currentDateFilter != "all" && DpFilterDate.SelectedDate.HasValue)
-            {
-                DateTime selectedDate = DpFilterDate.SelectedDate.Value;
-                switch (_currentDateFilter)
-                {
-                    case "day":
-                        filtered = filtered.Where(l => l.DateSent.Date == selectedDate.Date);
-                        break;
-                    case "month":
-                        filtered = filtered.Where(l => l.DateSent.Year == selectedDate.Year && l.DateSent.Month == selectedDate.Month);
-                        break;
-                    case "year":
-                        filtered = filtered.Where(l => l.DateSent.Year == selectedDate.Year);
-                        break;
-                }
-            }
-
             DgLabWorks.ItemsSource = filtered.ToList();
+            UpdateSummary();
+        }
+
+        private bool IsInSelectedPeriod(LabWork labWork)
+        {
+            if (_currentDateFilter == "all" || !DpFilterDate.SelectedDate.HasValue)
+                return true;
+
+            DateTime selectedDate = DpFilterDate.SelectedDate.Value;
+            return _currentDateFilter switch
+            {
+                "day" => labWork.DateSent.Date == selectedDate.Date,
+                "month" => labWork.DateSent.Year == selectedDate.Year && labWork.DateSent.Month == selectedDate.Month,
+                "year" => labWork.DateSent.Year == selectedDate.Year,
+                _ => true
+            };
         }
 
         private void BtnDayRange_Click(object sender, RoutedEventArgs e)
         {
             _currentDateFilter = "day";
-            DpFilterDate.SelectedDate = DateTime.Now;
+            DpFilterDate.SelectedDate = AppClock.Today;
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
             ApplyFilters();
@@ -381,7 +384,7 @@ namespace MyClinic
         private void BtnMonthRange_Click(object sender, RoutedEventArgs e)
         {
             _currentDateFilter = "month";
-            DpFilterDate.SelectedDate = DateTime.Now;
+            DpFilterDate.SelectedDate = AppClock.Today;
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
             ApplyFilters();
@@ -393,7 +396,7 @@ namespace MyClinic
         private void BtnYearRange_Click(object sender, RoutedEventArgs e)
         {
             _currentDateFilter = "year";
-            DpFilterDate.SelectedDate = DateTime.Now;
+            DpFilterDate.SelectedDate = AppClock.Today;
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
             ApplyFilters();
@@ -404,7 +407,7 @@ namespace MyClinic
 
         private void BtnCurrentDate_Click(object sender, RoutedEventArgs e)
         {
-            DpFilterDate.SelectedDate = DateTime.Now;
+            DpFilterDate.SelectedDate = AppClock.Today;
             ApplyFilters();
         }
 

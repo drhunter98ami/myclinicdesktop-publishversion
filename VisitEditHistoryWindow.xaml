@@ -1,0 +1,30 @@
+<Window x:Class="MyClinic.VisitEditHistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="سجل تعديل الزيارة"
+        Width="760"
+        Height="700"
+        MinWidth="620"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="{DynamicResource AppWindowBg}"
+        Foreground="{DynamicResource AppTextPrimary}"
+        FontFamily="Segoe UI"
+        FontSize="14">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="سجل تعديل الزيارة" FontFamily="Traditional Arabic" FontSize="34" FontWeight="Bold"/>
+            <TextBlock Text="يعرض كل تعديل محفوظ بوقته الدقيق والقيم السابقة والجديدة." Foreground="{DynamicResource AppTextSecondary}"/>
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="HistoryItems"/>
+        </ScrollViewer>
+        <Button Grid.Row="2" Content="إغلاق" Width="100" Height="40" HorizontalAlignment="Left" Margin="0,14,0,0" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Click="Close_Click"/>
+    </Grid>
+</Window>

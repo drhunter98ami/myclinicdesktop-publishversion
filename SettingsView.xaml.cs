@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System;
+using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,32 +30,162 @@ namespace MyClinic
         private async void SettingsView_Loaded(object sender, RoutedEventArgs e)
         {
             LoadExchangeRate();
-            LoadFileKitCanalCount();
+            TxtUsername.Text = LoginSessionStore.CurrentUsername;
+            SetAppClockFields(AppClock.Now);
             if (Window.GetWindow(this) is MainWindow mainWindow)
                 ThemeToggle.IsChecked = mainWindow.IsDarkTheme;
             await LoadTreatmentsAsync();
         }
 
-        private void LoadFileKitCanalCount()
+        private void SetAppClockFields(DateTime appTime)
         {
-            using var db = new AppDbContext();
-            var count = db.AppSettings.Select(s => (int?)s.FileKitCanalCount).FirstOrDefault() ?? 0;
-            TxtFileKitCanalCount.Text = $"{count:N0} قناة";
+            DpAppDate.SelectedDate = appTime.Date;
+            TxtAppClockTime.Text = appTime.ToString("HH:mm", CultureInfo.InvariantCulture);
         }
 
-        private void BtnResetFileKitCanals_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveAppTime_Click(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("هل تريد تصفير عدد الأقنية لهذا الكيت؟", "تأكيد التصفير", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (DpAppDate.SelectedDate is not DateTime selectedDate ||
+                !TimeSpan.TryParseExact(TxtAppClockTime.Text.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out TimeSpan selectedTime) ||
+                selectedTime < TimeSpan.Zero ||
+                selectedTime >= TimeSpan.FromDays(1))
+            {
+                MessageBox.Show("يرجى إدخال تاريخ ووقت صحيحين بصيغة ساعة:دقيقة، مثل 14:30.", "وقت غير صالح", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
+            }
 
-            using var db = new AppDbContext();
-            var settings = db.AppSettings.FirstOrDefault() ?? new AppSettings();
-            if (settings.Id == 0) db.AppSettings.Add(settings);
-            settings.FileKitCanalCount = 0;
-            settings.UpdatedAt = DateTime.Now;
-            db.SaveChanges();
-            TxtFileKitCanalCount.Text = "0 قناة";
-            GlobalEvents.NotifyFileKitCanalCountChanged();
+            try
+            {
+                DateTime previousAppTime = AppClock.Now;
+                DateTime selectedAppTime = selectedDate.Date.Add(selectedTime);
+                AppClock.SetCurrentTime(selectedAppTime);
+                SetAppClockFields(AppClock.Now);
+                if (Window.GetWindow(this) is MainWindow mainWindow)
+                    await mainWindow.NotifyAppTimeChangedAsync(previousAppTime);
+                MessageBox.Show("تم حفظ وقت التطبيق وتطبيقه على أقسام البرنامج.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر حفظ وقت التطبيق: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void BtnResetAppTime_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                DateTime previousAppTime = AppClock.Now;
+                AppClock.ResetToComputerTime();
+                SetAppClockFields(AppClock.Now);
+                if (Window.GetWindow(this) is MainWindow mainWindow)
+                    await mainWindow.NotifyAppTimeChangedAsync(previousAppTime);
+                MessageBox.Show("تمت إعادة التطبيق إلى وقته الافتراضي.", "تمت إعادة الضبط", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر إعادة ضبط وقت التطبيق: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnSaveUsername_Click(object sender, RoutedEventArgs e)
+        {
+            string newUsername = TxtUsername.Text.Trim();
+            string currentUsername = LoginSessionStore.CurrentUsername;
+
+            if (string.IsNullOrWhiteSpace(newUsername))
+            {
+                MessageBox.Show("يرجى إدخال اسم مستخدم صحيح.", "اسم غير صالح", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtUsername.Focus();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentUsername))
+            {
+                MessageBox.Show("تعذر تحديد المستخدم الحالي. يرجى تسجيل الدخول مجدداً.", "تعذر تغيير الاسم", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                using var db = new AppDbContext();
+                var user = db.Users.FirstOrDefault(u => u.Username == currentUsername);
+                if (user == null)
+                {
+                    MessageBox.Show("لم يتم العثور على المستخدم الحالي في قاعدة البيانات.", "تعذر تغيير الاسم", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (db.Users.Any(u => u.Id != user.Id && u.Username == newUsername))
+                {
+                    MessageBox.Show("اسم المستخدم مستخدم مسبقاً. يرجى اختيار اسم آخر.", "اسم مستخدم موجود", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TxtUsername.Focus();
+                    TxtUsername.SelectAll();
+                    return;
+                }
+
+                user.Username = newUsername;
+                db.SaveChanges();
+
+                try
+                {
+                    LoginSessionStore.UpdateUsername(newUsername);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        $"تم تغيير اسم المستخدم في قاعدة البيانات، لكن تعذر تحديث الجلسة الحالية: {ex.Message}\nأعد تسجيل الدخول لتطبيق الاسم الجديد.",
+                        "تم الحفظ مع تنبيه",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (Window.GetWindow(this) is MainWindow mainWindow)
+                    mainWindow.RefreshWelcomeName();
+
+                MessageBox.Show("تم تغيير اسم المستخدم بنجاح.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"خطأ في تغيير اسم المستخدم: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void BtnCheckForUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                await mainWindow.CheckForUpdatesFromSettingsAsync(BtnCheckForUpdates);
+        }
+
+        private void BtnWhatsNew_Click(object sender, RoutedEventArgs e)
+        {
+            const string updates =
+                "الإصدار 1.7.0\n\n" +
+                "التحديثات الجديدة:\n" +
+                "1- تم تحسين التقارير الشهرية لتظهر تفاصيل أدق وتعطي إحصائيات احترافية.\n\n" +
+                "2- تم إصلاح خلل ظهور عدد الأقنية في المعالجات التي لا تتضمن سحب عصب.\n\n" +
+                "3- تم تحسين المواعيد لتظهر حالة الزيارة.\n\n" +
+                "4- تم إضافة ضبط الوقت في الإعدادات لمراعاة اختلاف الوقت في الأجهزة.\n\n" +
+                "5- تم إضافة خيار تغيير اسم المستخدم في الإعدادات.\n\n" +
+                "6- تم إضافة إمكانية تعديل تفاصيل الزيارة وإمكانية إضافة الصور لاحقاً.";
+
+            MessageBox.Show(updates, "لمحة عن التحديث الجديد", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void BtnContactDeveloper_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://wa.me/963935606912",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+            {
+                MessageBox.Show("تعذر فتح واتساب. يمكنك التواصل مع المطور على الرقم +963935606912.", "تعذر فتح واتساب", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
@@ -118,7 +250,7 @@ namespace MyClinic
                 else
                 {
                     settings.UsdToSypRate = rate;
-                    settings.UpdatedAt = DateTime.Now;
+                    settings.UpdatedAt = AppClock.Now;
                 }
 
                 db.SaveChanges();

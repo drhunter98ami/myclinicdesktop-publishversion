@@ -21,7 +21,7 @@ namespace MyClinic.Models
         [Required]
         public string Status { get; set; } = "تم الإرسال";
 
-        public DateTime DateSent { get; set; } = DateTime.Now;
+        public DateTime DateSent { get; set; } = AppClock.Now;
 
         public DateTime? DateReceived { get; set; }
 

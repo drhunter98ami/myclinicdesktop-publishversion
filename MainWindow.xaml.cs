@@ -4,7 +4,9 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using System.IO;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System.Net.NetworkInformation;
@@ -33,7 +35,6 @@ namespace MyClinic
         private static readonly HttpClient _internetClient = new() { Timeout = TimeSpan.FromSeconds(5) };
         private DateTime _lastInternetCheckUtc = DateTime.MinValue;
         private int _internetCheckVersion;
-        private UpdateInfo? _availableUpdate;
 
         public MainWindow()
         {
@@ -78,14 +79,17 @@ namespace MyClinic
             await CheckForUpdatesAsync(showResult: false);
         }
 
-        private async void BtnCheckForUpdates_Click(object sender, RoutedEventArgs e) =>
-            await CheckForUpdatesAsync(showResult: true);
+        public Task CheckForUpdatesFromSettingsAsync(Button triggerButton) =>
+            CheckForUpdatesAsync(showResult: true, triggerButton: triggerButton);
 
-        private async Task CheckForUpdatesAsync(bool showResult)
+        private async Task CheckForUpdatesAsync(bool showResult, Button? triggerButton = null)
         {
-            BtnCheckForUpdates.IsEnabled = false;
-            string originalContent = BtnCheckForUpdates.Content?.ToString() ?? "تفقد وجود نسخة جديدة";
-            BtnCheckForUpdates.Content = "جاري التفقد...";
+            string originalContent = triggerButton?.Content?.ToString() ?? "تفقد وجود نسخة جديدة";
+            if (triggerButton != null)
+            {
+                triggerButton.IsEnabled = false;
+                triggerButton.Content = "جاري التفقد...";
+            }
 
             try
             {
@@ -99,7 +103,6 @@ namespace MyClinic
                     return;
                 }
 
-                _availableUpdate = update;
                 MessageBoxResult result = MessageBox.Show(
                     $"تتوفر نسخة جديدة: {update.Version}\nحجم الملف: {update.SizeText}\n\nهل تريد فتح صفحة التحميل؟",
                     "تحديث جديد متاح",
@@ -108,24 +111,43 @@ namespace MyClinic
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    Process.Start(new ProcessStartInfo
+                    try
                     {
-                        FileName = update.DownloadUrl,
-                        UseShellExecute = true
-                    });
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = update.DownloadUrl,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+                    {
+                        MessageBox.Show(
+                            "تعذر فتح صفحة تحميل التحديث. يمكنك المحاولة مرة أخرى لاحقاً.",
+                            "تعذر فتح التحميل",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
                 }
             }
-            catch
+            catch (Exception ex) when (
+                ex is HttpRequestException or JsonException or TaskCanceledException or InvalidDataException)
             {
                 if (showResult)
                 {
-                    MessageBox.Show("تعذر الاتصال بخادم GitHub للتحقق من التحديثات. حاول لاحقاً.", "تعذر التفقد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(
+                        "تعذر التحقق من تحديثات GitHub. تحقق من اتصال الإنترنت وحاول لاحقاً.",
+                        "تعذر التفقد",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
                 }
             }
             finally
             {
-                BtnCheckForUpdates.Content = originalContent;
-                BtnCheckForUpdates.IsEnabled = true;
+                if (triggerButton != null)
+                {
+                    triggerButton.Content = originalContent;
+                    triggerButton.IsEnabled = true;
+                }
             }
         }
 
@@ -139,7 +161,7 @@ namespace MyClinic
 
         private async void ClockTimer_Tick(object? sender, EventArgs e)
         {
-            DateTime appTime = DateTime.Now.AddHours(7);
+            DateTime appTime = AppClock.Now;
 
             TxtAppTime.Text = appTime.ToString("hh:mm:ss tt", new System.Globalization.CultureInfo("ar-SY"));
             TxtAppDate.Text = appTime.ToString("yyyy/MM/dd");
@@ -255,7 +277,7 @@ namespace MyClinic
             }
 
             TxtNextSync.Visibility = Visibility.Visible;
-            DateTime appTime = DateTime.Now.AddHours(7);
+            DateTime appTime = AppClock.Now;
             DateTime nextSyncTime = appTime.Date;
 
             if (appTime.Hour < 10)
@@ -338,7 +360,7 @@ namespace MyClinic
                     
                     if (File.Exists(dbPath))
                     {
-                        string backupPath = Path.Combine(clinicFolder, $"ClinicData_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.db");
+                        string backupPath = Path.Combine(clinicFolder, $"ClinicData_Backup_{AppClock.Now:yyyyMMdd_HHmmss}.db");
                         File.Copy(dbPath, backupPath, true);
                         File.Delete(dbPath); 
                     }
@@ -437,7 +459,7 @@ namespace MyClinic
             if (result.Success)
             {
                 MessageBox.Show("تم عمل نسخة احتياطية من البيانات على Google Drive بنجاح!", "نجاح المزامنة", MessageBoxButton.OK, MessageBoxImage.Information);
-                DateTime appTime = DateTime.Now.AddHours(7);
+                DateTime appTime = AppClock.Now;
                 UpdateLastSyncUI(appTime);
             }
             else
@@ -484,10 +506,22 @@ namespace MyClinic
         public void ShowDashboard()
         {
             _dashboardView ??= new DashboardView();
+            _dashboardView.RefreshWelcomeName();
             MainContent.Content = _dashboardView;
             _dashboardView.RequestRefresh();
             _ = _dashboardView.RefreshNowAsync();
             SetActiveNavigation(BtnDashboard);
+        }
+
+        public void RefreshWelcomeName() => _dashboardView?.RefreshWelcomeName();
+
+        public async Task NotifyAppTimeChangedAsync(DateTime previousAppTime)
+        {
+            _dashboardView?.RefreshDatesForAppTimeChange(previousAppTime);
+            _financialRecordsView?.RefreshDateForAppTimeChange(previousAppTime);
+            _labView?.RefreshDateForAppTimeChange(previousAppTime);
+            if (_statisticsView != null)
+                await _statisticsView.RefreshForAppTimeChangeAsync(previousAppTime);
         }
 
         public void ShowAddPatient()
@@ -549,10 +583,10 @@ namespace MyClinic
         public void InvalidatePatientRecords() => _patientRecordsView?.RequestRefresh();
         public void InvalidateFinancialRecords() => _financialRecordsView?.RequestRefresh();
 
-        public void AddSavedVisitToDashboard(string patientName, string phoneNumber, string reason, DateTime visitDateTime, int visitId)
+        public void AddSavedVisitToDashboard(string patientName, string phoneNumber, string reason, DateTime visitDateTime, int visitId, int patientId)
         {
             _dashboardView ??= new DashboardView();
-            _dashboardView.AddSavedVisitImmediately(patientName, phoneNumber, reason, visitDateTime, visitId);
+            _dashboardView.AddSavedVisitImmediately(patientName, phoneNumber, reason, visitDateTime, visitId, patientId);
         }
 
         private void SetActiveNavigation(Button activeButton)

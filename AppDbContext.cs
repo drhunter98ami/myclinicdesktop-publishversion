@@ -11,6 +11,7 @@ namespace MyClinic
         public DbSet<AppointmentEntry> Appointments { get; set; }
         public DbSet<Patient> Patients { get; set; }
         public DbSet<Visit> Visits { get; set; }
+        public DbSet<VisitEditHistory> VisitEditHistories { get; set; }
         public DbSet<ExpenseEntry> Expenses { get; set; }
         public DbSet<ToothRecord> ToothRecords { get; set; }
         
@@ -94,6 +95,12 @@ namespace MyClinic
                 .HasMany(v => v.ToothRecords)
                 .WithOne(t => t.Visit)
                 .HasForeignKey(t => t.VisitId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Visit>()
+                .HasMany(v => v.EditHistories)
+                .WithOne(history => history.Visit)
+                .HasForeignKey(history => history.VisitId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

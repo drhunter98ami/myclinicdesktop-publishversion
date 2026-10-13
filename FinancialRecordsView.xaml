@@ -143,6 +143,103 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="ExpenseCategoryItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#1A3B82F6"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ExpenseCategoryComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ExpenseCategoryItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="28"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="1" Text="&#xE70D;"
+                                                           FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                           Foreground="{DynamicResource AppTextSecondary}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="8,0,28,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Right"/>
+                            <Popup Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                      SnapsToDevicePixels="True">
+                                    <Border Background="{DynamicResource AppCardBg}"
+                                            BorderBrush="{DynamicResource AppBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Margin="0,4,0,0">
+                                        <ScrollViewer SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True"
+                                                        KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -519,10 +616,12 @@
                             <Border Grid.Row="1" Padding="20,14" Background="{DynamicResource AppWindowBg}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="48"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="112"/>
-                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="130"/>
+                                        <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
@@ -537,7 +636,13 @@
                                     </Button>
 
                                     <TextBox x:Name="TxtExpenseAmount" Grid.Column="2" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="القيمة"/>
-                                    <TextBox x:Name="TxtExpenseDescription" Grid.Column="4" Style="{StaticResource InputBoxStyle}" TextAlignment="Right" Tag="التفاصيل..."/>
+                                    <ComboBox x:Name="CmbExpenseCategory" Grid.Column="4" Height="40" Padding="8,0"
+                                              VerticalContentAlignment="Center" Style="{StaticResource ExpenseCategoryComboBoxStyle}"
+                                              FlowDirection="RightToLeft">
+                                        <ComboBoxItem Content="اختر الفئة" IsEnabled="False" IsSelected="True"/>
+                                    </ComboBox>
+                                    <TextBox x:Name="TxtExpenseDetails" Grid.Column="6" Style="{StaticResource InputBoxStyle}"
+                                             TextAlignment="Right" Tag="تفاصيل إضافية (اختياري)..."/>
                                 </Grid>
                             </Border>
 

@@ -22,14 +22,14 @@
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Template">
                 <Setter.Value>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Margin="{TemplateBinding Padding}"/>
-                                </Border>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -54,15 +54,15 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        CornerRadius="8">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Margin="{TemplateBinding Padding}"/>
-                                </Border>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -87,15 +87,15 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        CornerRadius="8">
-                                    <ContentPresenter HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Margin="{TemplateBinding Padding}"/>
-                                </Border>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -126,6 +126,8 @@
             <!-- main tabs -->
             <RowDefinition Height="Auto"/>
             <!-- subtabs + date nav -->
+            <RowDefinition Height="Auto"/>
+            <!-- export note -->
             <RowDefinition Height="*"/>
             <!-- pie + legend -->
         </Grid.RowDefinitions>
@@ -184,9 +186,8 @@
                     <Button x:Name="BtnNow" Content="الآن" Style="{StaticResource NowBtn}" Margin="0,0,10,0" Click="BtnNow_Click"/>
                     <Button x:Name="BtnIncomeArea" Content="منحني" Style="{StaticResource ExportBtn}" Margin="0,0,6,0" Click="BtnIncomeArea_Click"/>
                     <Button x:Name="BtnIncomeColumns" Content="أعمدة" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnIncomeColumns_Click"/>
-                    <Button x:Name="BtnExportExpensesPdf" Content="تصدير المصاريف PDF" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportExpensesPdf_Click" Visibility="Collapsed"/>
-                    <Button x:Name="BtnExportTreatmentsExcel" Content="تصدير العلاجات Excel" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportTreatmentsExcel_Click"/>
-                    <Button x:Name="BtnExportIncomeExcel" Content="تصدير الدخل Excel" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportIncomeExcel_Click"/>
+                    <!-- Single combined PDF report (income + expenses, expenses, treatments) for the selected period -->
+                    <Button x:Name="BtnExportPdf" Content="تصدير التقرير PDF" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportPdf_Click"/>
                     <!-- forward (toward future) -->
                     <Button Content="&#8249;" Style="{StaticResource NavBtn}" Margin="0,0,6,0" Click="BtnNext_Click"/>
                     <TextBlock x:Name="TblDateLabel"
@@ -204,8 +205,22 @@
             </Grid>
         </Border>
 
-        <!-- ══ Row 2 — Pie chart + legend ══ -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Border Grid.Row="2"
+                Background="#142563EB"
+                BorderBrush="#3B82F6"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="16,10"
+                Margin="20,8">
+            <TextBlock Text="ملف التقرير الذي يتم تصديره يختلف باختلاف السنة/الشهر/اليوم الذي تختاره (الظاهر حالياً في الشاشة)"
+                       Foreground="{DynamicResource AppTextPrimary}"
+                       FontWeight="SemiBold"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+        <!-- ══ Row 3 — Pie chart + legend ══ -->
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <Grid Margin="24,24,24,24" FlowDirection="LeftToRight">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

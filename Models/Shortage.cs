@@ -22,6 +22,6 @@ namespace MyClinic.Models
         [Required]
         public string Currency { get; set; } = "SYP";
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = AppClock.Now;
     }
 }

@@ -497,7 +497,42 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <TextBlock Grid.Row="3" Text="موعد محفوظ في جدول العيادة" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
+                                                <Border Grid.Row="3" Padding="8,5" CornerRadius="8" HorizontalAlignment="Right">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ShowAttendanceStatus}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding AttendanceStatus}" Value="Attended">
+                                                                    <Setter Property="Background" Value="#DCFCE7"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding AttendanceStatus}" Value="Absent">
+                                                                    <Setter Property="Background" Value="#FEE2E2"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding AttendanceStatus}" Value="Waiting">
+                                                                    <Setter Property="Background" Value="#FEF9C3"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding AttendanceStatusText}" FontSize="12" FontWeight="Bold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#15803D"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding AttendanceStatus}" Value="Absent">
+                                                                        <Setter Property="Foreground" Value="#B91C1C"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding AttendanceStatus}" Value="Waiting">
+                                                                        <Setter Property="Foreground" Value="#A16207"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -639,6 +674,42 @@
                                                     <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                                         <TextBlock Text="{Binding Reason}" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
                                                         <TextBlock Text="{Binding PatientName}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
+                                                        <Border Padding="7,4" CornerRadius="7" HorizontalAlignment="Right" Margin="0,5,0,0">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding ShowAttendanceStatus}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding AttendanceStatus}" Value="Attended">
+                                                                            <Setter Property="Background" Value="#DCFCE7"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding AttendanceStatus}" Value="Absent">
+                                                                            <Setter Property="Background" Value="#FEE2E2"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding AttendanceStatus}" Value="Waiting">
+                                                                            <Setter Property="Background" Value="#FEF9C3"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding AttendanceStatusText}" FontSize="12" FontWeight="Bold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="#15803D"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding AttendanceStatus}" Value="Absent">
+                                                                                <Setter Property="Foreground" Value="#B91C1C"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding AttendanceStatus}" Value="Waiting">
+                                                                                <Setter Property="Foreground" Value="#A16207"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
                                                     </StackPanel>
                                                     <Button Grid.Column="2" Content="حذف الموعد" Tag="{Binding Id}" Width="104" Height="36" Margin="16,0,0,0" Background="#FEE2E2" Foreground="#991B1B" BorderThickness="0" FontSize="14" FontWeight="Bold" Cursor="Hand" Click="BtnDeleteAppointmentFromDay_Click">
                                                         <Button.Style>

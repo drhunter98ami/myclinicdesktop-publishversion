@@ -37,6 +37,9 @@ namespace MyClinic
         {
             InitializeComponent();
 
+            foreach (string category in ExpenseCategories.Labels)
+                CmbExpenseCategory.Items.Add(category);
+
             IncomeItemsControl.ItemsSource = _incomeRows;
             ExpenseItemsControl.ItemsSource = _expenseRows;
             UpcomingItemsControl.ItemsSource = _upcomingPayments;
@@ -56,7 +59,15 @@ namespace MyClinic
 
         private static DateTime GetSyrianTime()
         {
-            return DateTime.Now.AddHours(7);
+            return AppClock.Now;
+        }
+
+        public void RefreshDateForAppTimeChange(DateTime previousAppTime)
+        {
+            if (DpFilterDate.SelectedDate?.Date == previousAppTime.Date)
+                DpFilterDate.SelectedDate = AppClock.Today;
+
+            RefreshFinancialData();
         }
 
         private void FinancialRecordsView_Loaded(object sender, RoutedEventArgs e)
@@ -249,13 +260,14 @@ namespace MyClinic
 
         private async void BtnAddExpense_Click(object sender, RoutedEventArgs e)
         {
-            string description = TxtExpenseDescription.Text.Trim();
-            if (string.IsNullOrWhiteSpace(description))
+            if (CmbExpenseCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
             {
-                MessageBox.Show("يرجى إدخال تفاصيل المصروف.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtExpenseDescription.Focus();
+                MessageBox.Show("يرجى اختيار فئة المصروف.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Warning);
+                CmbExpenseCategory.Focus();
                 return;
             }
+
+            string description = ExpenseCategories.FormatDescription(category, TxtExpenseDetails.Text.Trim());
 
             if (!TryParseMoney(TxtExpenseAmount.Text, out decimal amount) || amount <= 0)
             {
@@ -292,8 +304,9 @@ namespace MyClinic
                     DpFilterDate.SelectedDate = expenseDate.Date;
                 }
 
-                TxtExpenseDescription.Clear();
+                TxtExpenseDetails.Clear();
                 TxtExpenseAmount.Clear();
+                CmbExpenseCategory.SelectedIndex = 0;
 
                 ApplyFilters();
             }

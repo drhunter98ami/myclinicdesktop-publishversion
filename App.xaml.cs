@@ -53,6 +53,9 @@ public partial class App : Application
         context.Database.ExecuteSqlRaw(
             @"CREATE INDEX IF NOT EXISTS IX_Appointments_AppointmentDateTime
               ON Appointments (AppointmentDateTime);");
+        EnsureColumnExists(context, "Appointments", "PatientId", "INTEGER NULL");
+        EnsureColumnExists(context, "Appointments", "IsAutomaticallyGenerated", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumnExists(context, "Appointments", "CreatedAt", "TEXT NULL");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Visits (
@@ -81,6 +84,19 @@ public partial class App : Application
         context.Database.ExecuteSqlRaw(
             @"CREATE INDEX IF NOT EXISTS IX_Visits_PatientId
               ON Visits (PatientId);");
+
+        context.Database.ExecuteSqlRaw(
+            @"CREATE TABLE IF NOT EXISTS VisitEditHistories (
+                Id INTEGER NOT NULL CONSTRAINT PK_VisitEditHistories PRIMARY KEY AUTOINCREMENT,
+                VisitId INTEGER NOT NULL,
+                EditedAt TEXT NOT NULL,
+                EditedBy TEXT NULL,
+                ChangesJson TEXT NOT NULL,
+                CONSTRAINT FK_VisitEditHistories_Visits_VisitId
+                    FOREIGN KEY (VisitId) REFERENCES Visits (Id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS IX_VisitEditHistories_VisitId
+                ON VisitEditHistories (VisitId);");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS ToothRecords (

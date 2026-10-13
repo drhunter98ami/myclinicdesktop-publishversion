@@ -202,6 +202,8 @@ namespace MyClinic
 
                 VisitDetailsViewModel viewModel = new()
                 {
+                VisitId        = visit.VisitId,
+                HasEditHistory = visit.HasEditHistory,
                 PatientName    = _selectedPatient.DisplayName,
                 DoctorName     = VisitDoctorName,
                 VisitDateTimeText      = visit.VisitDateTimeText,
@@ -252,6 +254,50 @@ namespace MyClinic
             {
                 HideVisitDetailsOverlay(immediate: true);
                 MessageBox.Show("تعذر فتح تفاصيل الزيارة حالياً. تم تجاهل البيانات غير المكتملة.", "تفاصيل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private async void EditVisit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int visitId } || _selectedPatient is null)
+                return;
+
+            try
+            {
+                VisitEditWindow editor = new(visitId) { Owner = Window.GetWindow(this) };
+                if (editor.ShowDialog() != true)
+                    return;
+
+                HideVisitDetailsOverlay(immediate: true);
+                GlobalEvents.NotifyPatientRecordAdded();
+                await EnsureDataCurrentAsync();
+                UpdateSelectedPatientState();
+                if (_selectedPatient is not null)
+                    await LoadPatientVisitsAsync(_selectedPatient.Id);
+
+                GlobalEvents.NotifyFinancialRecordAdded();
+                if (Window.GetWindow(this) is MainWindow mainWindow)
+                    mainWindow.InvalidateFinancialRecords();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenVisitEditHistory_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int visitId })
+                return;
+
+            try
+            {
+                VisitEditHistoryWindow history = new(visitId) { Owner = Window.GetWindow(this) };
+                history.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -503,6 +549,7 @@ namespace MyClinic
                     .AsNoTracking()
                     .Where(v => v.PatientId == patientId)
                     .Include(v => v.ToothRecords)
+                    .Include(v => v.EditHistories)
                     .OrderByDescending(v => v.VisitDate)
                     .ToListAsync();
 
@@ -554,10 +601,10 @@ namespace MyClinic
                     }));
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 _selectedPatientVisits.Clear();
-                EmptyVisitsText.Text       = "تعذر تحميل الزيارات حالياً.";
+                EmptyVisitsText.Text       = $"تعذر تحميل الزيارات: {ex.Message}";
                 EmptyVisitsText.Visibility = Visibility.Visible;
             }
         }
@@ -816,7 +863,8 @@ namespace MyClinic
                 FinalTreatmentText   = NormalizeOrFallback(v.FinalTreatment,     "لا يوجد إجراء نهائي مسجل."),
                 PrescriptionItems    = rx,
                 AttachmentPaths      = paths,
-                SelectedTreatments   = ParseSelectedTreatments(v.SelectedTreatmentsJson)
+                SelectedTreatments   = ParseSelectedTreatments(v.SelectedTreatmentsJson),
+                HasEditHistory       = v.EditHistories?.Count > 0
             };
         }
 
@@ -1084,6 +1132,7 @@ namespace MyClinic
     public sealed class VisitHistoryItem
     {
         public int      VisitId             { get; init; }       // unique DB id — used as cache key
+        public bool     HasEditHistory      { get; init; }
         public DateTime VisitDate           { get; init; }
         public string   VisitDateText       { get; init; } = string.Empty;
         public string   VisitDateTimeText   { get; init; } = string.Empty;
@@ -1113,6 +1162,8 @@ namespace MyClinic
 
     public sealed class VisitDetailsViewModel
     {
+        public int VisitId { get; init; }
+        public bool HasEditHistory { get; init; }
         public string PatientName           { get; init; } = string.Empty;
         public string? ChartModeText        { get; set; }
         public string DoctorName            { get; init; } = string.Empty;

@@ -8,7 +8,7 @@ namespace MyClinic.Models
         [Key]
         public int Id { get; set; }
 
-        public DateTime ExpenseDate { get; set; } = DateTime.Today;
+        public DateTime ExpenseDate { get; set; } = AppClock.Today;
 
         [Required]
         public string Description { get; set; } = string.Empty;

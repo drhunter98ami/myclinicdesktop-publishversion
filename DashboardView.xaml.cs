@@ -22,8 +22,10 @@ namespace MyClinic
         private readonly ObservableCollection<AppointmentCardModel> _appointments = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
         private readonly List<Patient> _allPatients = new(); 
+        private readonly List<VisitAttendanceRecord> _visitAttendanceRecords = new();
         private readonly List<string> _appointmentNameSuggestions = new();
         private readonly List<string> _appointmentPhoneSuggestions = new();
+        private int? _selectedAppointmentPatientId;
         private bool _isUpdatingAppointmentSuggestions;
         private bool _isUpdatingAppointmentFields;
         private bool _refreshRequested = true;
@@ -38,10 +40,7 @@ namespace MyClinic
             _isLoadingFileKitCanalCount = true;
             InitializeComponent();
 
-            string username = LoginSessionStore.CurrentUsername;
-            TxtWelcome.Text = string.IsNullOrWhiteSpace(username)
-                ? "أهلاً بك"
-                : $"أهلاً د. {username}";
+            RefreshWelcomeName();
 
             LoadFileKitCanalCount();
             _isLoadingFileKitCanalCount = false;
@@ -60,6 +59,27 @@ namespace MyClinic
 
             GlobalEvents.OnPatientRecordAdded += HandlePatientRecordAdded;
             GlobalEvents.OnFileKitCanalCountChanged += HandleFileKitCanalCountChanged;
+        }
+
+        public void RefreshWelcomeName()
+        {
+            string username = LoginSessionStore.CurrentUsername;
+            TxtWelcome.Text = string.IsNullOrWhiteSpace(username)
+                ? "أهلاً بك"
+                : $"أهلاً د. {username}";
+        }
+
+        public void RefreshDatesForAppTimeChange(DateTime previousAppTime)
+        {
+            DateTime previousDate = previousAppTime.Date;
+            DateTime currentDate = AppClock.Today;
+            if (DpAppointmentsFilter.SelectedDate?.Date == previousDate)
+                DpAppointmentsFilter.SelectedDate = currentDate;
+            if (DpAppointmentDate.SelectedDate?.Date == previousDate)
+                DpAppointmentDate.SelectedDate = currentDate;
+
+            RequestRefresh();
+            _ = RefreshNowAsync();
         }
 
         private void HandlePatientRecordAdded()
@@ -83,7 +103,7 @@ namespace MyClinic
             if (settings.Id == 0)
                 db.AppSettings.Add(settings);
             settings.FileKitCanalCount = 0;
-            settings.UpdatedAt = DateTime.Now;
+            settings.UpdatedAt = AppClock.Now;
             db.SaveChanges();
 
             _isLoadingFileKitCanalCount = true;
@@ -141,7 +161,7 @@ namespace MyClinic
                 }
 
                 settings.FileKitCanalCount = count;
-                settings.UpdatedAt = DateTime.Now;
+                settings.UpdatedAt = AppClock.Now;
                 db.SaveChanges();
             }
             catch
@@ -160,7 +180,7 @@ namespace MyClinic
 
         private DateTime GetSyrianTime()
         {
-            return DateTime.Now.AddHours(7);
+            return AppClock.Now;
         }
 
         public void RequestRefresh()
@@ -168,11 +188,12 @@ namespace MyClinic
             _refreshRequested = true;
         }
 
-        public void AddSavedVisitImmediately(string patientName, string phoneNumber, string reason, DateTime visitDateTime, int visitId)
+        public void AddSavedVisitImmediately(string patientName, string phoneNumber, string reason, DateTime visitDateTime, int visitId, int patientId)
         {
             AppointmentEntry savedVisit = new()
             {
                 Id = -Math.Abs(visitId),
+                PatientId = patientId,
                 PatientName = string.IsNullOrWhiteSpace(patientName) ? "بدون اسم" : patientName,
                 PhoneNumber = phoneNumber ?? string.Empty,
                 Reason = string.IsNullOrWhiteSpace(reason) ? "مراجعة" : reason,
@@ -180,14 +201,41 @@ namespace MyClinic
                 IsVisitRecord = true
             };
 
-            string key = BuildCalendarKey(savedVisit.PhoneNumber, savedVisit.AppointmentDateTime);
             _allAppointments.RemoveAll(a => a.IsVisitRecord
-                && BuildCalendarKey(a.PhoneNumber, a.AppointmentDateTime) == key);
-            _allAppointments.Add(savedVisit);
+                && IsSamePatient(a, savedVisit)
+                && a.AppointmentDateTime == visitDateTime);
+
+            bool visitIsRepresentedByManualAppointment = _allAppointments.Any(appointment =>
+                !appointment.IsVisitRecord
+                && !appointment.IsAutomaticallyGenerated
+                && appointment.AppointmentDateTime.Date == visitDateTime.Date
+                && appointment.CreatedAt is DateTime createdAt
+                && visitDateTime > createdAt
+                && IsSamePatient(appointment, savedVisit));
+            if (!visitIsRepresentedByManualAppointment)
+                _allAppointments.Add(savedVisit);
+
+            _visitAttendanceRecords.Add(new VisitAttendanceRecord(
+                patientId,
+                phoneNumber ?? string.Empty,
+                patientName ?? string.Empty,
+                visitDateTime));
+            foreach (AppointmentEntry appointment in _allAppointments)
+            {
+                if (appointment.PatientId is null
+                    && string.Equals(appointment.PatientName?.Trim(), patientName?.Trim(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(appointment.PhoneNumber?.Trim(), phoneNumber?.Trim(), StringComparison.Ordinal))
+                {
+                    appointment.PatientId = patientId;
+                }
+                UpdateAppointmentAttendance(appointment);
+            }
+
             _hasLoadedData = true;
             _refreshRequested = false;
             ApplyAppointmentsFilter();
             UpdateSearchSuggestions();
+            _ = RefreshNowAsync();
         }
 
         public Task EnsureDataCurrentAsync()
@@ -235,9 +283,28 @@ namespace MyClinic
                     .OrderBy(visit => visit.VisitDate)
                     .ToListAsync();
 
+                List<Patient> patients = await db.Patients
+                    .AsNoTracking()
+                    .ToListAsync();
+
                 var appointmentKeys = appointments
                     .Select(appointment => BuildCalendarKey(appointment.PhoneNumber, appointment.AppointmentDateTime))
                     .ToHashSet(StringComparer.Ordinal);
+                var automaticallyGeneratedKeys = visits
+                    .Select(visit => BuildCalendarKey(visit.Patient?.PhoneNumber, visit.VisitDate))
+                    .ToHashSet(StringComparer.Ordinal);
+
+                foreach (AppointmentEntry appointment in appointments)
+                {
+                    if (automaticallyGeneratedKeys.Contains(BuildCalendarKey(appointment.PhoneNumber, appointment.AppointmentDateTime)))
+                        appointment.IsAutomaticallyGenerated = true;
+
+                    appointment.PatientId ??= FindPatientId(appointment.PatientName, appointment.PhoneNumber, patients);
+                }
+
+                List<AppointmentEntry> manualAppointments = appointments
+                    .Where(appointment => !appointment.IsAutomaticallyGenerated)
+                    .ToList();
                 var visitNumberByPatient = new Dictionary<int, int>();
 
                 foreach (Visit visit in visits)
@@ -248,12 +315,18 @@ namespace MyClinic
                     visitNumber++;
                     visitNumberByPatient[visit.PatientId] = visitNumber;
 
-                    if (appointmentKeys.Contains(key))
+                    if (appointmentKeys.Contains(key)
+                        || manualAppointments.Any(appointment =>
+                            appointment.AppointmentDateTime.Date == visit.VisitDate.Date
+                            && appointment.CreatedAt is DateTime createdAt
+                            && visit.VisitDate > createdAt
+                            && IsSamePatient(appointment, visit)))
                         continue;
 
                     appointments.Add(new AppointmentEntry
                     {
                         Id = -visit.Id,
+                        PatientId = visit.PatientId,
                         PatientName = visit.Patient?.FullName ?? "بدون اسم",
                         PhoneNumber = phoneNumber,
                         Reason = visitNumber == 1 ? "معاينة جديدة" : "مراجعة",
@@ -262,15 +335,31 @@ namespace MyClinic
                     });
                 }
 
-                List<Patient> patients = await db.Patients
-                    .AsNoTracking()
-                    .ToListAsync();
+                appointments.RemoveAll(appointment =>
+                    appointment.IsAutomaticallyGenerated
+                    && manualAppointments.Any(manualAppointment =>
+                        manualAppointment.AppointmentDateTime.Date == appointment.AppointmentDateTime.Date
+                        && manualAppointment.CreatedAt is DateTime createdAt
+                        && appointment.AppointmentDateTime > createdAt
+                        && IsSamePatient(manualAppointment, appointment)));
 
                 _allAppointments.Clear();
                 _allAppointments.AddRange(appointments);
                 
                 _allPatients.Clear();
                 _allPatients.AddRange(patients);
+
+                _visitAttendanceRecords.Clear();
+                foreach (Visit visit in visits)
+                {
+                    _visitAttendanceRecords.Add(new VisitAttendanceRecord(
+                        visit.PatientId,
+                        visit.Patient?.PhoneNumber ?? string.Empty,
+                        visit.Patient?.FullName ?? string.Empty,
+                        visit.VisitDate));
+                }
+                foreach (AppointmentEntry appointment in _allAppointments)
+                    UpdateAppointmentAttendance(appointment);
                 
                 ApplyAppointmentsFilter();
                 UpdateSearchSuggestions();
@@ -331,6 +420,7 @@ namespace MyClinic
             if (!IsLoaded || _isUpdatingAppointmentFields || _isUpdatingAppointmentSuggestions)
                 return;
 
+            _selectedAppointmentPatientId = null;
             RefreshAppointmentSuggestions();
         }
 
@@ -339,6 +429,7 @@ namespace MyClinic
             if (!IsLoaded || _isUpdatingAppointmentFields || _isUpdatingAppointmentSuggestions)
                 return;
 
+            _selectedAppointmentPatientId = null;
             RefreshAppointmentSuggestions();
         }
 
@@ -420,6 +511,7 @@ namespace MyClinic
                 var patientMatch = _allPatients.FirstOrDefault(p => p.FullName == selectedName);
                 if (patientMatch != null && !string.IsNullOrWhiteSpace(patientMatch.PhoneNumber))
                 {
+                    _selectedAppointmentPatientId = patientMatch.Id;
                     _isUpdatingAppointmentFields = true;
                     try
                     {
@@ -437,6 +529,7 @@ namespace MyClinic
                 var appMatch = _allAppointments.FirstOrDefault(a => a.PatientName == selectedName);
                 if (appMatch != null && !string.IsNullOrWhiteSpace(appMatch.PhoneNumber))
                 {
+                    _selectedAppointmentPatientId = null;
                     _isUpdatingAppointmentFields = true;
                     try
                     {
@@ -462,6 +555,7 @@ namespace MyClinic
                 var patientMatch = _allPatients.FirstOrDefault(p => p.PhoneNumber == selectedPhone);
                 if (patientMatch != null && !string.IsNullOrWhiteSpace(patientMatch.FullName))
                 {
+                    _selectedAppointmentPatientId = patientMatch.Id;
                     _isUpdatingAppointmentFields = true;
                     try
                     {
@@ -479,6 +573,7 @@ namespace MyClinic
                 var appMatch = _allAppointments.FirstOrDefault(a => a.PhoneNumber == selectedPhone);
                 if (appMatch != null && !string.IsNullOrWhiteSpace(appMatch.PatientName))
                 {
+                    _selectedAppointmentPatientId = null;
                     _isUpdatingAppointmentFields = true;
                     try
                     {
@@ -556,7 +651,9 @@ namespace MyClinic
                     PatientName = patientName,
                     PhoneNumber = phoneNumber,
                     Reason = reason,
-                    AppointmentDateTime = appointmentDateTime
+                    AppointmentDateTime = appointmentDateTime,
+                    CreatedAt = AppClock.Now,
+                    PatientId = _selectedAppointmentPatientId ?? FindPatientId(patientName, phoneNumber, _allPatients)
                 };
 
                 using var db = new AppDbContext();
@@ -564,6 +661,7 @@ namespace MyClinic
 
                 await db.SaveChangesAsync();
 
+                UpdateAppointmentAttendance(newAppointment);
                 _allAppointments.Add(newAppointment);
 
                 // إخفاء النافذة يقوم بالتصفير تلقائياً بفضل استدعاء ResetAppointmentForm بداخلها
@@ -1001,6 +1099,20 @@ namespace MyClinic
             var appointmentsPanel = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
             foreach (AppointmentEntry appointment in dayAppointments)
             {
+                string statusLine = appointment.ShowAttendanceStatus
+                    ? $"\n{appointment.AttendanceStatusText}"
+                    : string.Empty;
+                Brush appointmentForeground = appointment.AttendanceStatus switch
+                {
+                    "Attended" when appointment.ShowAttendanceStatus =>
+                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#15803D")),
+                    "Absent" when appointment.ShowAttendanceStatus =>
+                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B91C1C")),
+                    "Waiting" when appointment.ShowAttendanceStatus =>
+                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A16207")),
+                    _ => (Brush)FindResource("AppTextPrimary")
+                };
+
                 var appointmentRow = new Grid
                 {
                     Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#14235DF6")),
@@ -1011,15 +1123,15 @@ namespace MyClinic
 
                 var appointmentText = new TextBlock
                 {
-                    Text = $"{appointment.AppointmentDateTime:hh\\:mm tt} - {appointment.Reason}\\n{appointment.PatientName}",
+                    Text = $"{appointment.AppointmentDateTime:hh\\:mm tt} - {appointment.Reason}\\n{appointment.PatientName}{statusLine}",
                     FontSize = 10,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = (Brush)FindResource("AppTextPrimary"),
+                    Foreground = appointmentForeground,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.Wrap,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(5, 3, 0, 3),
-                    ToolTip = $"{appointment.PatientName} - {appointment.Reason}"
+                    ToolTip = $"{appointment.PatientName} - {appointment.Reason}{statusLine}"
                 };
                 Grid.SetColumn(appointmentText, 0);
 
@@ -1108,9 +1220,93 @@ namespace MyClinic
                 Reason = appointment.Reason,
                 AppointmentDateText = appointment.AppointmentDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
                 AppointmentTimeText = appointment.AppointmentDateTime.ToString("hh:mm tt", CultureInfo.InvariantCulture),
+                AttendanceStatus = appointment.AttendanceStatus,
+                AttendanceStatusText = appointment.AttendanceStatusText,
+                ShowAttendanceStatus = appointment.ShowAttendanceStatus,
                 ReasonBackground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isNewConsultation ? "#EAF1FF" : "#F0FDF4")),
                 ReasonForeground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isNewConsultation ? "#235DF6" : "#15803D"))
             };
+        }
+
+        private void UpdateAppointmentAttendance(AppointmentEntry appointment)
+        {
+            appointment.AttendanceStatus = string.Empty;
+            appointment.AttendanceStatusText = string.Empty;
+
+            if (appointment.IsVisitRecord || appointment.IsAutomaticallyGenerated)
+                return;
+
+            DateTime? attendedAt = appointment.CreatedAt is DateTime createdAt
+                ? _visitAttendanceRecords
+                    .Where(visit => IsSamePatient(appointment, visit)
+                        && visit.VisitDate.Date == appointment.AppointmentDateTime.Date
+                        && visit.VisitDate > createdAt)
+                    .OrderBy(visit => visit.VisitDate)
+                    .Select(visit => (DateTime?)visit.VisitDate)
+                    .FirstOrDefault()
+                : null;
+
+            if (attendedAt.HasValue)
+            {
+                appointment.AttendanceStatus = "Attended";
+                appointment.AttendanceStatusText =
+                    $"✓ حضر الساعة {attendedAt.Value.ToString("hh:mm tt", CultureInfo.InvariantCulture)}";
+                return;
+            }
+
+            if (appointment.AppointmentDateTime < GetSyrianTime())
+            {
+                appointment.AttendanceStatus = "Absent";
+                appointment.AttendanceStatusText = "✕ لم يحضر";
+                return;
+            }
+
+            appointment.AttendanceStatus = "Waiting";
+            appointment.AttendanceStatusText = "◷ لم يأت بعد";
+        }
+
+        private static int? FindPatientId(string patientName, string phoneNumber, IEnumerable<Patient> patients)
+        {
+            List<Patient> matches = patients
+                .Where(patient => string.Equals(patient.FullName?.Trim(), patientName.Trim(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(patient.PhoneNumber?.Trim(), phoneNumber.Trim(), StringComparison.Ordinal))
+                .Take(2)
+                .ToList();
+
+            return matches.Count == 1 ? matches[0].Id : null;
+        }
+
+        private static bool IsSamePatient(AppointmentEntry first, AppointmentEntry second)
+        {
+            if (first.PatientId is int firstPatientId && second.PatientId is int secondPatientId)
+            {
+                if (firstPatientId == secondPatientId)
+                    return true;
+            }
+
+            return string.Equals(first.PhoneNumber?.Trim(), second.PhoneNumber?.Trim(), StringComparison.Ordinal)
+                && string.Equals(first.PatientName?.Trim(), second.PatientName?.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSamePatient(AppointmentEntry appointment, Visit visit)
+        {
+            if (appointment.PatientId is int patientId)
+            {
+                if (patientId == visit.PatientId)
+                    return true;
+            }
+
+            return string.Equals(appointment.PhoneNumber?.Trim(), visit.Patient?.PhoneNumber?.Trim(), StringComparison.Ordinal)
+                && string.Equals(appointment.PatientName?.Trim(), visit.Patient?.FullName?.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSamePatient(AppointmentEntry appointment, VisitAttendanceRecord visit)
+        {
+            if (appointment.PatientId is int patientId && patientId == visit.PatientId)
+                return true;
+
+            return string.Equals(appointment.PhoneNumber?.Trim(), visit.PhoneNumber.Trim(), StringComparison.Ordinal)
+                && string.Equals(appointment.PatientName?.Trim(), visit.PatientName.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildCalendarKey(string? phoneNumber, DateTime dateTime) =>
@@ -1154,6 +1350,7 @@ namespace MyClinic
 
         private void ResetAppointmentForm()
         {
+            _selectedAppointmentPatientId = null;
             CmbAppointmentPatientName.Text = string.Empty;
             CmbAppointmentPhoneNumber.Text = string.Empty;
             CmbAppointmentReason.SelectedIndex = 0;
@@ -1179,7 +1376,16 @@ namespace MyClinic
         public string Reason { get; init; } = string.Empty;
         public string AppointmentDateText { get; init; } = string.Empty;
         public string AppointmentTimeText { get; init; } = string.Empty;
+        public string AttendanceStatus { get; init; } = string.Empty;
+        public string AttendanceStatusText { get; init; } = string.Empty;
+        public bool ShowAttendanceStatus { get; init; }
         public Brush ReasonBackground { get; init; } = Brushes.Transparent;
         public Brush ReasonForeground { get; init; } = Brushes.Black;
     }
+
+    internal sealed record VisitAttendanceRecord(
+        int PatientId,
+        string PhoneNumber,
+        string PatientName,
+        DateTime VisitDate);
 }

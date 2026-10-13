@@ -158,7 +158,7 @@ namespace MyClinic
                     Price = price,
                     Quantity = quantity,
                     Currency = currency,
-                    CreatedAt = DateTime.Now
+                    CreatedAt = AppClock.Now
                 };
                 context.Shortages.Add(shortage);
                 context.SaveChanges();
@@ -305,7 +305,7 @@ namespace MyClinic
 
                     var newExpense = new ExpenseEntry
                     {
-                        ExpenseDate = DateTime.Now,
+                        ExpenseDate = AppClock.Now,
                         Description = $"نواقص - {item.Item}",
                         Amount = (double)amountInSyp
                     };

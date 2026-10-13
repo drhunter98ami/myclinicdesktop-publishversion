@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 
 namespace MyClinic
@@ -37,13 +38,20 @@ namespace MyClinic
                     return false;
                 }
 
-                string savedText = File.ReadAllText(SessionFilePath).Trim();
-                if (!DateTime.TryParse(savedText, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime lastLoginUtc))
+                string[] lines = File.ReadAllLines(SessionFilePath);
+                if (lines.Length < 2 ||
+                    string.IsNullOrWhiteSpace(lines[1]) ||
+                    !DateTime.TryParse(
+                        lines[0].Trim(),
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.RoundtripKind,
+                        out DateTime lastLoginUtc))
                 {
                     return false;
                 }
 
-                return DateTime.UtcNow - lastLoginUtc < maxAge;
+                TimeSpan sessionAge = DateTime.UtcNow - lastLoginUtc.ToUniversalTime();
+                return sessionAge >= TimeSpan.Zero && sessionAge < maxAge;
             }
             catch
             {
@@ -59,6 +67,16 @@ namespace MyClinic
                 DateTime.UtcNow.ToString("O"),
                 username.Trim()
             });
+        }
+
+        public static void UpdateUsername(string username)
+        {
+            string lastLoginUtc = File.Exists(SessionFilePath)
+                ? File.ReadLines(SessionFilePath).FirstOrDefault() ?? DateTime.UtcNow.ToString("O")
+                : DateTime.UtcNow.ToString("O");
+
+            Directory.CreateDirectory(SessionDirectory);
+            File.WriteAllLines(SessionFilePath, new[] { lastLoginUtc, username.Trim() });
         }
     }
 }

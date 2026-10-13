@@ -14,7 +14,7 @@ namespace MyClinic.Models
         [Key]
         public int Id { get; set; }
 
-        public DateTime VisitDate { get; set; } = DateTime.Now;
+        public DateTime VisitDate { get; set; } = AppClock.Now;
 
         // ── FK to Patient ──────────────────────────────────────────────
         [ForeignKey(nameof(Patient))]
@@ -62,5 +62,6 @@ namespace MyClinic.Models
         public string ChartMode { get; set; } = "Adult";
 
         public ICollection<ToothRecord> ToothRecords { get; set; } = new List<ToothRecord>();
+        public ICollection<VisitEditHistory> EditHistories { get; set; } = new List<VisitEditHistory>();
     }
 }
