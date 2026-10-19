@@ -208,7 +208,7 @@ namespace MyClinic.OriginalTheme
 
         private void TreatmentTooth_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            ApplySelectedTooth(sender);
+            ApplySelectedTooth(sender, e.RemovedItems.OfType<string>().FirstOrDefault());
         }
 
         private void TreatmentTooth_DropDownClosed(object sender, EventArgs e)
@@ -216,7 +216,7 @@ namespace MyClinic.OriginalTheme
             ApplySelectedTooth(sender);
         }
 
-        private static void ApplySelectedTooth(object sender)
+        private void ApplySelectedTooth(object sender, string? previousTooth = null)
         {
             if (sender is not ComboBox combo)
                 return;
@@ -227,9 +227,45 @@ namespace MyClinic.OriginalTheme
 
             if (combo.SelectedItem is string tooth && int.TryParse(tooth, out _))
             {
+                if (!string.IsNullOrWhiteSpace(previousTooth)
+                    && !string.Equals(previousTooth, tooth, StringComparison.Ordinal)
+                    && !IsToothUsedByAnotherTreatment(detail, previousTooth))
+                {
+                    AdultChartControl.DeselectTooth(previousTooth);
+                    ChildChartControl.DeselectTooth(previousTooth);
+                }
+
                 detail.ToothId = tooth;
+                SelectToothOnChart(tooth);
                 if (detail.IsRootCanal)
                     ConfigureCanalsForTooth(detail);
+            }
+        }
+
+        private bool IsToothUsedByAnotherTreatment(TreatmentToothDetail currentDetail, string tooth)
+        {
+            return _treatmentSelectionItems
+                .Where(item => item.IsSelected)
+                .SelectMany(item => item.ToothDetails)
+                .Any(detail => !ReferenceEquals(detail, currentDetail)
+                    && string.Equals(detail.ToothId, tooth, StringComparison.Ordinal));
+        }
+
+        private void SelectToothOnChart(string tooth)
+        {
+            if (int.TryParse(tooth, out int toothNumber) && toothNumber is >= 51 and <= 85)
+            {
+                if (!ChildChartControl.SelectTooth(tooth))
+                    return;
+
+                BtnChild_Click(this, new RoutedEventArgs());
+            }
+            else
+            {
+                if (!AdultChartControl.SelectTooth(tooth))
+                    return;
+
+                BtnAdult_Click(this, new RoutedEventArgs());
             }
         }
 
@@ -270,7 +306,7 @@ namespace MyClinic.OriginalTheme
         private static void ResizeCanals(TreatmentToothDetail detail)
         {
             while (detail.Canals.Count < detail.CanalCount)
-                detail.Canals.Add(new CanalMeasurement { Name = $"قناة {detail.Canals.Count + 1}", IsExtraCanal = true });
+                detail.Canals.Add(new CanalMeasurement { Name = string.Empty, IsExtraCanal = true });
             while (detail.Canals.Count > detail.CanalCount)
                 detail.Canals.RemoveAt(detail.Canals.Count - 1);
         }

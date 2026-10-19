@@ -26,6 +26,28 @@ namespace MyClinic
                 .ToArray();
         }
 
+        public bool SelectTooth(string toothId)
+        {
+            ToggleButton? toothButton = FindVisualChildren<ToggleButton>(this)
+                .FirstOrDefault(button => string.Equals(button.Content?.ToString(), toothId, StringComparison.Ordinal));
+            if (toothButton is null)
+                return false;
+
+            toothButton.IsChecked = true;
+            return true;
+        }
+
+        public bool DeselectTooth(string toothId)
+        {
+            ToggleButton? toothButton = FindVisualChildren<ToggleButton>(this)
+                .FirstOrDefault(button => string.Equals(button.Content?.ToString(), toothId, StringComparison.Ordinal));
+            if (toothButton is null)
+                return false;
+
+            toothButton.IsChecked = false;
+            return true;
+        }
+
         public void ClearSelection()
         {
             foreach (ToggleButton button in FindVisualChildren<ToggleButton>(this))

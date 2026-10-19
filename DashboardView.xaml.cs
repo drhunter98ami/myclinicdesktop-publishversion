@@ -552,14 +552,12 @@ namespace MyClinic
                 .Select(s => s!.Trim());
             var allPhones = appointmentPhones.Concat(patientPhones).Distinct().ToList();
 
-            var allSuggestions = allNames.Concat(allPhones).Distinct().ToList();
-
             _appointmentNameSuggestions.Clear();
             _appointmentNameSuggestions.AddRange(allNames);
             _appointmentPhoneSuggestions.Clear();
             _appointmentPhoneSuggestions.AddRange(allPhones);
 
-            CmbAppointmentsSearch.ItemsSource = allSuggestions;
+            RefreshDashboardSearchSuggestions();
             RefreshAppointmentSuggestions();
         }
 
@@ -1031,16 +1029,37 @@ namespace MyClinic
             }
         }
 
-        private void CmbAppointmentsSearch_TextChanged(object sender, TextChangedEventArgs e)
+        private void AppointmentsSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (!IsLoaded) return;
+            if (!IsLoaded)
+                return;
+
+            RefreshDashboardSearchSuggestions();
             ApplyAppointmentsFilter();
         }
 
-        private void CmbAppointmentsSearch_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void RefreshDashboardSearchSuggestions()
         {
-            if (!IsLoaded) return;
-            ApplyAppointmentsFilter();
+            if (TxtAppointmentsSearch is null || AppointmentsSearchSuggestionsPanel is null)
+                return;
+
+            string query = TxtAppointmentsSearch.Text?.Trim() ?? string.Empty;
+            List<string> matchingNames = FilterAppointmentSuggestions(_appointmentNameSuggestions, query);
+            AppointmentsSearchSuggestions.ItemsSource = matchingNames;
+            AppointmentsSearchSuggestionsPanel.Visibility =
+                TxtAppointmentsSearch.IsKeyboardFocusWithin && query.Length > 0 && matchingNames.Count > 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+        }
+
+        private void AppointmentSearchSuggestion_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string patientName })
+                return;
+
+            TxtAppointmentsSearch.Text = patientName;
+            TxtAppointmentsSearch.CaretIndex = TxtAppointmentsSearch.Text.Length;
+            AppointmentsSearchSuggestionsPanel.Visibility = Visibility.Collapsed;
         }
 
         private void AppointmentDialogBackdrop_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -1081,7 +1100,7 @@ namespace MyClinic
             DateTime syrianNow = GetSyrianTime();
             DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? syrianNow.Date).Date;
 
-            string searchText = CmbAppointmentsSearch.Text?.Trim().ToLowerInvariant() ?? "";
+            string searchText = TxtAppointmentsSearch.Text?.Trim().ToLowerInvariant() ?? "";
             bool isSearching = !string.IsNullOrWhiteSpace(searchText);
 
             var query = _allAppointments.AsEnumerable();
@@ -1112,8 +1131,7 @@ namespace MyClinic
 
             if (isSearching)
             {
-                query = query.Where(a => (a.PatientName?.ToLowerInvariant().Contains(searchText) == true) ||
-                                         (a.PhoneNumber?.Contains(searchText) == true));
+                query = query.Where(a => a.PatientName?.ToLowerInvariant().Contains(searchText) == true);
             }
 
             List<AppointmentCardModel> visibleAppointments = query
@@ -1149,8 +1167,7 @@ namespace MyClinic
             if (isSearching)
             {
                 monthAppointments = monthAppointments.Where(a =>
-                    (a.PatientName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true)
-                    || (a.PhoneNumber?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true));
+                    a.PatientName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true);
             }
 
             Dictionary<DateTime, List<AppointmentEntry>> appointmentsByDay = monthAppointments

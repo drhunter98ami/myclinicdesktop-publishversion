@@ -976,7 +976,9 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="44"/>
                                     <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="95"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="140"/>
                                     <ColumnDefinition Width="10"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
@@ -1005,7 +1007,12 @@
                                 </Button>
 
                                 <TextBox x:Name="TxtUpcomingAmount" Grid.Column="2" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="القيمة"/>
-                                <TextBox x:Name="TxtUpcomingDescription" Grid.Column="4" Style="{StaticResource InputBoxStyle}" TextAlignment="Right" Tag="تفاصيل الدفعة..."/>
+                                <ComboBox x:Name="CmbUpcomingCategory" Grid.Column="4" Height="40" Padding="8,0"
+                                          VerticalContentAlignment="Center" Style="{StaticResource ExpenseCategoryComboBoxStyle}"
+                                          FlowDirection="RightToLeft">
+                                    <ComboBoxItem Content="اختر الفئة" IsEnabled="False" IsSelected="True"/>
+                                </ComboBox>
+                                <TextBox x:Name="TxtUpcomingDescription" Grid.Column="6" Style="{StaticResource InputBoxStyle}" TextAlignment="Right" Tag="تفاصيل الدفعة..."/>
                             </Grid>
                         </Border>
 

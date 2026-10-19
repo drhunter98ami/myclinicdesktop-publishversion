@@ -613,33 +613,81 @@
                             <TextBlock Text="بطاقات المواعيد تعرض الاسم، الهاتف، السبب، وتوقيت الحجز." FontSize="13" Foreground="{DynamicResource AppTextSecondary}"/>
                         </StackPanel>
 
-                        <!-- حقل البحث التلقائي المزدوج الإطار كما في الصور -->
                         <Border Grid.Column="2"
                                 Background="{DynamicResource DashFilterGroupBg}"
                                 BorderBrush="{DynamicResource DashFilterGroupBorder}"
                                 BorderThickness="1"
                                 CornerRadius="13"
                                 Padding="5"
-                                VerticalAlignment="Center">
-                            <Border Background="{DynamicResource AppCardBg}"
-                                    BorderBrush="{DynamicResource AppBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="9"
-                                    Padding="4,0">
-                                <ComboBox x:Name="CmbAppointmentsSearch"
-                                          Width="236"
-                                          Height="34"
-                                          IsEditable="True"
-                                          IsTextSearchEnabled="True"
-                                          Foreground="{DynamicResource AppTextPrimary}"
-                                          StaysOpenOnEdit="True"
-                                          BorderThickness="0"
-                                          Background="Transparent"
-                                          VerticalContentAlignment="Center"
-                                          Padding="6,0"
-                                          TextBoxBase.TextChanged="CmbAppointmentsSearch_TextChanged"
-                                          SelectionChanged="CmbAppointmentsSearch_SelectionChanged"/>
-                            </Border>
+                                VerticalAlignment="Center"
+                                Panel.ZIndex="5">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Border Background="{DynamicResource AppCardBg}"
+                                        BorderBrush="{DynamicResource AppBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="9"
+                                        Padding="4,0">
+                                    <Grid>
+                                        <TextBox x:Name="TxtAppointmentsSearch"
+                                                 Width="236"
+                                                 Height="34"
+                                                 Foreground="{DynamicResource AppTextPrimary}"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 VerticalContentAlignment="Center"
+                                                 Padding="6,0"
+                                                 TextChanged="AppointmentsSearch_TextChanged"/>
+                                        <TextBlock Text="بحث عن موعد مريض"
+                                                   Margin="12,0,12,0"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Right"
+                                                   Foreground="{DynamicResource AppTextSecondary}"
+                                                   IsHitTestVisible="False">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Text, ElementName=TxtAppointmentsSearch}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                                <Border x:Name="AppointmentsSearchSuggestionsPanel"
+                                        Grid.Row="1"
+                                        Margin="0,5,0,0"
+                                        MaxHeight="210"
+                                        Background="{DynamicResource AppCardBg}"
+                                        BorderBrush="{DynamicResource AppBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="9"
+                                        Visibility="Collapsed">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl x:Name="AppointmentsSearchSuggestions">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Tag="{Binding}"
+                                                            Content="{Binding}"
+                                                            Click="AppointmentSearchSuggestion_Click"
+                                                            HorizontalContentAlignment="Right"
+                                                            Padding="10,8"
+                                                            Background="Transparent"
+                                                            Foreground="{DynamicResource AppTextPrimary}"
+                                                            BorderThickness="0"
+                                                            Cursor="Hand"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
                         </Border>
                     </Grid>
 

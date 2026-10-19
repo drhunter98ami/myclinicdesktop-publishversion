@@ -38,7 +38,10 @@ namespace MyClinic.OriginalTheme
             InitializeComponent();
 
             foreach (string category in ExpenseCategories.Labels)
+            {
                 CmbExpenseCategory.Items.Add(category);
+                CmbUpcomingCategory.Items.Add(category);
+            }
 
             IncomeItemsControl.ItemsSource = _incomeRows;
             ExpenseItemsControl.ItemsSource = _expenseRows;
@@ -320,6 +323,13 @@ namespace MyClinic.OriginalTheme
         
         private async void BtnAddUpcoming_Click(object sender, RoutedEventArgs e)
         {
+            if (CmbUpcomingCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
+            {
+                MessageBox.Show("يرجى اختيار فئة الدفعة.", "دفعات قادمة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                CmbUpcomingCategory.Focus();
+                return;
+            }
+
             string desc = TxtUpcomingDescription.Text.Trim();
             if (string.IsNullOrWhiteSpace(desc))
             {
@@ -336,12 +346,14 @@ namespace MyClinic.OriginalTheme
                 return;
             }
             
+            string description = ExpenseCategories.FormatDescription(category, desc);
+
             try
             {
                 using var db = new AppDbContext();
                 var newUpcoming = new UpcomingPayment
                 {
-                    Description = desc,
+                    Description = description,
                     Amount = (double)amt
                 };
                 
@@ -358,6 +370,7 @@ namespace MyClinic.OriginalTheme
                 
                 TxtUpcomingDescription.Clear();
                 TxtUpcomingAmount.Clear();
+                CmbUpcomingCategory.SelectedIndex = 0;
                 EmptyUpcomingText.Visibility = Visibility.Collapsed;
             }
             catch (Exception)
