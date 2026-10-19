@@ -9,19 +9,36 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
 
 namespace MyClinic
 {
+    public sealed class RowNumberConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int index)
+                return (index + 1).ToString(CultureInfo.InvariantCulture);
+            return "1";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            Binding.DoNothing;
+    }
+
     public partial class SettingsView : UserControl
     {
         private readonly ObservableCollection<TreatmentCost> _treatmentCosts = new();
         private int? _editingTreatmentId;
+        private bool _isLoadingInterfaceTheme;
 
         public SettingsView()
         {
             InitializeComponent();
             TreatmentItemsControl.ItemsSource = _treatmentCosts;
             Loaded += SettingsView_Loaded;
+            Unloaded += SettingsView_Unloaded;
             
             // Set default currency selection
             CmbTreatmentCurrency.SelectedIndex = 0;
@@ -29,12 +46,68 @@ namespace MyClinic
 
         private async void SettingsView_Loaded(object sender, RoutedEventArgs e)
         {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+
             LoadExchangeRate();
             TxtUsername.Text = LoginSessionStore.CurrentUsername;
             SetAppClockFields(AppClock.Now);
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                ThemeToggle.IsChecked = mainWindow.IsDarkTheme;
+            bool isDark = IsDarkThemeActive();
+            ThemeToggle.IsChecked = isDark;
+            ApplyThemeVisuals(isDark);
+            _isLoadingInterfaceTheme = true;
+            InterfaceThemeComboBox.SelectedIndex = InterfaceThemeSettings.IsOriginalTheme ? 1 : 0;
+            _isLoadingInterfaceTheme = false;
             await LoadTreatmentsAsync();
+        }
+
+        private void SettingsView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (SettingsBackSpotlightCanvas is not null)
+                SettingsBackSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+            if (SettingsBannerDarkGlow is not null)
+                SettingsBannerDarkGlow.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Settings_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || SettingsBackSpotlightCanvas is null || SettingsBackSpotlightTransform is null)
+                return;
+
+            if (SettingsBackSpotlightCanvas.Visibility != Visibility.Visible)
+                SettingsBackSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(SettingsRootGrid);
+            SettingsBackSpotlightTransform.X = pos.X - (SettingsBackSpotlight.Width / 2.0);
+            SettingsBackSpotlightTransform.Y = pos.Y - (SettingsBackSpotlight.Height / 2.0);
+        }
+
+        private void Settings_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (SettingsBackSpotlightTransform is not null)
+            {
+                SettingsBackSpotlightTransform.X = -1200;
+                SettingsBackSpotlightTransform.Y = -1200;
+            }
         }
 
         private void SetAppClockFields(DateTime appTime)
@@ -160,7 +233,7 @@ namespace MyClinic
         private void BtnWhatsNew_Click(object sender, RoutedEventArgs e)
         {
             const string updates =
-                "الإصدار 2.0.0\n\n" +
+                "الإصدار 2.1.0\n\n" +
                 "التحديثات الجديدة:\n" +
                 "1- تم تحسين التقارير الشهرية لتظهر تفاصيل أدق وتعطي إحصائيات احترافية.\n\n" +
                 "2- تم إصلاح خلل ظهور عدد الأقنية في المعالجات التي لا تتضمن سحب عصب.\n\n" +
@@ -198,6 +271,30 @@ namespace MyClinic
         {
             if (Window.GetWindow(this) is MainWindow mainWindow)
                 mainWindow.SetDarkTheme(false);
+        }
+
+        private void InterfaceThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingInterfaceTheme ||
+                InterfaceThemeComboBox.SelectedItem is not ComboBoxItem item ||
+                Window.GetWindow(this) is not MainWindow mainWindow)
+            {
+                return;
+            }
+
+            bool useOriginalTheme = string.Equals(item.Tag?.ToString(), "Original", StringComparison.Ordinal);
+            if (useOriginalTheme == InterfaceThemeSettings.IsOriginalTheme)
+                return;
+
+            try
+            {
+                mainWindow.SetInterfaceTheme(useOriginalTheme);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"تعذر تغيير تصميم الواجهة: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                InterfaceThemeComboBox.SelectedIndex = InterfaceThemeSettings.IsOriginalTheme ? 1 : 0;
+            }
         }
 
         private async void BtnRestoreDrive_Click(object sender, RoutedEventArgs e)

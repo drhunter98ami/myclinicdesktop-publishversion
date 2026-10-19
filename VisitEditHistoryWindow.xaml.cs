@@ -7,20 +7,100 @@ using System.Linq;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace MyClinic
 {
     public partial class VisitEditHistoryWindow : Window
     {
+        private readonly int _visitId;
+
         public VisitEditHistoryWindow(int visitId)
         {
             InitializeComponent();
-            LoadHistory(visitId);
+            _visitId = visitId;
+            ApplyThemeAndLoad(IsDarkThemeActive());
+            GlobalEvents.OnThemeChanged += ApplyThemeAndLoad;
+            Closed += (_, _) => GlobalEvents.OnThemeChanged -= ApplyThemeAndLoad;
         }
 
-        private void LoadHistory(int visitId)
+        private bool IsDarkThemeActive()
         {
+            if (Owner is MainWindow ownerMain)
+                return ownerMain.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMain)
+                return appMain.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
+        private void ApplyThemeAndLoad(bool isDark)
+        {
+            if (isDark)
+            {
+                var bannerGradient = new LinearGradientBrush { StartPoint = new Point(1, 0), EndPoint = new Point(0, 1) };
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0D6C6B"), 0.0));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0B8674"), 0.48));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#216382"), 1.0));
+
+                HistoryHeaderBanner.Background = bannerGradient;
+                HistoryHeaderBanner.BorderBrush = CreateBrush("#662DD4BF");
+                TxtHistoryHeaderTitle.Foreground = CreateBrush("#FFFFFF");
+                TxtHistoryHeaderSub.Foreground = CreateBrush("#E2F2F0");
+
+                BtnCloseHistory.Background = CreateBrush("#47535E");
+                BtnCloseHistory.BorderBrush = CreateBrush("#64748B");
+                BtnCloseHistory.BorderThickness = new Thickness(1);
+                BtnCloseHistory.Foreground = CreateBrush("#FFFFFF");
+            }
+            else
+            {
+                HistoryHeaderBanner.Background = CreateBrush("#E3EFED");
+                HistoryHeaderBanner.BorderBrush = CreateBrush("#D5E6E3");
+                TxtHistoryHeaderTitle.Foreground = CreateBrush("#13284A");
+                TxtHistoryHeaderSub.Foreground = CreateBrush("#2C3E50");
+
+                BtnCloseHistory.Background = CreateBrush("#C3DCD8");
+                BtnCloseHistory.BorderBrush = CreateBrush("#8EB4AE");
+                BtnCloseHistory.BorderThickness = new Thickness(1);
+                BtnCloseHistory.Foreground = CreateBrush("#264642");
+            }
+
+            if (HistorySpotlightCanvas is not null)
+                HistorySpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+
+            LoadHistory(_visitId, isDark);
+        }
+
+        private void Window_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || HistorySpotlightCanvas is null || HistorySpotlightTransform is null)
+                return;
+
+            if (HistorySpotlightCanvas.Visibility != Visibility.Visible)
+                HistorySpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(RootHistoryGrid);
+            HistorySpotlightTransform.X = pos.X - (HistorySpotlightEllipse.Width / 2.0);
+            HistorySpotlightTransform.Y = pos.Y - (HistorySpotlightEllipse.Height / 2.0);
+        }
+
+        private void Window_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (HistorySpotlightTransform is not null)
+            {
+                HistorySpotlightTransform.X = -1200;
+                HistorySpotlightTransform.Y = -1200;
+            }
+        }
+
+        private void LoadHistory(int visitId, bool isDark)
+        {
+            HistoryItems.Children.Clear();
+
             using AppDbContext db = new();
             List<VisitEditHistory> entries = db.VisitEditHistories
                 .AsNoTracking()
@@ -40,6 +120,15 @@ namespace MyClinic
                 return;
             }
 
+            // ألوان بطاقات قبل/بعد التعديل مطابقة لألوان بطاقات المواعيد في الوضعين الفاتح والداكن
+            string beforeBg = isDark ? "#BA6571" : "#FB7A6D";
+            string beforeBorder = isDark ? "#D47A87" : "#F06457";
+            string beforeFg = isDark ? "#FFF1F2" : "#2B0908";
+
+            string afterBg = isDark ? "#0D514F" : "#B2DCCC";
+            string afterBorder = isDark ? "#14857E" : "#96CEB8";
+            string afterFg = isDark ? "#E6FFFA" : "#0F291E";
+
             foreach (VisitEditHistory entry in entries)
             {
                 List<VisitEditChange> changes;
@@ -53,6 +142,7 @@ namespace MyClinic
                 {
                     changes = new();
                 }
+
                 StackPanel changeList = new();
                 foreach (VisitEditChange change in changes)
                 {
@@ -60,8 +150,8 @@ namespace MyClinic
                     values.ColumnDefinitions.Add(new ColumnDefinition());
                     values.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
                     values.ColumnDefinitions.Add(new ColumnDefinition());
-                    values.Children.Add(CreateValueCard("قبل التعديل", change.Before, "#FEF2F2", "#B91C1C"));
-                    Border after = CreateValueCard("بعد التعديل", change.After, "#ECFDF5", "#047857");
+                    values.Children.Add(CreateValueCard("قبل التعديل", change.Before, beforeBg, beforeBorder, beforeFg));
+                    Border after = CreateValueCard("بعد التعديل", change.After, afterBg, afterBorder, afterFg);
                     Grid.SetColumn(after, 2);
                     values.Children.Add(after);
 
@@ -76,6 +166,7 @@ namespace MyClinic
                     field.Children.Add(values);
                     changeList.Children.Add(field);
                 }
+
                 if (changes.Count == 0)
                 {
                     changeList.Children.Add(new TextBlock
@@ -89,10 +180,10 @@ namespace MyClinic
                 StackPanel card = new() { Margin = new Thickness(0, 0, 0, 14) };
                 Border shell = new()
                 {
-                    Padding = new Thickness(16),
-                    CornerRadius = new CornerRadius(12),
-                    Background = (Brush)FindResource("AppCardBg"),
-                    BorderBrush = (Brush)FindResource("AppBorder"),
+                    Padding = new Thickness(18),
+                    CornerRadius = new CornerRadius(16),
+                    Background = CreateBrush(isDark ? "#121621" : "#FFFFFF"),
+                    BorderBrush = CreateBrush(isDark ? "#232E42" : "#E4ECEA"),
                     BorderThickness = new Thickness(1)
                 };
                 StackPanel content = new();
@@ -101,7 +192,7 @@ namespace MyClinic
                     Text = entry.EditedAt.ToString("dd/MM/yyyy  hh:mm:ss.fff tt", CultureInfo.InvariantCulture),
                     FontSize = 16,
                     FontWeight = FontWeights.Bold,
-                    Foreground = (Brush)FindResource("AppTextPrimary")
+                    Foreground = CreateBrush(isDark ? "#5EEAD4" : "#3348BD")
                 });
                 content.Children.Add(new TextBlock
                 {
@@ -116,24 +207,32 @@ namespace MyClinic
             }
         }
 
-        private Border CreateValueCard(string label, string value, string background, string accent)
+        private static Border CreateValueCard(string label, string value, string background, string borderHex, string textHex)
         {
             Border card = new()
             {
-                Padding = new Thickness(10),
-                CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(background)),
-                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(accent)),
+                Padding = new Thickness(12, 10, 12, 10),
+                CornerRadius = new CornerRadius(10),
+                Background = CreateBrush(background),
+                BorderBrush = CreateBrush(borderHex),
                 BorderThickness = new Thickness(1)
             };
             StackPanel content = new();
-            content.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(accent)) });
+            content.Children.Add(new TextBlock
+            {
+                Text = label,
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = CreateBrush(textHex),
+                Opacity = 0.85
+            });
             content.Children.Add(new TextBlock
             {
                 Text = string.IsNullOrWhiteSpace(value) ? "غير محدد" : value,
                 TextWrapping = TextWrapping.Wrap,
                 MaxWidth = 280,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#111827")),
+                FontWeight = FontWeights.SemiBold,
+                Foreground = CreateBrush(textHex),
                 Margin = new Thickness(0, 4, 0, 0)
             });
             card.Child = content;

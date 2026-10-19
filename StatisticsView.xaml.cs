@@ -49,7 +49,67 @@ namespace MyClinic
             InitializeComponent();
             UpdateSubTabStyles();
             UpdateIncomeChartStyles();
-            Loaded += async (_, _) => await RefreshAsync();
+            Loaded += StatisticsView_Loaded;
+            Unloaded += StatisticsView_Unloaded;
+        }
+
+        private async void StatisticsView_Loaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplyThemeVisuals(IsDarkThemeActive());
+            UpdateIncomeChartStyles();
+            await RefreshAsync();
+        }
+
+        private void StatisticsView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private async void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+            UpdateIncomeChartStyles();
+            if (IsLoaded)
+                await RefreshAsync();
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (StatisticsSpotlightCanvas is not null)
+                StatisticsSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Statistics_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || StatisticsSpotlightCanvas is null || StatisticsSpotlightTransform is null)
+                return;
+
+            if (StatisticsSpotlightCanvas.Visibility != Visibility.Visible)
+                StatisticsSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(StatisticsRootGrid);
+            StatisticsSpotlightTransform.X = pos.X - (StatisticsSpotlightEllipse.Width / 2.0);
+            StatisticsSpotlightTransform.Y = pos.Y - (StatisticsSpotlightEllipse.Height / 2.0);
+        }
+
+        private void Statistics_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (StatisticsSpotlightTransform is not null)
+            {
+                StatisticsSpotlightTransform.X = -1200;
+                StatisticsSpotlightTransform.Y = -1200;
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -571,15 +631,16 @@ namespace MyClinic
                 startAngle += sweep;
             }
 
-            // Centre hole (white/card bg)
+            // Centre hole (card bg)
             if (slices.Count > 1)
             {
                 var hole = new Ellipse
                 {
                     Width  = innerR * 2,
                     Height = innerR * 2,
-                    Fill   = (Brush)Application.Current.Resources["AppWindowBg"]
-                             ?? new SolidColorBrush(Color.FromRgb(11, 17, 32))
+                    Fill   = Application.Current.Resources["SettingsCardBg"] as Brush
+                             ?? Application.Current.Resources["AppCardBg"] as Brush
+                             ?? new SolidColorBrush(Color.FromRgb(18, 26, 36))
                 };
                 Canvas.SetLeft(hole, cx - innerR);
                 Canvas.SetTop(hole,  cy - innerR);
@@ -849,7 +910,7 @@ namespace MyClinic
                 double barWidth = Math.Max(4, slotWidth * 0.62);
                 double x = left + i * slotWidth + (slotWidth - barWidth) / 2;
                 double y = top + plotHeight - barHeight;
-                Rectangle bar = new() { Width = barWidth, Height = Math.Max(1, barHeight), Fill = HexBrush("#3B82F6"), ToolTip = $"{points[i].Label}: {points[i].Amount:N0} ل.س" };
+                Rectangle bar = new() { Width = barWidth, Height = Math.Max(1, barHeight), Fill = HexBrush(IsDarkThemeActive() ? "#14B8A6" : "#2250DF"), RadiusX = 4, RadiusY = 4, ToolTip = $"{points[i].Label}: {points[i].Amount:N0} ل.س" };
                 Canvas.SetLeft(bar, x);
                 Canvas.SetTop(bar, y);
                 IncomeChartCanvas.Children.Add(bar);
@@ -879,10 +940,11 @@ namespace MyClinic
                     true));
             }
             geometry.Figures.Add(figure);
+            Brush lineStroke = HexBrush(IsDarkThemeActive() ? "#2DD4BF" : "#2250DF");
             IncomeChartCanvas.Children.Add(new System.Windows.Shapes.Path
             {
                 Data = geometry,
-                Stroke = HexBrush("#2196F3"),
+                Stroke = lineStroke,
                 StrokeThickness = 3,
                 StrokeLineJoin = PenLineJoin.Round,
                 ToolTip = "الدخل"
@@ -894,8 +956,8 @@ namespace MyClinic
                 {
                     Width = 12,
                     Height = 12,
-                    Fill = Brushes.White,
-                    Stroke = HexBrush("#2196F3"),
+                    Fill = IsDarkThemeActive() ? HexBrush("#0F172A") : Brushes.White,
+                    Stroke = lineStroke,
                     StrokeThickness = 3,
                     ToolTip = $"{points[i].Label}: {points[i].Amount:N0} ل.س"
                 };
@@ -1145,12 +1207,16 @@ namespace MyClinic
 
         private void UpdateIncomeChartStyles()
         {
-            Brush active = HexBrush("#0F766E");
-            Brush inactive = (Brush)FindResource("AppTextSecondary");
-            BtnIncomeArea.Foreground = _incomeChartType == IncomeChartType.Area ? active : inactive;
-            BtnIncomeArea.BorderBrush = _incomeChartType == IncomeChartType.Area ? active : (Brush)FindResource("AppBorder");
-            BtnIncomeColumns.Foreground = _incomeChartType == IncomeChartType.Columns ? active : inactive;
-            BtnIncomeColumns.BorderBrush = _incomeChartType == IncomeChartType.Columns ? active : (Brush)FindResource("AppBorder");
+            bool isDark = IsDarkThemeActive();
+            Brush activeFg = HexBrush(isDark ? "#5EEAD4" : "#2250DF");
+            Brush activeBorder = HexBrush(isDark ? "#2DD4BF" : "#2250DF");
+            Brush inactiveFg = Application.Current.Resources["AppTextSecondary"] as Brush ?? Brushes.Gray;
+            Brush inactiveBorder = Application.Current.Resources["SettingsOutlineBtnBorder"] as Brush ?? Brushes.Gray;
+
+            BtnIncomeArea.Foreground = _incomeChartType == IncomeChartType.Area ? activeFg : inactiveFg;
+            BtnIncomeArea.BorderBrush = _incomeChartType == IncomeChartType.Area ? activeBorder : inactiveBorder;
+            BtnIncomeColumns.Foreground = _incomeChartType == IncomeChartType.Columns ? activeFg : inactiveFg;
+            BtnIncomeColumns.BorderBrush = _incomeChartType == IncomeChartType.Columns ? activeBorder : inactiveBorder;
         }
 
         private void UpdateSubTabStyles()

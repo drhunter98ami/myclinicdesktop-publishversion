@@ -137,7 +137,7 @@ namespace MyClinic
                         txtError.Visibility = Visibility.Collapsed;
                         LoginSessionStore.MarkSuccessfulLogin(user.Username);
 
-                        MainWindow mainAppWindow = new MainWindow();
+                        Window mainAppWindow = InterfaceThemeSettings.CreateMainWindow();
                         Application.Current.MainWindow = mainAppWindow;
                         mainAppWindow.Show();
                         this.Close();

@@ -1,0 +1,192 @@
+<Window x:Class="MyClinic.OriginalTheme.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="My Clinic" Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        FlowDirection="RightToLeft"
+        Background="{DynamicResource AppWindowBg}"
+        Icon="/Assets/logo.png">
+
+    <Window.Resources>
+        <!-- ScrollBar Style -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Width" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent" Margin="2,0,0,0">
+                                    <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                        <Track.Thumb>
+                                            <Thumb>
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border Background="{DynamicResource AppBorder}" CornerRadius="4"/>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ToggleSwitchStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" CornerRadius="12" Background="#CBD5E1" BorderThickness="2" BorderBrush="Transparent">
+                            <Ellipse x:Name="Knob" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.2"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#2563EB"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RoundedButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarButton" TargetType="Button" BasedOn="{StaticResource RoundedButtonStyle}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#A0AAB5"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Margin" Value="15,5"/>
+            <Setter Property="Height" Value="45"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarActiveButton" TargetType="Button" BasedOn="{StaticResource SidebarButton}">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1D4ED8"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="{DynamicResource AppSidebarBg}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,35,0,0">
+                        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,40">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" FlowDirection="LeftToRight" Margin="0,0,0,10">
+                                <Image Source="/Assets/logo.png" Width="45" Height="45" Margin="0,0,15,0" RenderOptions.BitmapScalingMode="HighQuality">
+                                    <Image.Clip>
+                                        <EllipseGeometry RadiusX="22.5" RadiusY="22.5" Center="22.5,22.5" />
+                                    </Image.Clip>
+                                </Image>
+                                <TextBlock Text="عيادتي" Foreground="White" FontSize="26" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,0">
+                                <Ellipse x:Name="ConnectionStatusDot" Width="8" Height="8" Fill="#00D26A" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="TxtConnectionStatus" Text="جارٍ التحقق من الاتصال..." Foreground="#A0AAB5" FontSize="13" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Button Name="BtnDashboard" Content="الرئيسية" Style="{StaticResource SidebarActiveButton}" Click="BtnDashboard_Click"/>
+                        <Button Name="BtnPatients" Content="سجل المرضى" Style="{StaticResource SidebarButton}" Click="BtnPatients_Click"/>
+                        <Button Name="BtnFinancials" Content="الشؤون المالية" Style="{StaticResource SidebarButton}" Click="BtnFinancials_Click"/>
+                        
+                        <!-- التبويب الجديد: النواقص -->
+                        <Button Name="BtnShortages" Content="النواقص" Style="{StaticResource SidebarButton}" Click="BtnShortages_Click"/>
+                        
+                        <!-- التبويب الجديد: المخبر -->
+                        <Button Name="BtnLab" Content="المخبر" Style="{StaticResource SidebarButton}" Click="BtnLab_Click"/>
+                        
+                        <!-- التبويب الجديد: الإحصائيات -->
+                        <Button Name="BtnStatistics" Content="الإحصائيات" Style="{StaticResource SidebarButton}" Click="BtnStatistics_Click"/>
+                        
+                        <!-- التبويب الجديد: الإعدادات -->
+                        <Button Name="BtnSettings" Content="الإعدادات" Style="{StaticResource SidebarButton}" Click="BtnSettings_Click"/>
+                        
+                        <Border Margin="15,20,15,5" Height="1" Background="#334155"/>
+                        <Button Name="BtnSyncDrive" Content="مزامنة مع Google Drive" Style="{StaticResource SidebarButton}" Click="BtnSyncDrive_Click"/>
+
+                        <Border Margin="15,10,15,5" Height="1" Background="#334155"/>
+                        
+                        <StackPanel Margin="15,10,15,20">
+                            <TextBlock x:Name="TxtAppTime" Text="--:--:--" Foreground="White" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,15">
+                                <TextBlock x:Name="TxtAppDay" Text="اليوم" Foreground="#A0AAB5" FontSize="13" Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtAppDate" Text="التاريخ" Foreground="#A0AAB5" FontSize="13"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                <TextBlock Text="المزامنة التلقائية" Foreground="#A0AAB5" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <ToggleButton x:Name="AutoSyncToggle" Style="{StaticResource ToggleSwitchStyle}" Checked="AutoSyncToggle_Checked" Unchecked="AutoSyncToggle_Unchecked"/>
+                            </StackPanel>
+                            
+                            <TextBlock x:Name="TxtLastSync" Text="آخر مزامنة: لم يتم" Foreground="#A0AAB5" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="TxtNextSync" Text="المزامنة القادمة: --:--" Foreground="#A0AAB5" FontSize="11" HorizontalAlignment="Center" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,20">
+                    <!-- App Version -->
+                    <TextBlock x:Name="TxtCurrentVersion" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ContentControl x:Name="MainContent" Grid.Column="1" Margin="30"/>
+    </Grid>
+</Window>

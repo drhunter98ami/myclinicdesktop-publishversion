@@ -226,7 +226,7 @@ public partial class App : Application
             return;
         }
         Window startupWindow = hasUsers && LoginSessionStore.HasValidLoginSession(LoginGracePeriod)
-            ? new MainWindow()
+            ? InterfaceThemeSettings.CreateMainWindow()
             : new LoginWindow();
 
         MainWindow = startupWindow;

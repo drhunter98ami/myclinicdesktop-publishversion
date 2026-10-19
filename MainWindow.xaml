@@ -1,11 +1,14 @@
 <Window x:Class="MyClinic.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="My Clinic" Height="700" Width="1100"
+        Title="My Clinic" Height="768" Width="1376"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
         FlowDirection="RightToLeft"
         Background="{DynamicResource AppWindowBg}"
-        Icon="Assets/logo.png">
+        Icon="Assets/logo.png"
+        PreviewMouseMove="Window_PreviewMouseMove"
+        MouseLeave="Window_MouseLeave">
 
     <Window.Resources>
         <!-- ScrollBar Style -->
@@ -45,18 +48,19 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Border" CornerRadius="12" Background="#CBD5E1" BorderThickness="2" BorderBrush="Transparent">
-                            <Ellipse x:Name="Knob" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                        <Border x:Name="Border" CornerRadius="12" Background="#CBD5E1" BorderThickness="1" BorderBrush="Transparent">
+                            <Ellipse x:Name="Knob" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.2"/>
+                                    <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.25"/>
                                 </Ellipse.Effect>
                             </Ellipse>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#2563EB"/>
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource AppToggleActiveBg}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AppToggleActiveBorder}"/>
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
-                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -68,12 +72,14 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}"
-                                CornerRadius="8"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"/>
@@ -85,107 +91,367 @@
 
         <Style x:Key="SidebarButton" TargetType="Button" BasedOn="{StaticResource RoundedButtonStyle}">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#A0AAB5"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppSidebarText}"/>
             <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Margin" Value="15,5"/>
-            <Setter Property="Height" Value="45"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="12,3"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Padding" Value="10,0,14,0"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
-                    <Setter Property="Foreground" Value="#FFFFFF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="SidebarActiveButton" TargetType="Button" BasedOn="{StaticResource SidebarButton}">
-            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Background" Value="{DynamicResource AppSidebarActiveBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppSidebarActiveBorder}"/>
+            <Setter Property="BorderThickness" Value="1.2"/>
             <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#2DD4BF"
+                                                  BlurRadius="18"
+                                                  ShadowDepth="0"
+                                                  Opacity="{DynamicResource AppSidebarActiveGlowOpacity}"/>
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#1D4ED8"/>
+                    <Setter Property="Background" Value="{DynamicResource AppSidebarActiveHoverBg}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
     </Window.Resources>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
+    <Grid x:Name="RootWindowGrid" ClipToBounds="True">
+        <!-- إضاءة خلفية تتبع مؤشر الفأرة في الوضع الداكن (Window-level Spotlight) -->
+        <Canvas x:Name="WindowSpotlightCanvas"
+                IsHitTestVisible="False"
+                Panel.ZIndex="0"
+                Visibility="Collapsed">
+            <Ellipse x:Name="WindowSpotlightOuter"
+                     Width="760"
+                     Height="760"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#3814B8A6" Offset="0.0"/>
+                        <GradientStop Color="#1F0EA5E9" Offset="0.38"/>
+                        <GradientStop Color="#0A0D9488" Offset="0.70"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="WindowSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
 
-        <Border Grid.Column="0" Background="{DynamicResource AppSidebarBg}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+        <Grid Panel.ZIndex="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="264"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="0,35,0,0">
-                        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,40">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" FlowDirection="LeftToRight" Margin="0,0,0,10">
-                                <Image Source="Assets/logo.png" Width="45" Height="45" Margin="0,0,15,0" RenderOptions.BitmapScalingMode="HighQuality">
-                                    <Image.Clip>
-                                        <EllipseGeometry RadiusX="22.5" RadiusY="22.5" Center="22.5,22.5" />
-                                    </Image.Clip>
-                                </Image>
-                                <TextBlock Text="عيادتي" Foreground="White" FontSize="26" FontWeight="Bold" VerticalAlignment="Center"/>
+            <!-- الشريط الجانبي (Sidebar) -->
+            <Border x:Name="SidebarOuterBorder"
+                    Grid.Column="0"
+                    Background="{DynamicResource AppSidebarOuterBg}"
+                    BorderBrush="{DynamicResource AppSidebarOuterBorder}"
+                    BorderThickness="{DynamicResource AppSidebarOuterBorderThickness}"
+                    Padding="{DynamicResource AppSidebarOuterPadding}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- البطاقة العلوية للشريط الجانبي (الشعار + التبويبات) -->
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource AppSidebarTopCardBg}"
+                            BorderBrush="{DynamicResource AppSidebarTopCardBorder}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="4,18,4,12">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <!-- الشعار وحالة الاتصال -->
+                                <StackPanel HorizontalAlignment="Center" Margin="0,6,0,22">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" FlowDirection="LeftToRight" Margin="0,0,0,8">
+                                        <Border Width="48" Height="48" CornerRadius="24" Margin="0,0,12,0" Background="#FFFFFF" BorderBrush="{DynamicResource AppSidebarTopCardBorder}" BorderThickness="1">
+                                            <Image Source="Assets/logo.png" Width="44" Height="44" RenderOptions.BitmapScalingMode="HighQuality">
+                                                <Image.Clip>
+                                                    <EllipseGeometry RadiusX="22" RadiusY="22" Center="22,22" />
+                                                </Image.Clip>
+                                            </Image>
+                                        </Border>
+                                        <TextBlock Text="عيادتي"
+                                                   Foreground="{DynamicResource AppSidebarText}"
+                                                   FontSize="27"
+                                                   FontWeight="Bold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <Border Background="{DynamicResource AppConnectionPillBg}"
+                                            CornerRadius="12"
+                                            Padding="12,4"
+                                            HorizontalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <Ellipse x:Name="ConnectionStatusDot" Width="8" Height="8" Fill="#10B981" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock x:Name="TxtConnectionStatus"
+                                                       Text="متصل بالإنترنت"
+                                                       Foreground="{DynamicResource AppConnectionTextBrush}"
+                                                       FontSize="12.5"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- أزرار التنقل مع الأيقونات -->
+                                <Button Name="BtnDashboard" Style="{StaticResource SidebarActiveButton}" Click="BtnDashboard_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeDashboard" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#33FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconDashboard" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M3,10.5 L12,3 L21,10.5 V20 A1,1 0 0 1 20,21 H4 A1,1 0 0 1 3,20 Z M9,21 V14 H15 V21"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblDashboard" Grid.Column="1" Text="الرئيسية" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnPatients" Style="{StaticResource SidebarButton}" Click="BtnPatients_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgePatients" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#D8DBF3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconPatients" Stroke="#3C4167" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M16,21 V19 A4,4 0 0 0 12,15 H6 A4,4 0 0 0 2,19 V21 M9,11 A4,4 0 1 0 9,3 A4,4 0 0 0 9,11 Z M22,21 V19 A4,4 0 0 0 19,15.13 M16,3.13 A4,4 0 0 1 16,10.87"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblPatients" Grid.Column="1" Text="سجل المرضى" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnFinancials" Style="{StaticResource SidebarButton}" Click="BtnFinancials_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeFinancials" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#CCE2DD" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconFinancials" Stroke="#406762" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M12,2 A10,10 0 1 0 22,12 A10,10 0 0 0 12,2 Z M12,6 V18 M15,9.5 C15,8.1 13.7,7 12,7 C10.3,7 9,8.1 9,9.5 C9,10.9 10.3,12 12,12 C13.7,12 15,13.1 15,14.5 C15,15.9 13.7,17 12,17 C10.3,17 9,15.9 9,14.5"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblFinancials" Grid.Column="1" Text="الشؤون المالية" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnShortages" Style="{StaticResource SidebarButton}" Click="BtnShortages_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeShortages" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#F9E0DF" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconShortages" Stroke="#976059" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M6,2 L3,6 V20 A2,2 0 0 0 5,22 H19 A2,2 0 0 0 21,20 V6 L18,2 Z M3,6 H21 M16,10 A4,4 0 0 1 8,10"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblShortages" Grid.Column="1" Text="النواقص" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnLab" Style="{StaticResource SidebarButton}" Click="BtnLab_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeLab" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#DCF3F6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconLab" Stroke="#4D8383" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M9,3 H15 M10,3 V9 L4.5,18.5 A2,2 0 0 0 6.2,21 H17.8 A2,2 0 0 0 19.5,18.5 L14,9 V3 M7,15 H17"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblLab" Grid.Column="1" Text="المخبر" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnStatistics" Style="{StaticResource SidebarButton}" Click="BtnStatistics_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeStatistics" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#D7DDF0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconStatistics" Stroke="#41456B" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M3,3 V21 H21 M7,15 L11,10 L15,13 L20,7"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblStatistics" Grid.Column="1" Text="الإحصائيات" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
+
+                                <Button Name="BtnSettings" Style="{StaticResource SidebarButton}" Click="BtnSettings_Click">
+                                    <Grid HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="BadgeSettings" Grid.Column="0" Width="32" Height="32" CornerRadius="9" Background="#E6E7E5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Viewbox Width="17" Height="17">
+                                                <Canvas Width="24" Height="24">
+                                                    <Path x:Name="IconSettings" Stroke="#515558" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                          Data="M12,15 A3,3 0 1 0 12,9 A3,3 0 0 0 12,15 Z M19.4,15 A1.65,1.65 0 0 0 19.73,16.82 L19.79,16.88 A2,2 0 0 1 16.96,19.71 L16.9,19.65 A1.65,1.65 0 0 0 15.08,19.32 A1.65,1.65 0 0 0 14,20.85 V21 A2,2 0 0 1 10,21 V20.79 A1.65,1.65 0 0 0 8.92,19.26 A1.65,1.65 0 0 0 7.1,19.59 L7.04,19.65 A2,2 0 0 1 4.21,16.82 L4.27,16.76 A1.65,1.65 0 0 0 4.6,14.94 A1.65,1.65 0 0 0 3.07,13.86 H3 A2,2 0 0 1 3,9.86 H3.21 A1.65,1.65 0 0 0 4.74,8.78 A1.65,1.65 0 0 0 4.41,6.96 L4.35,6.9 A2,2 0 0 1 7.18,4.07 L7.24,4.13 A1.65,1.65 0 0 0 9.06,4.46 H9.15 A1.65,1.65 0 0 0 10.15,2.95 V2.86 A2,2 0 0 1 14.15,2.86 V3.07 A1.65,1.65 0 0 0 15.15,4.58 A1.65,1.65 0 0 0 16.97,4.25 L17.03,4.19 A2,2 0 0 1 19.86,7.02 L19.8,7.08 A1.65,1.65 0 0 0 19.47,8.9 V8.99 A1.65,1.65 0 0 0 20.98,10 H21.14 A2,2 0 0 1 21.14,14 H20.93 A1.65,1.65 0 0 0 19.4,15 Z"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock x:Name="LblSettings" Grid.Column="1" Text="الإعدادات" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                    </Grid>
+                                </Button>
                             </StackPanel>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,0">
-                                <Ellipse x:Name="ConnectionStatusDot" Width="8" Height="8" Fill="#00D26A" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock x:Name="TxtConnectionStatus" Text="جارٍ التحقق من الاتصال..." Foreground="#A0AAB5" FontSize="13" VerticalAlignment="Center"/>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- البطاقة السفلية للشريط الجانبي (مزامنة Google Drive + الساعة + الإصدار) -->
+                    <Border Grid.Row="1"
+                            Margin="0,12,0,0"
+                            Background="{DynamicResource AppSidebarBottomCardBg}"
+                            BorderBrush="{DynamicResource AppSidebarBottomCardBorder}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="14,14,14,12">
+                        <StackPanel>
+                            <Button Name="BtnSyncDrive"
+                                    Style="{StaticResource SidebarButton}"
+                                    Margin="0,0,0,10"
+                                    Height="38"
+                                    Padding="6,0"
+                                    Click="BtnSyncDrive_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Viewbox Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <Canvas Width="24" Height="24">
+                                            <!-- Google Drive 3-color triangle -->
+                                            <Path Fill="#0F9D58" Data="M9.0,3.5 L15.0,3.5 L8.8,14.5 L2.8,14.5 Z"/>
+                                            <Path Fill="#F4B400" Data="M15.0,3.5 L21.2,14.5 L15.2,14.5 L9.0,3.5 Z"/>
+                                            <Path Fill="#4285F4" Data="M5.8,14.5 L21.2,14.5 L18.2,19.8 L2.8,19.8 Z"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <TextBlock x:Name="TxtSyncDriveLabel"
+                                               Text="مزامنة مع Google Drive"
+                                               Foreground="{DynamicResource AppSidebarText}"
+                                               FontSize="13.5"
+                                               FontWeight="Bold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <TextBlock x:Name="TxtAppTime"
+                                       Text="--:--:--"
+                                       Foreground="{DynamicResource AppSidebarText}"
+                                       FontSize="24"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,12">
+                                <TextBlock x:Name="TxtAppDay"
+                                           Text="اليوم"
+                                           Foreground="{DynamicResource AppSidebarSubText}"
+                                           FontSize="12.5"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,5,0"/>
+                                <TextBlock x:Name="TxtAppDate"
+                                           Text="التاريخ"
+                                           Foreground="{DynamicResource AppSidebarSubText}"
+                                           FontSize="12.5"
+                                           FontWeight="SemiBold"/>
                             </StackPanel>
+
+                            <Grid Margin="4,0,4,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="المزامنة التلقائية"
+                                           Foreground="{DynamicResource AppSidebarText}"
+                                           FontSize="13.5"
+                                           FontWeight="Bold"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"/>
+                                <ToggleButton Grid.Column="1"
+                                              x:Name="AutoSyncToggle"
+                                              Style="{StaticResource ToggleSwitchStyle}"
+                                              Checked="AutoSyncToggle_Checked"
+                                              Unchecked="AutoSyncToggle_Unchecked"
+                                              HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <TextBlock x:Name="TxtLastSync"
+                                       Text="آخر مزامنة: لم يتم"
+                                       Foreground="{DynamicResource AppSidebarSubText}"
+                                       FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,2"/>
+                            <TextBlock x:Name="TxtNextSync"
+                                       Text="المزامنة القادمة: --:--"
+                                       Foreground="{DynamicResource AppSidebarSubText}"
+                                       FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtCurrentVersion"
+                                       Foreground="{DynamicResource AppSidebarSubText}"
+                                       FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,2,0,0"/>
                         </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
 
-                        <Button Name="BtnDashboard" Content="الرئيسية" Style="{StaticResource SidebarActiveButton}" Click="BtnDashboard_Click"/>
-                        <Button Name="BtnPatients" Content="سجل المرضى" Style="{StaticResource SidebarButton}" Click="BtnPatients_Click"/>
-                        <Button Name="BtnFinancials" Content="الشؤون المالية" Style="{StaticResource SidebarButton}" Click="BtnFinancials_Click"/>
-                        
-                        <!-- التبويب الجديد: النواقص -->
-                        <Button Name="BtnShortages" Content="النواقص" Style="{StaticResource SidebarButton}" Click="BtnShortages_Click"/>
-                        
-                        <!-- التبويب الجديد: المخبر -->
-                        <Button Name="BtnLab" Content="المخبر" Style="{StaticResource SidebarButton}" Click="BtnLab_Click"/>
-                        
-                        <!-- التبويب الجديد: الإحصائيات -->
-                        <Button Name="BtnStatistics" Content="الإحصائيات" Style="{StaticResource SidebarButton}" Click="BtnStatistics_Click"/>
-                        
-                        <!-- التبويب الجديد: الإعدادات -->
-                        <Button Name="BtnSettings" Content="الإعدادات" Style="{StaticResource SidebarButton}" Click="BtnSettings_Click"/>
-                        
-                        <Border Margin="15,20,15,5" Height="1" Background="#334155"/>
-                        <Button Name="BtnSyncDrive" Content="مزامنة مع Google Drive" Style="{StaticResource SidebarButton}" Click="BtnSyncDrive_Click"/>
-
-                        <Border Margin="15,10,15,5" Height="1" Background="#334155"/>
-                        
-                        <StackPanel Margin="15,10,15,20">
-                            <TextBlock x:Name="TxtAppTime" Text="--:--:--" Foreground="White" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,15">
-                                <TextBlock x:Name="TxtAppDay" Text="اليوم" Foreground="#A0AAB5" FontSize="13" Margin="0,0,5,0"/>
-                                <TextBlock x:Name="TxtAppDate" Text="التاريخ" Foreground="#A0AAB5" FontSize="13"/>
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
-                                <TextBlock Text="المزامنة التلقائية" Foreground="#A0AAB5" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <ToggleButton x:Name="AutoSyncToggle" Style="{StaticResource ToggleSwitchStyle}" Checked="AutoSyncToggle_Checked" Unchecked="AutoSyncToggle_Unchecked"/>
-                            </StackPanel>
-                            
-                            <TextBlock x:Name="TxtLastSync" Text="آخر مزامنة: لم يتم" Foreground="#A0AAB5" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="TxtNextSync" Text="المزامنة القادمة: --:--" Foreground="#A0AAB5" FontSize="11" HorizontalAlignment="Center" Visibility="Collapsed"/>
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-
-                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,20">
-                    <!-- App Version -->
-                    <TextBlock x:Name="TxtCurrentVersion" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <ContentControl x:Name="MainContent" Grid.Column="1" Margin="30"/>
+            <!-- المحتوى الرئيسي -->
+            <ContentControl x:Name="MainContent" Grid.Column="1" Margin="20,16,20,16"/>
+        </Grid>
     </Grid>
 </Window>

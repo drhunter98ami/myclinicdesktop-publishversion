@@ -2,15 +2,16 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FlowDirection="RightToLeft"
-             Background="{DynamicResource AppWindowBg}"
-             FontFamily="Segoe UI">
+             Background="Transparent"
+             FontFamily="Segoe UI"
+             PreviewMouseMove="Dashboard_PreviewMouseMove"
+             MouseLeave="Dashboard_MouseLeave">
 
     <UserControl.Resources>
-        
         <!-- ============================================== -->
-        <!-- إصلاحات الثيم الداكن للـ Scrollbar و DatePicker و ComboBox -->
+        <!-- أنماط شريط التمرير والحقول والقوائم المنسدلة والتقويم -->
         <!-- ============================================== -->
-        
+
         <!-- شريط التمرير (ScrollBar) -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -21,7 +22,7 @@
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ScrollBar">
-                                <Grid Background="Transparent" Margin="2,0,0,0">
+                                <Grid Background="Transparent" Margin="2,0,2,0">
                                     <Track x:Name="PART_Track" IsDirectionReversed="true">
                                         <Track.Thumb>
                                             <Thumb>
@@ -71,7 +72,7 @@
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
 
-        <!-- النمط الشامل لـ ComboBox لإصلاح اللون الأبيض في الثيم الداكن -->
+        <!-- النمط الشامل لـ ComboBox -->
         <Style TargetType="ComboBox">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -85,7 +86,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton x:Name="ToggleButton" 
+                            <ToggleButton x:Name="ToggleButton"
                                           BorderBrush="{TemplateBinding BorderBrush}"
                                           Background="{TemplateBinding Background}"
                                           Focusable="false"
@@ -93,14 +94,14 @@
                                           ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="30"/>
+                                                    <ColumnDefinition Width="28"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Border Grid.Column="1" Background="Transparent">
-                                                    <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                             </Grid>
                                         </Border>
@@ -112,12 +113,12 @@
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="12,0,30,0"
+                                              Margin="12,0,28,0"
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="Right"/>
                             <TextBox x:Name="PART_EditableTextBox"
                                      Style="{x:Null}"
-                                     Margin="8,0,30,0"
+                                     Margin="8,0,28,0"
                                      HorizontalAlignment="Stretch"
                                      VerticalAlignment="Center"
                                      Focusable="True"
@@ -135,9 +136,9 @@
                                    Focusable="False"
                                    PopupAnimation="Slide">
                                 <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="{DynamicResource AppCardBg}" BorderThickness="1" BorderBrush="{DynamicResource AppBorder}" CornerRadius="8" Margin="0,4,0,8">
+                                    <Border x:Name="DropDownBorder" Background="{DynamicResource AppCardBg}" BorderThickness="1" BorderBrush="{DynamicResource AppBorder}" CornerRadius="10" Margin="0,4,0,8">
                                         <Border.Effect>
-                                            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="2" Opacity="0.2"/>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="2" Opacity="0.25"/>
                                         </Border.Effect>
                                         <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
                                             <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
@@ -174,11 +175,10 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
-                                <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#1A235DF6"/>
-                                <Setter Property="Foreground" Value="#235DF6"/>
+                                <Setter Property="Background" Value="#2214B8A6"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -197,8 +197,20 @@
         <!-- صندوق نص التقويم (DatePicker TextBox) -->
         <Style TargetType="DatePickerTextBox">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DatePickerTextBox">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Background="Transparent"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- أزرار أيام التقويم (Calendar Day Buttons) -->
@@ -217,7 +229,7 @@
                                 <Setter Property="Background" Value="{DynamicResource AppBorder}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#235DF6"/>
+                                <Setter Property="Background" Value="{DynamicResource DashActiveFilterBg}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -244,7 +256,7 @@
         <Style x:Key="RoundedButtonStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -252,7 +264,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12"
+                                CornerRadius="11"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"/>
@@ -263,9 +275,10 @@
         </Style>
 
         <Style x:Key="RangeButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="40"/>
+            <Setter Property="Height" Value="36"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="13.5"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -276,7 +289,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
+                                CornerRadius="9">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -301,50 +314,279 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid x:Name="DashboardRootGrid" ClipToBounds="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- الهيدر العلوي -->
-        <Border Grid.Row="0" Background="#235DF6" CornerRadius="18" Padding="35" Margin="0,0,0,25">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- طبقة الإضاءة الخلفية التفاعلية للوضع الداكن (Behind Cards Spotlight) -->
+        <Canvas x:Name="DashboardBackSpotlightCanvas"
+                Grid.RowSpan="2"
+                Panel.ZIndex="0"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <Ellipse x:Name="DashboardBackSpotlight"
+                     Width="620"
+                     Height="620"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#4514B8A6" Offset="0.0"/>
+                        <GradientStop Color="#220EA5E9" Offset="0.42"/>
+                        <GradientStop Color="#0C2DD4BF" Offset="0.72"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="DashboardBackSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
 
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtWelcome" Text="أهلاً بك" Foreground="White" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="رتّب المواعيد القادمة بسرعة واحفظ بيانات المراجعين في مكان واحد." Foreground="#DDE7FF" FontSize="15" Margin="0,8,0,0"/>
-                </StackPanel>
+        <!-- الصف العلوي: 3 بطاقات منفصلة (الترحيب | عداد الفايلات | أزرار الإضافة) -->
+        <Grid Grid.Row="0" Panel.ZIndex="2" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.45*"/>
+                <ColumnDefinition Width="222"/>
+                <ColumnDefinition Width="1.02*"/>
+            </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="1" Width="245" Margin="24,0,24,0" VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="عدد القنوات التي تم إنجازها بنفس كيت الفايلات" Foreground="White" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Right"/>
-                    <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Right" Margin="0,8,0,0">
-                        <Border Background="White" CornerRadius="8" Height="38" Width="95">
-                            <TextBox x:Name="TxtFileKitCanalCount" Text="0" TextAlignment="Center" VerticalContentAlignment="Center" Foreground="#13284A" FontSize="17" FontWeight="Bold" MaxLength="4" TextChanged="TxtFileKitCanalCount_TextChanged" PreviewMouseLeftButtonDown="TxtFileKitCanalCount_PreviewMouseLeftButtonDown"/>
-                        </Border>
-                        <Button Content="↺" Width="38" Height="38" Margin="8,0,0,0" Padding="0" FontSize="18" ToolTip="تصفير العداد عند شراء كيت جديد" Click="BtnResetFileKitCanalCount_Click" Style="{StaticResource RoundedButtonStyle}" Background="#153DA7" Foreground="White"/>
+            <!-- 1. بطاقة الترحيب (يمين) -->
+            <Border x:Name="WelcomeCardBorder"
+                    Grid.Column="0"
+                    Background="{DynamicResource DashWelcomeCardBg}"
+                    BorderBrush="{DynamicResource DashWelcomeCardBorder}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Margin="0,0,14,0"
+                    MinHeight="132"
+                    ClipToBounds="True">
+                <Grid>
+                    <!-- إضاءة قطرية ناعمة في الوضع الداكن -->
+                    <Ellipse x:Name="WelcomeDarkGlow"
+                             Width="320"
+                             Height="220"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Top"
+                             Margin="0,-80,0,0"
+                             IsHitTestVisible="False"
+                             Visibility="Collapsed">
+                        <Ellipse.Fill>
+                            <RadialGradientBrush>
+                                <GradientStop Color="#355EEAD4" Offset="0"/>
+                                <GradientStop Color="#005EEAD4" Offset="1"/>
+                            </RadialGradientBrush>
+                        </Ellipse.Fill>
+                    </Ellipse>
+
+                    <!-- رسمة السن المائية في الخلفية -->
+                    <Viewbox Width="138"
+                             Height="138"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Center"
+                             Margin="0,0,175,0"
+                             IsHitTestVisible="False">
+                        <Canvas Width="120" Height="120">
+                            <Path Stroke="{DynamicResource DashWelcomeToothBrush}"
+                                  StrokeThickness="5.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Data="M60,24 C47,12 24,16 22,38 C20,56 30,68 33,88 C35,103 42,108 47,96 C51,85 55,78 60,78 C65,78 69,85 73,96 C78,108 85,103 87,88 C90,68 100,56 98,38 C96,16 73,12 60,24 Z"/>
+                            <Path Stroke="{DynamicResource DashWelcomeToothBrush}"
+                                  StrokeThickness="3.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Data="M43,36 C52,43 68,43 77,36"/>
+                        </Canvas>
+                    </Viewbox>
+
+                    <StackPanel VerticalAlignment="Center" Margin="28,20,28,20">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtWelcome"
+                                       Text="أهلاً د. احمد"
+                                       Foreground="{DynamicResource DashWelcomeTitleFg}"
+                                       FontSize="31"
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center"/>
+                            <!-- أيقونة اليد للوضع الفاتح -->
+                            <TextBlock x:Name="TxtWelcomeWave"
+                                       Text="👋"
+                                       FontSize="28"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"/>
+                            <!-- أيقونة النجوم المضيئة للوضع الداكن -->
+                            <Viewbox x:Name="IconWelcomeSparkles"
+                                     Width="30"
+                                     Height="30"
+                                     Margin="10,0,0,0"
+                                     VerticalAlignment="Center"
+                                     Visibility="Collapsed">
+                                <Canvas Width="32" Height="32">
+                                    <Path Stroke="#38BDF8" StrokeThickness="1.8" Fill="#2238BDF8" StrokeLineJoin="Round"
+                                          Data="M18,3 L20.5,11.5 L29,14 L20.5,16.5 L18,25 L15.5,16.5 L7,14 L15.5,11.5 Z"/>
+                                    <Path Stroke="#5EEAD4" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                          Data="M7,4 L8,7.5 L11.5,8.5 L8,9.5 L7,13 L6,9.5 L2.5,8.5 L6,7.5 Z"/>
+                                    <Path Stroke="#5EEAD4" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                          Data="M8,20 L8.8,22.7 L11.5,23.5 L8.8,24.3 L8,27 L7.2,24.3 L4.5,23.5 L7.2,22.7 Z"/>
+                                </Canvas>
+                            </Viewbox>
+                        </StackPanel>
+                        <TextBlock Text="رتب المواعيد القادمة بسرعة واحفظ بيانات المراجعين في مكان واحد."
+                                   Foreground="{DynamicResource DashWelcomeSubFg}"
+                                   FontSize="14.5"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,0"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
-                    <TextBlock x:Name="TxtFileKitWarning" Text="انتهت صلاحية كيت الفايلات، يرجى تغييرها" Foreground="#FEE2E2" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Right" Margin="0,6,0,0" Visibility="Collapsed"/>
-                </StackPanel>
+                </Grid>
+            </Border>
 
-                <StackPanel Grid.Column="2" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
-                    <Button Name="BtnAddPatient" Content="+ إضافة مريض" Width="150" Height="45" Background="White" Foreground="#235DF6" FontSize="16" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddPatient_Click"/>
-                    <Button Name="BtnAddAppointment" Content="+ إضافة موعد جديد" Width="170" Height="45" Background="#153DA7" Foreground="White" FontSize="15" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointment_Click"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+            <!-- 2. بطاقة عداد كيت الفايلات (الوسط) -->
+            <Border x:Name="CanalCardBorder"
+                    Grid.Column="1"
+                    Background="{DynamicResource DashCanalCardBg}"
+                    BorderBrush="{DynamicResource DashCanalCardBorder}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Margin="0,0,14,0"
+                    Padding="18,16"
+                    MinHeight="132">
+                <Grid VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-        <!-- المحتوى الرئيسي (البحث، الفلاتر، والمواعيد) -->
-        <Border Grid.Row="1" Background="{DynamicResource AppCardBg}" CornerRadius="18" Padding="28" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">
-            <Border.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.04"/>
-            </Border.Effect>
+                    <TextBlock Grid.Row="0"
+                               Text="عدد القنوات التي تم إنجازها بنفس كيت الفايلات"
+                               Foreground="{DynamicResource DashCanalTitleFg}"
+                               FontSize="13"
+                               FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               TextAlignment="Right"
+                               LineHeight="19"/>
 
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                FlowDirection="LeftToRight"
+                                HorizontalAlignment="Right"
+                                Margin="0,12,0,0">
+                        <Border x:Name="CanalCountBoxBorder"
+                                Background="{DynamicResource DashCanalBoxBg}"
+                                BorderBrush="{DynamicResource DashCanalBoxBorder}"
+                                BorderThickness="1.5"
+                                CornerRadius="10"
+                                Height="40"
+                                Width="82">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#2DD4BF"
+                                                  BlurRadius="16"
+                                                  ShadowDepth="0"
+                                                  Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
+                            </Border.Effect>
+                            <TextBox x:Name="TxtFileKitCanalCount"
+                                     Text="3"
+                                     TextAlignment="Center"
+                                     VerticalContentAlignment="Center"
+                                     Foreground="{DynamicResource DashCanalBoxFg}"
+                                     FontSize="19"
+                                     FontWeight="Bold"
+                                     MaxLength="4"
+                                     TextChanged="TxtFileKitCanalCount_TextChanged"
+                                     PreviewMouseLeftButtonDown="TxtFileKitCanalCount_PreviewMouseLeftButtonDown"/>
+                        </Border>
+                        <Button x:Name="BtnResetFileKitCanalCount"
+                                Content="↻"
+                                Width="40"
+                                Height="40"
+                                Margin="8,0,0,0"
+                                Padding="0"
+                                FontSize="17"
+                                FontWeight="Bold"
+                                ToolTip="تصفير العداد عند شراء كيت جديد"
+                                Click="BtnResetFileKitCanalCount_Click"
+                                Style="{StaticResource RoundedButtonStyle}"
+                                Background="{DynamicResource DashCanalResetBg}"
+                                BorderBrush="{DynamicResource DashCanalResetBorder}"
+                                BorderThickness="1"
+                                Foreground="{DynamicResource DashCanalResetFg}"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="2"
+                               x:Name="TxtFileKitWarning"
+                               Text="انتهت صلاحية كيت الفايلات، يرجى تغييرها"
+                               Foreground="#EF4444"
+                               FontSize="11.5"
+                               FontWeight="Bold"
+                               TextWrapping="Wrap"
+                               TextAlignment="Right"
+                               Margin="0,6,0,0"
+                               Visibility="Collapsed"/>
+                </Grid>
+            </Border>
+
+            <!-- 3. بطاقة الإجراءات السريعة (يسار) -->
+            <Border x:Name="ActionsCardBorder"
+                    Grid.Column="2"
+                    Background="{DynamicResource DashActionsCardBg}"
+                    BorderBrush="{DynamicResource DashActionsCardBorder}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Padding="16,20"
+                    MinHeight="132">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="BtnAddPatient"
+                            Grid.Column="0"
+                            Height="44"
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Click="BtnAddPatient_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox x:Name="IconAddPatient" Width="16" Height="16" Margin="0,0,6,0" Visibility="Collapsed">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Data="M16,21 V19 A4,4 0 0 0 12,15 H5 A4,4 0 0 0 1,19 V21 M8.5,11 A4,4 0 1 0 8.5,3 A4,4 0 0 0 8.5,11 Z M20,8 V14 M23,11 H17"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock x:Name="TxtAddPatientBtn" Text="+ إضافة مريض" FontSize="14.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="BtnAddAppointment"
+                            Grid.Column="2"
+                            Height="44"
+                            Style="{StaticResource RoundedButtonStyle}"
+                            Click="BtnAddAppointment_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Viewbox x:Name="IconAddAppointment" Width="16" Height="16" Margin="0,0,6,0" Visibility="Collapsed">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Data="M19,4 H5 A2,2 0 0 0 3,6 V20 A2,2 0 0 0 5,22 H19 A2,2 0 0 0 21,20 V6 A2,2 0 0 0 19,4 Z M16,2 V6 M8,2 V6 M3,10 H21 M12,14 V18 M10,16 H14"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock x:Name="TxtAddAppointmentBtn" Text="+ إضافة موعد جديد" FontSize="14.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- المحتوى الرئيسي (المواعيد والتقويم) -->
+        <Border Grid.Row="1"
+                Panel.ZIndex="2"
+                Background="{DynamicResource DashMainCardBg}"
+                CornerRadius="20"
+                Padding="24,18,24,16"
+                BorderBrush="{DynamicResource DashMainCardBorder}"
+                BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -352,13 +594,14 @@
                 </Grid.RowDefinitions>
 
                 <!-- شريط البحث والفلاتر -->
-                <Grid Grid.Row="0" Margin="0,0,0,24">
+                <Grid Grid.Row="0" Margin="0,0,0,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                    <!-- الصف الأول: عنوان المواعيد (يمين) وحقل البحث (يسار) -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -366,56 +609,117 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="المواعيد" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,5"/>
+                            <TextBlock Text="المواعيد" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,3"/>
                             <TextBlock Text="بطاقات المواعيد تعرض الاسم، الهاتف، السبب، وتوقيت الحجز." FontSize="13" Foreground="{DynamicResource AppTextSecondary}"/>
                         </StackPanel>
 
-                        <!-- البحث التلقائي -->
-                        <Border Grid.Column="2" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="10" Padding="5,0">
-                            <ComboBox x:Name="CmbAppointmentsSearch"
-                                      Width="270" Height="40" IsEditable="True" IsTextSearchEnabled="True"
-                                      Foreground="{DynamicResource AppTextPrimary}"
-                                      StaysOpenOnEdit="True" BorderThickness="0" Background="Transparent"
-                                      VerticalContentAlignment="Center" Padding="8,0"
-                                      TextBoxBase.TextChanged="CmbAppointmentsSearch_TextChanged"
-                                      SelectionChanged="CmbAppointmentsSearch_SelectionChanged"/>
+                        <!-- حقل البحث التلقائي المزدوج الإطار كما في الصور -->
+                        <Border Grid.Column="2"
+                                Background="{DynamicResource DashFilterGroupBg}"
+                                BorderBrush="{DynamicResource DashFilterGroupBorder}"
+                                BorderThickness="1"
+                                CornerRadius="13"
+                                Padding="5"
+                                VerticalAlignment="Center">
+                            <Border Background="{DynamicResource AppCardBg}"
+                                    BorderBrush="{DynamicResource AppBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Padding="4,0">
+                                <ComboBox x:Name="CmbAppointmentsSearch"
+                                          Width="236"
+                                          Height="34"
+                                          IsEditable="True"
+                                          IsTextSearchEnabled="True"
+                                          Foreground="{DynamicResource AppTextPrimary}"
+                                          StaysOpenOnEdit="True"
+                                          BorderThickness="0"
+                                          Background="Transparent"
+                                          VerticalContentAlignment="Center"
+                                          Padding="6,0"
+                                          TextBoxBase.TextChanged="CmbAppointmentsSearch_TextChanged"
+                                          SelectionChanged="CmbAppointmentsSearch_SelectionChanged"/>
+                            </Border>
                         </Border>
                     </Grid>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" FlowDirection="RightToLeft">
-                        <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="2" Margin="0,0,12,0">
+                    <!-- الصف الثاني: أزرار التصفية والتاريخ ونوع العرض -->
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                FlowDirection="RightToLeft"
+                                HorizontalAlignment="Left"
+                                Margin="215,0,0,0">
+                        <!-- مجموعة القادمة / السابقة / الكل -->
+                        <Border Background="{DynamicResource DashFilterGroupBg}"
+                                BorderBrush="{DynamicResource DashFilterGroupBorder}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="4"
+                                Margin="0,0,10,0">
                             <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnFilterUpcoming" Content="القادمة" Style="{StaticResource RangeButtonStyle}" Width="75" Click="BtnFilterUpcoming_Click"/>
-                                <Button x:Name="BtnFilterPast" Content="السابقة" Style="{StaticResource RangeButtonStyle}" Width="75" Click="BtnFilterPast_Click"/>
-                                <Button x:Name="BtnFilterAll" Content="الكل" Style="{StaticResource RangeButtonStyle}" Width="60" Click="BtnFilterAll_Click"/>
+                                <Button x:Name="BtnFilterUpcoming" Content="القادمة" Style="{StaticResource RangeButtonStyle}" Width="72" Click="BtnFilterUpcoming_Click"/>
+                                <Button x:Name="BtnFilterPast" Content="السابقة" Style="{StaticResource RangeButtonStyle}" Width="72" Click="BtnFilterPast_Click"/>
+                                <Button x:Name="BtnFilterAll" Content="الكل" Style="{StaticResource RangeButtonStyle}" Width="58" Click="BtnFilterAll_Click"/>
                             </StackPanel>
                         </Border>
 
-                        <Button x:Name="BtnCurrentDate" Content="الشهر الحالي" Height="44" Padding="16,0" Background="#1A235DF6" Foreground="#235DF6" FontWeight="SemiBold" Margin="0,0,12,0" Cursor="Hand" Visibility="Collapsed" Click="BtnCurrentDate_Click">
+                        <Button x:Name="BtnCurrentDate"
+                                Content="الشهر الحالي"
+                                Height="42"
+                                Padding="14,0"
+                                Background="#2214B8A6"
+                                Foreground="{DynamicResource AppTextPrimary}"
+                                FontWeight="Bold"
+                                Margin="0,0,10,0"
+                                Cursor="Hand"
+                                Visibility="Collapsed"
+                                Click="BtnCurrentDate_Click">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource DashFilterGroupBorder}" BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}">
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
 
-                        <Border BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Background="{DynamicResource AppInputBg}" Padding="6" Margin="0,0,12,0">
-                            <DatePicker x:Name="DpAppointmentsFilter" Width="140" Height="32" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0" Background="Transparent" SelectedDateChanged="DpAppointmentsFilter_SelectedDateChanged" CalendarOpened="DpAppointmentsFilter_CalendarOpened" CalendarClosed="DpAppointmentsFilter_CalendarClosed"/>
+                        <!-- منتقي التاريخ -->
+                        <Border BorderBrush="{DynamicResource DashFilterGroupBorder}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Background="{DynamicResource DashFilterGroupBg}"
+                                Padding="8,4"
+                                Margin="0,0,10,0">
+                            <DatePicker x:Name="DpAppointmentsFilter"
+                                        Width="136"
+                                        Height="34"
+                                        Foreground="{DynamicResource AppTextPrimary}"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        VerticalContentAlignment="Center"
+                                        SelectedDateChanged="DpAppointmentsFilter_SelectedDateChanged"
+                                        CalendarOpened="DpAppointmentsFilter_CalendarOpened"
+                                        CalendarClosed="DpAppointmentsFilter_CalendarClosed"/>
                         </Border>
 
-                        <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="2">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnMonthlyView" Content="شهري" Style="{StaticResource RangeButtonStyle}" Width="70" Click="BtnMonthlyView_Click"/>
-                                <Button x:Name="BtnDailyView" Content="يومي" Style="{StaticResource RangeButtonStyle}" Width="70" Click="BtnDailyView_Click"/>
+                        <!-- مجموعة شهري / يومي -->
+                        <Border Background="{DynamicResource DashFilterGroupBg}"
+                                BorderBrush="{DynamicResource DashFilterGroupBorder}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="4">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="BtnMonthlyView" Content="شهري" Style="{StaticResource RangeButtonStyle}" Width="66" Click="BtnMonthlyView_Click"/>
+                                <Border Width="1" Height="18" Background="{DynamicResource AppBorder}" VerticalAlignment="Center" Margin="2,0"/>
+                                <Button x:Name="BtnDailyView" Content="يومي" Style="{StaticResource RangeButtonStyle}" Width="66" Click="BtnDailyView_Click"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </Grid>
 
-                <!-- شبكة البطاقات -->
+                <!-- شبكة البطاقات والتقويم الشهري -->
                 <Grid Grid.Row="1">
+                    <!-- العرض اليومي -->
                     <ScrollViewer x:Name="DailyAppointmentsPanel" VerticalScrollBarVisibility="Auto">
                         <Grid>
                             <ItemsControl x:Name="AppointmentsItemsControl">
@@ -482,7 +786,7 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#235DF6" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="0" Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#14B8A6" VerticalAlignment="Center"/>
                                                         <StackPanel Grid.Column="1" Margin="12,0,0,0" HorizontalAlignment="Right">
                                                             <TextBlock Text="{Binding AppointmentDateText}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
                                                             <TextBlock Text="{Binding AppointmentTimeText}" FontSize="12" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
@@ -493,7 +797,7 @@
                                                 <Border Grid.Row="2" Background="{DynamicResource AppInputBg}" CornerRadius="12" Padding="10" Margin="0,0,0,10">
                                                     <StackPanel HorizontalAlignment="Right">
                                                         <TextBlock Text="سبب الموعد" FontSize="11" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right"/>
-                                                        <TextBlock Text="{Binding Reason}" Margin="0,4,0,0" FontSize="13" FontWeight="Bold" Foreground="#2447E4" TextAlignment="Right"/>
+                                                        <TextBlock Text="{Binding Reason}" Margin="0,4,0,0" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
                                                     </StackPanel>
                                                 </Border>
 
@@ -557,7 +861,8 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Margin="0,0,0,18">
+                        <!-- شريط التنقل بين الأشهر -->
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -565,14 +870,14 @@
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
                                     Content="&#x2039;"
-                                    Width="42"
-                                    Height="38"
+                                    Width="38"
+                                    Height="36"
                                     Style="{StaticResource RoundedButtonStyle}"
-                                    Background="{DynamicResource AppInputBg}"
+                                    Background="{DynamicResource DashFilterGroupBg}"
                                     Foreground="{DynamicResource AppTextPrimary}"
-                                    BorderBrush="{DynamicResource AppBorder}"
+                                    BorderBrush="{DynamicResource DashFilterGroupBorder}"
                                     BorderThickness="1"
-                                    FontSize="24"
+                                    FontSize="22"
                                     Click="BtnCalendarPreviousMonth_Click"
                                     ToolTip="الشهر السابق"/>
                             <TextBlock x:Name="CalendarMonthLabel"
@@ -584,19 +889,20 @@
                                        Foreground="{DynamicResource AppTextPrimary}"/>
                             <Button Grid.Column="2"
                                     Content="&#x203A;"
-                                    Width="42"
-                                    Height="38"
+                                    Width="38"
+                                    Height="36"
                                     Style="{StaticResource RoundedButtonStyle}"
-                                    Background="{DynamicResource AppInputBg}"
+                                    Background="{DynamicResource DashFilterGroupBg}"
                                     Foreground="{DynamicResource AppTextPrimary}"
-                                    BorderBrush="{DynamicResource AppBorder}"
+                                    BorderBrush="{DynamicResource DashFilterGroupBorder}"
                                     BorderThickness="1"
-                                    FontSize="24"
+                                    FontSize="22"
                                     Click="BtnCalendarNextMonth_Click"
                                     ToolTip="الشهر التالي"/>
                         </Grid>
 
-                        <Grid Grid.Row="1" x:Name="CalendarWeekHeader" FlowDirection="LeftToRight" Margin="0,0,0,8">
+                        <!-- ترويسة أيام الأسبوع (من اليسار إلى اليمين: الأحد .. السبت كما في الصور) -->
+                        <Grid Grid.Row="1" x:Name="CalendarWeekHeader" FlowDirection="LeftToRight" Margin="10,0,4,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -606,17 +912,17 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="الأحد" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="1" Text="الإثنين" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="2" Text="الثلاثاء" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="3" Text="الأربعاء" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="4" Text="الخميس" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="5" Text="الجمعة" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
-                            <TextBlock Grid.Column="6" Text="السبت" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="0" Text="الأحد" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="1" Text="الإثنين" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="2" Text="الثلاثاء" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="3" Text="الأربعاء" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="4" Text="الخميس" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="5" Text="الجمعة" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
+                            <TextBlock Grid.Column="6" Text="السبت" HorizontalAlignment="Center" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
                         </Grid>
 
                         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                            <Grid x:Name="CalendarDaysGrid" FlowDirection="LeftToRight"/>
+                            <Grid x:Name="CalendarDaysGrid" FlowDirection="LeftToRight" Margin="6,0,0,0"/>
                         </ScrollViewer>
                     </Grid>
 
@@ -624,7 +930,7 @@
                         <Border Width="260" Height="120" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="جارٍ تحميل المواعيد" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center"/>
-                                <ProgressBar Width="180" Height="8" Margin="0,18,0,0" IsIndeterminate="True" Foreground="#235DF6" Background="{DynamicResource AppInputBg}"/>
+                                <ProgressBar Width="180" Height="8" Margin="0,18,0,0" IsIndeterminate="True" Foreground="#14B8A6" Background="{DynamicResource AppInputBg}"/>
                             </StackPanel>
                         </Border>
                     </Border>
@@ -632,10 +938,33 @@
             </Grid>
         </Border>
 
+        <!-- طبقة الإضاءة السطحية التفاعلية للوضع الداكن (Surface Cursor Spotlight) -->
+        <Canvas x:Name="DashboardSurfaceSpotlightCanvas"
+                Grid.RowSpan="2"
+                Panel.ZIndex="10"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <Ellipse x:Name="DashboardSurfaceSpotlight"
+                     Width="440"
+                     Height="440"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#222DD4BF" Offset="0.0"/>
+                        <GradientStop Color="#1238BDF8" Offset="0.45"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="DashboardSurfaceSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
+
         <!-- تفاصيل اليوم المحدد -->
         <Grid x:Name="DayDetailsOverlay" Grid.RowSpan="2" Panel.ZIndex="25" Visibility="Collapsed">
             <Border Background="#A00F172A" MouseLeftButtonDown="DayDetailsBackdrop_MouseLeftButtonDown"/>
-            <Border Width="720" MaxHeight="640" Padding="28" Background="{DynamicResource AppCardBg}" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="720" MaxHeight="640" Padding="28" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid FlowDirection="RightToLeft">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -670,10 +999,11 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding DisplayTime}" FontSize="16" FontWeight="Bold" Foreground="#235DF6" Margin="0,0,18,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="0" Text="{Binding DisplayTime}" FontSize="16" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,18,0" VerticalAlignment="Center"/>
                                                     <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                                         <TextBlock Text="{Binding Reason}" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
                                                         <TextBlock Text="{Binding PatientName}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
+                                                        <TextBlock Text="{Binding PhoneNumber}" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
                                                         <Border Padding="7,4" CornerRadius="7" HorizontalAlignment="Right" Margin="0,5,0,0">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
@@ -742,7 +1072,7 @@
                     </Border>
 
                     <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Left" Margin="0,18,0,0">
-                        <Button Content="إضافة موعد لهذا اليوم" Width="190" Height="44" Background="#235DF6" Foreground="White" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointmentForDay_Click"/>
+                        <Button Content="إضافة موعد لهذا اليوم" Width="190" Height="44" Background="{DynamicResource DashActiveFilterBg}" Foreground="White" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointmentForDay_Click"/>
                         <Button Content="إغلاق" Width="100" Height="44" Margin="12,0,0,0" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Style="{StaticResource RoundedButtonStyle}" Click="BtnCloseDayDetails_Click"/>
                     </StackPanel>
                 </Grid>
@@ -753,9 +1083,9 @@
         <Grid x:Name="AppointmentDialogOverlay" Grid.RowSpan="2" Panel.ZIndex="20" Visibility="Collapsed">
             <Border Background="#A00F172A" MouseLeftButtonDown="AppointmentDialogBackdrop_MouseLeftButtonDown"/>
 
-            <Border Width="560" Padding="32" Background="{DynamicResource AppCardBg}" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="560" Padding="32" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Border.Effect>
-                    <DropShadowEffect Color="#0F172A" BlurRadius="40" ShadowDepth="10" Opacity="0.15"/>
+                    <DropShadowEffect Color="#0F172A" BlurRadius="40" ShadowDepth="10" Opacity="0.25"/>
                 </Border.Effect>
 
                 <Grid>
@@ -790,8 +1120,8 @@
                         <StackPanel Grid.Column="2" HorizontalAlignment="Right">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock Text="إضافة موعد جديد" FontFamily="Traditional Arabic" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,10,0"/>
-                                <Border Width="38" Height="38" Background="#1A235DF6" CornerRadius="12">
-                                    <TextBlock Text="&#xE783;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#235DF6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Width="38" Height="38" Background="#2214B8A6" CornerRadius="12">
+                                    <TextBlock Text="&#xE783;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#14B8A6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="أدخل بيانات المريض والوقت لتسجيل الموعد في الجدول." Margin="0,-2,0,0" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
@@ -813,7 +1143,7 @@
                                     <ComboBox x:Name="CmbAppointmentPatientName"
                                               Height="44" Padding="8,0" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}"
                                               VerticalContentAlignment="Center" IsEditable="True" IsTextSearchEnabled="False"
-                                       TextBoxBase.TextChanged="CmbAppointmentPatientName_TextChanged"
+                                              TextBoxBase.TextChanged="CmbAppointmentPatientName_TextChanged"
                                               SelectionChanged="CmbAppointmentPatientName_SelectionChanged"/>
                                 </DockPanel>
                             </Border>
@@ -827,7 +1157,7 @@
                                     <ComboBox x:Name="CmbAppointmentPhoneNumber"
                                               Height="44" Padding="8,0" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}"
                                               VerticalContentAlignment="Center" IsEditable="True" IsTextSearchEnabled="False"
-                                       TextBoxBase.TextChanged="CmbAppointmentPhoneNumber_TextChanged"
+                                              TextBoxBase.TextChanged="CmbAppointmentPhoneNumber_TextChanged"
                                               SelectionChanged="CmbAppointmentPhoneNumber_SelectionChanged"/>
                                 </DockPanel>
                             </Border>
@@ -858,7 +1188,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0">
                             <TextBlock Text="تاريخ الموعد" Style="{StaticResource FieldLabelStyle}"/>
                             <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="4,0">
-                                <DatePicker x:Name="DpAppointmentDate" Height="44" Background="Transparent" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0"/>
+                                <DatePicker x:Name="DpAppointmentDate" Height="44" Background="Transparent" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0" VerticalContentAlignment="Center"/>
                             </Border>
                         </StackPanel>
 
@@ -887,7 +1217,7 @@
 
                     <!-- الصف الرابع -->
                     <StackPanel Grid.Row="4" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Left">
-                        <Button Content="حفظ الموعد" Width="140" Height="48" Background="#235DF6" Foreground="White" BorderThickness="0" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnSaveAppointment_Click"/>
+                        <Button Content="حفظ الموعد" Width="140" Height="48" Background="{DynamicResource DashActiveFilterBg}" Foreground="White" BorderThickness="0" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnSaveAppointment_Click"/>
                         <Button Content="إلغاء الأمر" Width="110" Height="48" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Style="{StaticResource RoundedButtonStyle}" Click="BtnCloseAppointmentDialog_Click"/>
                     </StackPanel>
                 </Grid>

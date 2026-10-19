@@ -32,17 +32,17 @@ namespace MyClinic
         private readonly ObservableCollection<PatientLookupSuggestion> _patientSuggestions = new();
         private readonly ObservableCollection<VisitHistoryItem> _previousVisits = new();
         private readonly ObservableCollection<TreatmentSelectionItem> _treatmentSelectionItems = new();
-        
+
         // Dynamic Medicine Autofill Collections
         private readonly ObservableCollection<string> _recentMedicines = new();
         private List<string> _allMedicines = new();
         private static readonly string MedicinesFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
-            "MyClinicApp", 
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MyClinicApp",
             "Medicines.json");
 
         private readonly Dictionary<int, IReadOnlyList<VisitAttachmentItem>> _attachmentCache = new();
-        
+
         private PatientLookupSnapshot? _selectedPatientLookup;
         private bool _isApplyingPatientLookup;
 
@@ -51,21 +51,270 @@ namespace MyClinic
             InitializeComponent();
             ItemsPatientSuggestions.ItemsSource = _patientSuggestions;
             ItemsPreviousVisits.ItemsSource = _previousVisits;
-            ItemsRecentMedicines.ItemsSource = _recentMedicines; // Bind Recent drugs
+            ItemsRecentMedicines.ItemsSource = _recentMedicines;
             TreatmentItemsControl.ItemsSource = _treatmentSelectionItems;
 
-            LoadMedicines(); // Loads local JSON record of previously entered medicines
-            LoadTreatments(); // Load treatments from database
+            ApplyThemeVisuals(IsDarkThemeActive());
+
+            LoadMedicines();
+            LoadTreatments();
 
             UpdateRemainingVisitAmount();
             UpdateFemaleDetailsVisibility();
             UpdatePregnancyMonthVisibility();
             RefreshPrescriptionList();
             RefreshSelectedImagesList();
+
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            Loaded += AddPatientView_Loaded;
+            Unloaded += AddPatientView_Unloaded;
+        }
+
+        private void AddPatientView_Loaded(object sender, RoutedEventArgs e)
+        {
+            ApplyThemeVisuals(IsDarkThemeActive());
+        }
+
+        private void AddPatientView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
+        private static LinearGradientBrush CreateGradient(string startHex, string endHex, Point startPoint, Point endPoint)
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = startPoint,
+                EndPoint = endPoint
+            };
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(startHex), 0.0));
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(endHex), 1.0));
+            return brush;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (isDark)
+            {
+                // تدرج الترويسة العلوية وترويسة بطاقة الزيارة (الوضع الداكن)
+                var bannerGradient = new LinearGradientBrush { StartPoint = new Point(1, 0), EndPoint = new Point(0, 1) };
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0D6C6B"), 0.0));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0B8674"), 0.48));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#216382"), 1.0));
+
+                Resources["VisitBannerBg"] = bannerGradient;
+                Resources["VisitBannerBorder"] = CreateBrush("#662DD4BF");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#FFFFFF");
+                Resources["VisitBannerSubFg"] = CreateBrush("#E2F2F0");
+                Resources["VisitBannerToothBrush"] = CreateBrush("#1EFFFFFF");
+
+                // البطاقات والحقول (الوضع الداكن)
+                Resources["VisitCardBg"] = CreateBrush("#121621");
+                Resources["VisitCardBorder"] = CreateBrush("#232E42");
+                Resources["VisitSubCardBg"] = CreateBrush("#0B101B");
+                Resources["VisitSubCardBorder"] = CreateBrush("#1E283A");
+
+                // البطاقات المميزة والمربعات المضيئة (الوضع الداكن)
+                Resources["VisitAccentCardBg"] = CreateBrush("#102930");
+                Resources["VisitAccentCardBorder"] = CreateBrush("#452DD4BF");
+                Resources["VisitGlowBoxBg"] = CreateBrush("#0F353D");
+                Resources["VisitGlowBoxBorder"] = CreateBrush("#2DD4BF");
+                Resources["VisitGlowBoxFg"] = CreateBrush("#5EEAD4");
+                Resources["VisitGlowOpacity"] = 0.52d;
+
+                // الأزرار الأساسية والثانوية (الوضع الداكن)
+                Resources["VisitPrimaryBtnBg"] = CreateGradient("#14B8A6", "#0D9488", new Point(0, 0), new Point(1, 0));
+                Resources["VisitPrimaryBtnBorder"] = CreateBrush("#5EEAD4");
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#47535E");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#64748B");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#FFFFFF");
+
+                // بطاقات الزيارات السابقة ونافذة تفاصيل الزيارة (الوضع الداكن)
+                Resources["VisitHistoryHeaderBg"] = CreateGradient("#14464B", "#102B33", new Point(0, 0), new Point(1, 1));
+                Resources["VisitHistoryHeaderFg"] = CreateBrush("#F8FAFC");
+                Resources["VisitEntryCardBg"] = CreateBrush("#0A0E19");
+                Resources["VisitEntryCardBorder"] = CreateBrush("#1E2638");
+                Resources["VisitEntryPillIndicator"] = CreateBrush("#14B8A6");
+
+                Resources["VisitModalOuterBg"] = CreateBrush("#0B131D");
+                Resources["VisitModalOuterBorder"] = CreateBrush("#552DD4BF");
+                Resources["VisitModalChipBg"] = CreateBrush("#12363B");
+                Resources["VisitModalChipBorder"] = CreateBrush("#452DD4BF");
+
+                // شارات العلاجات والكميات والأسنان والتحذيرات (مطابقة لألوان التقويم في الوضع الداكن)
+                Resources["VisitTreatmentPillBg"] = CreateBrush("#0D514F");
+                Resources["VisitTreatmentPillBorder"] = CreateBrush("#14857E");
+                Resources["VisitTreatmentPillFg"] = CreateBrush("#E6FFFA");
+
+                Resources["VisitQtyPillBg"] = CreateBrush("#15203E");
+                Resources["VisitQtyPillBorder"] = CreateBrush("#25386B");
+                Resources["VisitQtyPillFg"] = CreateBrush("#E2E8F0");
+
+                Resources["VisitCostPillBg"] = CreateBrush("#0F353D");
+                Resources["VisitCostPillBorder"] = CreateBrush("#2DD4BF");
+                Resources["VisitCostPillFg"] = CreateBrush("#5EEAD4");
+
+                Resources["VisitToothBadgeBg"] = CreateBrush("#103339");
+                Resources["VisitToothBadgeBorder"] = CreateBrush("#14B8A6");
+                Resources["VisitToothBadgeFg"] = CreateBrush("#2DD4BF");
+
+                Resources["VisitWarningCardBg"] = CreateBrush("#2A161D");
+                Resources["VisitWarningCardBorder"] = CreateBrush("#BA6571");
+                Resources["VisitWarningFg"] = CreateBrush("#FDA4AF");
+            }
+            else
+            {
+                // الترويسة العلوية وترويسة بطاقة الزيارة (الوضع الفاتح)
+                Resources["VisitBannerBg"] = CreateBrush("#E3EFED");
+                Resources["VisitBannerBorder"] = CreateBrush("#D5E6E3");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#13284A");
+                Resources["VisitBannerSubFg"] = CreateBrush("#2C3E50");
+                Resources["VisitBannerToothBrush"] = CreateBrush("#CFE3DF");
+
+                // البطاقات والحقول (الوضع الفاتح)
+                Resources["VisitCardBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitCardBorder"] = CreateBrush("#E4ECEA");
+                Resources["VisitSubCardBg"] = CreateBrush("#F8FAFC");
+                Resources["VisitSubCardBorder"] = CreateBrush("#DCE5E7");
+
+                // البطاقات المميزة والمربعات (الوضع الفاتح)
+                Resources["VisitAccentCardBg"] = CreateBrush("#E3EFED");
+                Resources["VisitAccentCardBorder"] = CreateBrush("#B4D0CB");
+                Resources["VisitGlowBoxBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitGlowBoxBorder"] = CreateBrush("#B4D0CB");
+                Resources["VisitGlowBoxFg"] = CreateBrush("#13284A");
+                Resources["VisitGlowOpacity"] = 0.0d;
+
+                // الأزرار الأساسية والثانوية (الوضع الفاتح)
+                Resources["VisitPrimaryBtnBg"] = CreateBrush("#3348BD");
+                Resources["VisitPrimaryBtnBorder"] = Brushes.Transparent;
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#C3DCD8");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#8EB4AE");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#264642");
+
+                // بطاقات الزيارات السابقة ونافذة تفاصيل الزيارة (الوضع الفاتح)
+                Resources["VisitHistoryHeaderBg"] = CreateBrush("#C3DCD8");
+                Resources["VisitHistoryHeaderFg"] = CreateBrush("#13284A");
+                Resources["VisitEntryCardBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitEntryCardBorder"] = CreateBrush("#CBD5E1");
+                Resources["VisitEntryPillIndicator"] = CreateBrush("#3348BD");
+
+                Resources["VisitModalOuterBg"] = CreateBrush("#F6F5F1");
+                Resources["VisitModalOuterBorder"] = CreateBrush("#D5E6E3");
+                Resources["VisitModalChipBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitModalChipBorder"] = CreateBrush("#C3DCD8");
+
+                // شارات العلاجات والكميات والأسنان والتحذيرات (مطابقة لألوان التقويم في الوضع الفاتح)
+                Resources["VisitTreatmentPillBg"] = CreateBrush("#B2DCCC");
+                Resources["VisitTreatmentPillBorder"] = CreateBrush("#96CEB8");
+                Resources["VisitTreatmentPillFg"] = CreateBrush("#0F291E");
+
+                Resources["VisitQtyPillBg"] = CreateBrush("#CAD4F0");
+                Resources["VisitQtyPillBorder"] = CreateBrush("#B2C0E8");
+                Resources["VisitQtyPillFg"] = CreateBrush("#1E293B");
+
+                Resources["VisitCostPillBg"] = CreateBrush("#E3EFED");
+                Resources["VisitCostPillBorder"] = CreateBrush("#96CEB8");
+                Resources["VisitCostPillFg"] = CreateBrush("#15803D");
+
+                Resources["VisitToothBadgeBg"] = CreateBrush("#E3EFED");
+                Resources["VisitToothBadgeBorder"] = CreateBrush("#7FA6A0");
+                Resources["VisitToothBadgeFg"] = CreateBrush("#25635A");
+
+                Resources["VisitWarningCardBg"] = CreateBrush("#FFF2F0");
+                Resources["VisitWarningCardBorder"] = CreateBrush("#FB7A6D");
+                Resources["VisitWarningFg"] = CreateBrush("#B91C1C");
+            }
+
+            if (IconBannerSparkles is not null)
+                IconBannerSparkles.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+
+            if (AddPatientBackSpotlightCanvas is not null)
+                AddPatientBackSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+            if (AddPatientSurfaceSpotlightCanvas is not null)
+                AddPatientSurfaceSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateChartModeButtons();
+        }
+
+        private void UpdateChartModeButtons()
+        {
+            if (BtnAdult is null || BtnChild is null)
+                return;
+
+            bool isAdultActive = AdultChartControl?.Visibility == Visibility.Visible;
+            Brush activeBg = (Brush)Resources["VisitPrimaryBtnBg"];
+            Brush activeFg = Brushes.White;
+            Brush inactiveBg = Brushes.Transparent;
+            Brush inactiveFg = TryFindResource("AppTextSecondary") as Brush ?? CreateBrush("#64748B");
+
+            BtnAdult.Background = isAdultActive ? activeBg : inactiveBg;
+            BtnAdult.Foreground = isAdultActive ? activeFg : inactiveFg;
+
+            BtnChild.Background = !isAdultActive ? activeBg : inactiveBg;
+            BtnChild.Foreground = !isAdultActive ? activeFg : inactiveFg;
+        }
+
+        private void AddPatient_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive())
+                return;
+
+            Point pos = e.GetPosition(AddPatientRootGrid);
+
+            if (AddPatientBackSpotlightCanvas is not null && AddPatientBackSpotlightTransform is not null)
+            {
+                if (AddPatientBackSpotlightCanvas.Visibility != Visibility.Visible)
+                    AddPatientBackSpotlightCanvas.Visibility = Visibility.Visible;
+
+                AddPatientBackSpotlightTransform.X = pos.X - (AddPatientBackSpotlight.Width / 2.0);
+                AddPatientBackSpotlightTransform.Y = pos.Y - (AddPatientBackSpotlight.Height / 2.0);
+            }
+
+            if (AddPatientSurfaceSpotlightCanvas is not null && AddPatientSurfaceSpotlightTransform is not null)
+            {
+                if (AddPatientSurfaceSpotlightCanvas.Visibility != Visibility.Visible)
+                    AddPatientSurfaceSpotlightCanvas.Visibility = Visibility.Visible;
+
+                AddPatientSurfaceSpotlightTransform.X = pos.X - (AddPatientSurfaceSpotlight.Width / 2.0);
+                AddPatientSurfaceSpotlightTransform.Y = pos.Y - (AddPatientSurfaceSpotlight.Height / 2.0);
+            }
+        }
+
+        private void AddPatient_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (AddPatientBackSpotlightTransform is not null)
+            {
+                AddPatientBackSpotlightTransform.X = -1200;
+                AddPatientBackSpotlightTransform.Y = -1200;
+            }
+
+            if (AddPatientSurfaceSpotlightTransform is not null)
+            {
+                AddPatientSurfaceSpotlightTransform.X = -1200;
+                AddPatientSurfaceSpotlightTransform.Y = -1200;
+            }
         }
 
         #region Medicine Persistence & Autofill Logic
-        
+
         private void LoadMedicines()
         {
             try
@@ -81,7 +330,7 @@ namespace MyClinic
                     }
                 }
             }
-            catch { /* Keep going if error */ }
+            catch { }
         }
 
         private void SaveMedicines()
@@ -90,7 +339,7 @@ namespace MyClinic
             {
                 File.WriteAllText(MedicinesFilePath, JsonSerializer.Serialize(_allMedicines));
             }
-            catch { /* Keep going if error */ }
+            catch { }
         }
 
         private void AddToMedicines(string medicine)
@@ -98,7 +347,6 @@ namespace MyClinic
             if (string.IsNullOrWhiteSpace(medicine)) return;
             medicine = medicine.Trim();
 
-            // Move this medicine to the top (Most recent)
             _allMedicines.RemoveAll(m => string.Equals(m, medicine, StringComparison.CurrentCultureIgnoreCase));
             _allMedicines.Insert(0, medicine);
 
@@ -140,7 +388,6 @@ namespace MyClinic
                 .Take(10)
                 .ToList();
 
-            // Only show suggestions popup if there are results AND we didn't just auto-fill exactly the result.
             if (matches.Any() && !matches.Any(m => string.Equals(m, query, StringComparison.CurrentCultureIgnoreCase)))
             {
                 LstMedicineSuggestions.ItemsSource = matches;
@@ -192,7 +439,6 @@ namespace MyClinic
             }
             catch (Exception)
             {
-                // If treatments fail to load, continue without them
             }
         }
 
@@ -303,8 +549,7 @@ namespace MyClinic
                 {
                     int quantity = item.Quantity > 0 ? item.Quantity : 1;
                     decimal cost = item.Cost;
-                    
-                    // Convert USD to SYP if needed
+
                     if (item.Currency == "USD")
                     {
                         try
@@ -318,10 +563,9 @@ namespace MyClinic
                         }
                         catch (Exception)
                         {
-                            // If conversion fails, use original cost
                         }
                     }
-                    
+
                     total += cost * quantity;
                 }
             }
@@ -387,9 +631,6 @@ namespace MyClinic
                 return cost * Math.Max(1, t.Quantity);
             });
 
-            // A higher manual value is the actual negotiated cost for this visit.
-            // Store the difference evenly in the selected treatment prices so the
-            // finance details and payment allocation use that real cost.
             if (manualCost <= automaticCost)
                 return;
 
@@ -455,24 +696,14 @@ namespace MyClinic
         {
             AdultChartControl.Visibility = Visibility.Visible;
             ChildChartControl.Visibility = Visibility.Collapsed;
-
-            BtnAdult.Background = Brushes.White;
-            BtnAdult.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"));
-
-            BtnChild.Background = Brushes.Transparent;
-            BtnChild.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64748B"));
+            UpdateChartModeButtons();
         }
 
         private void BtnChild_Click(object sender, RoutedEventArgs e)
         {
             AdultChartControl.Visibility = Visibility.Collapsed;
             ChildChartControl.Visibility = Visibility.Visible;
-
-            BtnChild.Background = Brushes.White;
-            BtnChild.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"));
-
-            BtnAdult.Background = Brushes.Transparent;
-            BtnAdult.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64748B"));
+            UpdateChartModeButtons();
         }
 
         private void PatientLookup_TextChanged(object sender, TextChangedEventArgs e)
@@ -839,20 +1070,19 @@ namespace MyClinic
             if (PreviousVisitsPanel != null) PreviousVisitsPanel.Visibility = Visibility.Collapsed;
             if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = "0";
             if (TxtPreviousVisitsHint != null) TxtPreviousVisitsHint.Text = "اضغط على أي زيارة لعرض تفاصيلها.";
-            
-            // إخفاء شريط السجل المالي عند عدم وجود مريض
+
             if (PatientFinancialHistoryPanel != null)
             {
                 PatientFinancialHistoryPanel.Visibility = Visibility.Collapsed;
             }
-            
+
             HideVisitDetailsOverlay();
         }
 
         private void HideVisitDetailsOverlay()
         {
             VisitDetailsOverlay.Visibility = Visibility.Collapsed;
-            
+
             if (VisitDetailsModal.DataContext is VisitDetailsViewModel vm)
             {
                 vm.AttachmentItems.Clear();
@@ -868,7 +1098,6 @@ namespace MyClinic
                 return false;
             }
 
-            // لضمان أنه عند تغيير الاسم أو الرقم بعد التحديد، يتم فك الارتباط لإنشاء فرد جديد من العائلة
             bool matchesPhone = string.IsNullOrWhiteSpace(phoneQuery) ||
                 _selectedPatientLookup.PhoneNumber.Contains(phoneQuery, StringComparison.CurrentCultureIgnoreCase) ||
                 phoneQuery.Contains(_selectedPatientLookup.PhoneNumber, StringComparison.CurrentCultureIgnoreCase);
@@ -877,7 +1106,6 @@ namespace MyClinic
                 _selectedPatientLookup.DisplayName.Contains(nameQuery, StringComparison.CurrentCultureIgnoreCase) ||
                 nameQuery.Contains(_selectedPatientLookup.DisplayName, StringComparison.CurrentCultureIgnoreCase);
 
-            // يجب أن يتطابق الاثنان معاً لكي يتم اعتبارهما نفس المريض المحدد
             return matchesPhone && matchesName;
         }
 
@@ -1002,7 +1230,6 @@ namespace MyClinic
 
                 Patient? patient = null;
 
-                // تحديث المريض الحالي فقط إذا قام المستخدم باختياره بشكل صريح من قائمة المقترحات
                 if (_selectedPatientLookup != null)
                 {
                     patient = db.Patients.FirstOrDefault(existingPatient => existingPatient.Id == _selectedPatientLookup.Id);
@@ -1010,7 +1237,6 @@ namespace MyClinic
 
                 bool isExistingPatient = patient is not null;
 
-                // إنشاء مريض جديد إذا لم يتم اختيار أحد (يسمح بإضافة أفراد العائلة بنفس رقم الهاتف)
                 if (patient is null)
                 {
                     patient = new Patient
@@ -1022,7 +1248,6 @@ namespace MyClinic
                 }
                 else
                 {
-                    // تحديث رقم الهاتف في حال قام المستخدم بتصحيح خطأ إملائي بسيط بعد الاختيار
                     patient.PhoneNumber = phoneNumber;
                 }
 
@@ -1036,8 +1261,6 @@ namespace MyClinic
                 patient.Allergies = NullIfWhiteSpace(TxtAllergies.Text);
                 patient.ChronicDiseases = NullIfWhiteSpace(TxtChronicDiseases.Text);
 
-                // Snapshot the current USD→SYP rate so historic payment details
-                // are never retroactively affected by future rate changes.
                 double usdToSypRateSnapshot = 15000;
                 var appSettings = db.AppSettings.FirstOrDefault();
                 if (appSettings != null)
@@ -1056,7 +1279,7 @@ namespace MyClinic
                 }
 
                 int completedCanals = selectedTreatments
-                .Where(t => IsRootCanalTreatment(t.TreatmentName))
+                    .Where(t => IsRootCanalTreatment(t.TreatmentName))
                     .Sum(t => t.ToothDetails.Count > 0
                         ? t.ToothDetails.Where(d => int.TryParse(d.ToothId, out _)).Sum(d => d.CanalCount > 0 ? d.CanalCount : GetDefaultCanalNames(int.Parse(d.ToothId!)).Count)
                         : (!string.IsNullOrWhiteSpace(t.ToothId) ? Math.Max(1, t.CanalCount) : 0));
@@ -1108,41 +1331,32 @@ namespace MyClinic
                     PatientId = patient.Id > 0 ? patient.Id : null,
                     IsAutomaticallyGenerated = true
                 });
-                await db.SaveChangesAsync(); // أو db.SaveChanges();
-                
+                await db.SaveChangesAsync();
 
                 if (_selectedImagePaths.Count > 0)
                 {
                     string safePatientName = string.IsNullOrWhiteSpace(patient.FullName) ? "بدون_اسم" : patient.FullName;
                     visit.AttachedImagePathsJson = SaveVisitImages(safePatientName, visit.Id, _selectedImagePaths);
                     await db.SaveChangesAsync();
-                    
                 }
 
-                // Update the global runtime cache so the Dashboard stays accurate
                 AppRuntimeCache.AddOrUpdateVisit(visit);
 
-                // IMMEDIATELY notify the MainWindow that Financials need a refresh
                 if (Window.GetWindow(this) is MainWindow mainWindow)
                 {
                     mainWindow.InvalidateFinancialRecords();
                 }
 
-                // إضافة هذا السطر فوراً بعد نجاح عملية الحفظ لإشعار الواجهة المالية بوجود تحديث
                 GlobalEvents.NotifyFinancialRecordAdded();
-
-                // --- الكود الجديد: إرسال تنبيه لتحديث سجل المرضى ---
-                GlobalEvents.NotifyPatientRecordAdded(); 
+                GlobalEvents.NotifyPatientRecordAdded();
                 GlobalEvents.NotifyFileKitCanalCountChanged();
 
-                // ... باقي كود تفريغ الحقول وإظهار رسالة النجاح ...
                 MessageBox.Show("تم حفظ المريض والزيارة بنجاح.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
                 ResetForm();
                 NavigateToDashboard(visit, patient, isExistingPatient, savedVisitDateTime);
             }
             catch (Exception ex)
             {
-                // ... معالجة الأخطاء ...
                 MessageBox.Show($"حدث خطأ أثناء حفظ البيانات:\n{ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1305,7 +1519,6 @@ namespace MyClinic
                 return;
             }
 
-            // Storing the drug to dictionary for AutoFill logic
             AddToMedicines(medicineName);
 
             _prescriptionItems.Add(new PrescriptionItem
@@ -1452,8 +1665,7 @@ namespace MyClinic
             }
 
             string storageRoot = ResolveVisitImagesRoot();
-            
-            // استخدام اسم المريض بدلاً من رقم الهاتف لاسم المجلد
+
             string sanitizedName = SanitizePathSegment(patientName);
             string visitFolderName = $"{sanitizedName}_visit_{visitId}_{AppClock.Now:yyyyMMdd_HHmmss}";
             string visitFolderPath = Path.Combine(storageRoot, visitFolderName);
@@ -1465,8 +1677,7 @@ namespace MyClinic
             foreach (string sourcePath in existingFiles)
             {
                 string extension = Path.GetExtension(sourcePath);
-                
-                // استخدام التاريخ/الوقت مع أجزاء الثانية (_fff) ورقم تسلسلي لضمان عدم وجود أسماء مكررة أبداً
+
                 string timestamp = AppClock.Now.ToString("yyyyMMdd_HHmmss_fff");
                 string destinationFileName = $"{timestamp}_{sequence:00}{extension}";
                 string destinationPath = Path.Combine(visitFolderPath, destinationFileName);
@@ -1483,12 +1694,10 @@ namespace MyClinic
 
         private static string ResolveVisitImagesRoot()
         {
-            // توجيه مجلد الصور ليكون داخل المجلد الآمن الخاص بالعيادة
             string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string clinicFolder = Path.Combine(appDataFolder, "MyClinicApp");
             string imagesFolder = Path.Combine(clinicFolder, "PatientVisitImages");
 
-            // التأكد من أن مجلد الصور موجود، وإلا سيقوم بإنشائه
             if (!Directory.Exists(imagesFolder))
             {
                 Directory.CreateDirectory(imagesFolder);
@@ -1529,8 +1738,8 @@ namespace MyClinic
             string details = Truncate(
                 FirstNonEmpty(
                     ToLabelValue("خطة العلاج", visit.TreatmentPlanNotes),
-                    toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الز الزيارة." : null,
-                            ToLabelValue("شكوى المريض", visit.Symptoms),
+                    toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الزيارة." : null,
+                    ToLabelValue("شكوى المريض", visit.Symptoms),
                     ToLabelValue("الضغط", visit.BloodPressure),
                     "لا توجد ملاحظات إضافية."),
                 120);
@@ -1604,8 +1813,8 @@ namespace MyClinic
                 BitmapImage image = new();
                 image.BeginInit();
                 image.CacheOption = BitmapCacheOption.OnLoad;
-                image.DecodePixelWidth = 320; 
-                image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile; 
+                image.DecodePixelWidth = 320;
+                image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
                 image.UriSource = new Uri(filePath, UriKind.Absolute);
                 image.EndInit();
                 image.Freeze();
@@ -1956,9 +2165,6 @@ namespace MyClinic
 
         private void NavigateToDashboard(Visit? savedVisit = null, Patient? savedPatient = null, bool isExistingPatient = false, DateTime savedVisitDateTime = default)
         {
-            // Let the save context finish disposing before the dashboard opens a
-            // second context to reload the calendar. This avoids a transient
-            // SQLite read/lock race immediately after saving a visit.
             Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Background,
                 new Action(() =>

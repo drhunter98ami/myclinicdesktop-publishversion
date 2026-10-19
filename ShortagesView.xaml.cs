@@ -35,6 +35,62 @@ namespace MyClinic
             NonUrgentItems.CollectionChanged += (_, _) => UpdateTotals();
 
             GlobalEvents.OnExchangeRateChanged += OnExchangeRateChanged;
+            Loaded += ShortagesView_Loaded;
+            Unloaded += ShortagesView_Unloaded;
+        }
+
+        private void ShortagesView_Loaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplyThemeVisuals(IsDarkThemeActive());
+        }
+
+        private void ShortagesView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (ShortagesSpotlightCanvas is not null)
+                ShortagesSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Shortages_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || ShortagesSpotlightCanvas is null || ShortagesSpotlightTransform is null)
+                return;
+
+            if (ShortagesSpotlightCanvas.Visibility != Visibility.Visible)
+                ShortagesSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(ShortagesRootGrid);
+            ShortagesSpotlightTransform.X = pos.X - (ShortagesSpotlightEllipse.Width / 2.0);
+            ShortagesSpotlightTransform.Y = pos.Y - (ShortagesSpotlightEllipse.Height / 2.0);
+        }
+
+        private void Shortages_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (ShortagesSpotlightTransform is not null)
+            {
+                ShortagesSpotlightTransform.X = -1200;
+                ShortagesSpotlightTransform.Y = -1200;
+            }
         }
 
         private void OnExchangeRateChanged()
@@ -418,7 +474,7 @@ namespace MyClinic
         public string CurrencyBadge { get; init; } = "SYP";
 
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged(string propertyName)
+        private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
         }

@@ -11,23 +11,76 @@
         Background="{DynamicResource AppWindowBg}"
         Foreground="{DynamicResource AppTextPrimary}"
         FontFamily="Segoe UI"
-        FontSize="14">
+        FontSize="14"
+        PreviewMouseMove="Window_PreviewMouseMove"
+        MouseLeave="Window_MouseLeave">
     <Window.Resources>
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Width" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent" Margin="2,0,2,0">
+                                    <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                        <Track.Thumb>
+                                            <Thumb>
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border Background="{DynamicResource AppBorder}" CornerRadius="4"/>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="EditField" TargetType="TextBox">
-            <Setter Property="MinHeight" Value="38"/>
-            <Setter Property="Padding" Value="9,6"/>
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="Padding" Value="12,8"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
-            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSubCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSubCardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="6,2"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+
         <Style x:Key="EditLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="13.5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
+
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -43,9 +96,9 @@
                             <Border x:Name="CheckBoxBorder"
                                     Width="20"
                                     Height="20"
-                                    CornerRadius="5"
-                                    Background="{DynamicResource AppInputBg}"
-                                    BorderBrush="{DynamicResource AppBorder}"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource VisitSubCardBg}"
+                                    BorderBrush="{DynamicResource VisitSubCardBorder}"
                                     BorderThickness="1"
                                     VerticalAlignment="Center">
                                 <Path x:Name="CheckMark"
@@ -66,8 +119,8 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="CheckBoxBorder" Property="Background" Value="#0D9488"/>
-                                <Setter TargetName="CheckBoxBorder" Property="BorderBrush" Value="#0D9488"/>
+                                <Setter TargetName="CheckBoxBorder" Property="Background" Value="{DynamicResource VisitPrimaryBtnBg}"/>
+                                <Setter TargetName="CheckBoxBorder" Property="BorderBrush" Value="{DynamicResource VisitPrimaryBtnBorder}"/>
                                 <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -78,115 +131,186 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="PrimaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource VisitPrimaryBtnBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitPrimaryBtnBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryBtn" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource VisitSecondaryBtnBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSecondaryBtnBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource VisitSecondaryBtnFg}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Grid x:Name="RootEditGrid" ClipToBounds="True">
+        <!-- إضاءة مؤشر الفأرة في الوضع الداكن -->
+        <Canvas x:Name="EditSpotlightCanvas"
+                IsHitTestVisible="False"
+                Panel.ZIndex="0"
+                Visibility="Collapsed">
+            <Ellipse x:Name="EditSpotlightEllipse"
+                     Width="520"
+                     Height="520"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#3814B8A6" Offset="0.0"/>
+                        <GradientStop Color="#1C0EA5E9" Offset="0.45"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="EditSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="تعديل بيانات الزيارة"
-                       FontFamily="Traditional Arabic"
-                       FontSize="34"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource AppTextPrimary}"/>
-            <TextBlock Text="سيُحفظ كل تغيير مع وقته الدقيق وقيمته قبل التعديل وبعده. تاريخ الزيارة والبيانات المالية والعلاجات والأسنان والوصفة والصور لا تتغير."
-                       Foreground="{DynamicResource AppTextSecondary}"
-                       TextWrapping="Wrap"
-                       Margin="0,2,0,0"/>
-        </StackPanel>
+        <Grid Margin="22" Panel.ZIndex="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="الحالة الصحية" FontSize="18" FontWeight="Bold" Margin="0,0,0,12"/>
-                        <WrapPanel Margin="0,0,0,10">
-                            <CheckBox x:Name="IsPregnantCheckBox" Content="حامل" Margin="0,0,20,0" Foreground="{DynamicResource AppTextPrimary}"/>
-                            <CheckBox x:Name="IsNursingCheckBox" Content="مرضع" Foreground="{DynamicResource AppTextPrimary}"/>
-                        </WrapPanel>
-                        <Grid>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="شهر الحمل" Style="{StaticResource EditLabel}"/>
-                                <TextBox x:Name="PregnancyMonthText" Style="{StaticResource EditField}"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
+            <!-- ترويسة تعديل بطاقة الزيارة بنفس ثيم بطاقة الترحيب -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource VisitBannerBg}"
+                    BorderBrush="{DynamicResource VisitBannerBorder}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Padding="24,18"
+                    Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="تعديل بيانات الزيارة"
+                               FontFamily="Traditional Arabic"
+                               FontSize="32"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource VisitBannerTitleFg}"/>
+                    <TextBlock Text="سيُحفظ كل تغيير مع وقته الدقيق وقيمته قبل التعديل وبعده. تاريخ الزيارة والبيانات المالية والعلاجات والأسنان والوصفة والصور لا تتغير."
+                               Foreground="{DynamicResource VisitBannerSubFg}"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
 
-                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="العلامات الحيوية" FontSize="18" FontWeight="Bold" Margin="0,0,0,12"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                            <StackPanel Grid.Row="0" Grid.Column="0"><TextBlock Text="ضغط الدم" Style="{StaticResource EditLabel}"/><TextBox x:Name="BloodPressureText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="2"><TextBlock Text="النبض" Style="{StaticResource EditLabel}"/><TextBox x:Name="HeartRateText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="4"><TextBlock Text="الحرارة" Style="{StaticResource EditLabel}"/><TextBox x:Name="TemperatureText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0"><TextBlock Text="معدل التنفس" Style="{StaticResource EditLabel}"/><TextBox x:Name="RespiratoryRateText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0"><TextBlock Text="الوزن" Style="{StaticResource EditLabel}"/><TextBox x:Name="WeightText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,12,0,0"><TextBlock Text="الطول" Style="{StaticResource EditLabel}"/><TextBox x:Name="HeightText" Style="{StaticResource EditField}"/></StackPanel>
-                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,12,0,0"><TextBlock Text="سكر الدم" Style="{StaticResource EditLabel}"/><TextBox x:Name="BloodSugarText" Style="{StaticResource EditField}"/></StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="الشكوى والتشخيص والعلاج" FontSize="18" FontWeight="Bold" Margin="0,0,0,12"/>
-                        <TextBlock Text="شكوى المريض" Style="{StaticResource EditLabel}"/>
-                        <TextBox x:Name="SymptomsText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
-                        <TextBlock Text="التشخيص" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
-                        <TextBox x:Name="DiagnosisText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
-                        <TextBlock Text="خطة العلاج والملاحظات" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
-                        <TextBox x:Name="TreatmentPlanText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
-                        <TextBlock Text="الإجراء النهائي" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
-                        <TextBox x:Name="FinalTreatmentText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
-                    </StackPanel>
-                </Border>
-
-                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16">
-                    <StackPanel>
-                        <TextBlock Text="صور ومرفقات الزيارة" FontSize="18" FontWeight="Bold"/>
-                        <TextBlock x:Name="ImageSelectionHint"
-                                   Text="يمكن إضافة صور جديدة دون حذف الصور الموجودة."
-                                   Foreground="{DynamicResource AppTextSecondary}"
-                                   Margin="0,4,0,10"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="إضافة صور"
-                                    Click="SelectImages_Click"
-                                    Padding="14,8"
-                                    Background="#0D9488"
-                                    Foreground="White"
-                                    BorderThickness="0"
-                                    Cursor="Hand"/>
-                            <Button Content="مسح الصور المحددة"
-                                    Click="ClearSelectedImages_Click"
-                                    Padding="14,8"
-                                    Margin="8,0,0,0"
-                                    Background="{DynamicResource AppInputBg}"
-                                    Foreground="{DynamicResource AppTextPrimary}"
-                                    BorderBrush="{DynamicResource AppBorder}"
-                                    BorderThickness="1"
-                                    Cursor="Hand"/>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="18" Padding="18" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="الحالة الصحية" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,12"/>
+                            <WrapPanel Margin="0,0,0,10">
+                                <CheckBox x:Name="IsPregnantCheckBox" Content="حامل" Margin="0,0,20,0" Foreground="{DynamicResource AppTextPrimary}"/>
+                                <CheckBox x:Name="IsNursingCheckBox" Content="مرضع" Foreground="{DynamicResource AppTextPrimary}"/>
+                            </WrapPanel>
+                            <Grid>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="شهر الحمل" Style="{StaticResource EditLabel}"/>
+                                    <TextBox x:Name="PregnancyMonthText" Style="{StaticResource EditField}"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                        <ItemsControl x:Name="SelectedImagesList" Margin="0,10,0,0"/>
-                    </StackPanel>
-                </Border>
+                    </Border>
 
+                    <Border Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="18" Padding="18" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="العلامات الحيوية" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,12"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Grid.Column="0"><TextBlock Text="ضغط الدم" Style="{StaticResource EditLabel}"/><TextBox x:Name="BloodPressureText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2"><TextBlock Text="النبض" Style="{StaticResource EditLabel}"/><TextBox x:Name="HeartRateText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="4"><TextBlock Text="الحرارة" Style="{StaticResource EditLabel}"/><TextBox x:Name="TemperatureText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,0,0"><TextBlock Text="معدل التنفس" Style="{StaticResource EditLabel}"/><TextBox x:Name="RespiratoryRateText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0"><TextBlock Text="الوزن" Style="{StaticResource EditLabel}"/><TextBox x:Name="WeightText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,12,0,0"><TextBlock Text="الطول" Style="{StaticResource EditLabel}"/><TextBox x:Name="HeightText" Style="{StaticResource EditField}"/></StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,12,0,0"><TextBlock Text="سكر الدم" Style="{StaticResource EditLabel}"/><TextBox x:Name="BloodSugarText" Style="{StaticResource EditField}"/></StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="18" Padding="18" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="الشكوى والتشخيص والعلاج" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,12"/>
+                            <TextBlock Text="شكوى المريض" Style="{StaticResource EditLabel}"/>
+                            <TextBox x:Name="SymptomsText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
+                            <TextBlock Text="التشخيص" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
+                            <TextBox x:Name="DiagnosisText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
+                            <TextBlock Text="خطة العلاج والملاحظات" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
+                            <TextBox x:Name="TreatmentPlanText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
+                            <TextBlock Text="الإجراء النهائي" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
+                            <TextBox x:Name="FinalTreatmentText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="18" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="صور ومرفقات الزيارة" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+                            <TextBlock x:Name="ImageSelectionHint"
+                                       Text="يمكن إضافة صور جديدة دون حذف الصور الموجودة."
+                                       Foreground="{DynamicResource AppTextSecondary}"
+                                       Margin="0,4,0,12"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="إضافة صور"
+                                        Click="SelectImages_Click"
+                                        Style="{StaticResource PrimaryBtn}"/>
+                                <Button Content="مسح الصور المحددة"
+                                        Click="ClearSelectedImages_Click"
+                                        Style="{StaticResource SecondaryBtn}"
+                                        Margin="10,0,0,0"/>
+                            </StackPanel>
+                            <ItemsControl x:Name="SelectedImagesList" Margin="0,10,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,16,0,0">
+                <Button Content="حفظ التعديل" Width="135" Height="44" Margin="0,0,10,0" Style="{StaticResource PrimaryBtn}" Click="Save_Click"/>
+                <Button Content="إلغاء" Width="105" Height="44" Style="{StaticResource SecondaryBtn}" Click="Cancel_Click"/>
             </StackPanel>
-        </ScrollViewer>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,16,0,0">
-            <Button Content="حفظ التعديل" Width="130" Height="42" Margin="0,0,10,0" Background="#0D9488" Foreground="White" BorderThickness="0" FontWeight="Bold" Cursor="Hand" Click="Save_Click"/>
-            <Button Content="إلغاء" Width="100" Height="42" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Cursor="Hand" Click="Cancel_Click"/>
-        </StackPanel>
+        </Grid>
     </Grid>
 </Window>

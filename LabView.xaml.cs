@@ -31,6 +31,64 @@ namespace MyClinic
             BtnCurrentDate.Visibility = Visibility.Visible;
             UpdateButtonStyles();
             ApplyFilters();
+            Loaded += LabView_Loaded;
+            Unloaded += LabView_Unloaded;
+        }
+
+        private void LabView_Loaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplyThemeVisuals(IsDarkThemeActive());
+            UpdateButtonStyles();
+        }
+
+        private void LabView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+            UpdateButtonStyles();
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (LabSpotlightCanvas is not null)
+                LabSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Lab_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || LabSpotlightCanvas is null || LabSpotlightTransform is null)
+                return;
+
+            if (LabSpotlightCanvas.Visibility != Visibility.Visible)
+                LabSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(LabRootGrid);
+            LabSpotlightTransform.X = pos.X - (LabSpotlightEllipse.Width / 2.0);
+            LabSpotlightTransform.Y = pos.Y - (LabSpotlightEllipse.Height / 2.0);
+        }
+
+        private void Lab_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (LabSpotlightTransform is not null)
+            {
+                LabSpotlightTransform.X = -1200;
+                LabSpotlightTransform.Y = -1200;
+            }
         }
 
         public void RefreshDateForAppTimeChange(DateTime previousAppTime)

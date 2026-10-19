@@ -9,6 +9,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace MyClinic
@@ -24,8 +26,97 @@ namespace MyClinic
         {
             InitializeComponent();
             _visitId = visitId;
+            ApplyThemeVisuals(IsDarkThemeActive());
             RefreshSelectedImages();
             LoadVisit();
+            GlobalEvents.OnThemeChanged += ApplyThemeVisuals;
+            Closed += (_, _) => GlobalEvents.OnThemeChanged -= ApplyThemeVisuals;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Owner is MainWindow ownerMain)
+                return ownerMain.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMain)
+                return appMain.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (isDark)
+            {
+                var bannerGradient = new LinearGradientBrush { StartPoint = new Point(1, 0), EndPoint = new Point(0, 1) };
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0D6C6B"), 0.0));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0B8674"), 0.48));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#216382"), 1.0));
+
+                Resources["VisitBannerBg"] = bannerGradient;
+                Resources["VisitBannerBorder"] = CreateBrush("#662DD4BF");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#FFFFFF");
+                Resources["VisitBannerSubFg"] = CreateBrush("#E2F2F0");
+
+                Resources["VisitCardBg"] = CreateBrush("#121621");
+                Resources["VisitCardBorder"] = CreateBrush("#232E42");
+                Resources["VisitSubCardBg"] = CreateBrush("#0B101B");
+                Resources["VisitSubCardBorder"] = CreateBrush("#1E283A");
+
+                var primaryBtnGradient = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+                primaryBtnGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#14B8A6"), 0.0));
+                primaryBtnGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0D9488"), 1.0));
+
+                Resources["VisitPrimaryBtnBg"] = primaryBtnGradient;
+                Resources["VisitPrimaryBtnBorder"] = CreateBrush("#5EEAD4");
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#47535E");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#64748B");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#FFFFFF");
+            }
+            else
+            {
+                Resources["VisitBannerBg"] = CreateBrush("#E3EFED");
+                Resources["VisitBannerBorder"] = CreateBrush("#D5E6E3");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#13284A");
+                Resources["VisitBannerSubFg"] = CreateBrush("#2C3E50");
+
+                Resources["VisitCardBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitCardBorder"] = CreateBrush("#E4ECEA");
+                Resources["VisitSubCardBg"] = CreateBrush("#F8FAFC");
+                Resources["VisitSubCardBorder"] = CreateBrush("#DCE5E7");
+
+                Resources["VisitPrimaryBtnBg"] = CreateBrush("#3348BD");
+                Resources["VisitPrimaryBtnBorder"] = Brushes.Transparent;
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#C3DCD8");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#8EB4AE");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#264642");
+            }
+
+            if (EditSpotlightCanvas is not null)
+                EditSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Window_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || EditSpotlightCanvas is null || EditSpotlightTransform is null)
+                return;
+
+            if (EditSpotlightCanvas.Visibility != Visibility.Visible)
+                EditSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(RootEditGrid);
+            EditSpotlightTransform.X = pos.X - (EditSpotlightEllipse.Width / 2.0);
+            EditSpotlightTransform.Y = pos.Y - (EditSpotlightEllipse.Height / 2.0);
+        }
+
+        private void Window_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (EditSpotlightTransform is not null)
+            {
+                EditSpotlightTransform.X = -1200;
+                EditSpotlightTransform.Y = -1200;
+            }
         }
 
         private void LoadVisit()

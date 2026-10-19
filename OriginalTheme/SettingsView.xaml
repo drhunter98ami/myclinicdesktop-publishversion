@@ -1,0 +1,393 @@
+<UserControl x:Class="MyClinic.OriginalTheme.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="RightToLeft"
+             Background="{DynamicResource AppWindowBg}"
+             Foreground="{DynamicResource AppTextPrimary}"
+             FontFamily="Segoe UI"
+             FontSize="14">
+    <UserControl.Resources>
+        <Style x:Key="PanelCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="18"/>
+        </Style>
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+        </Style>
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="InputBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="12,0"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
+                        <Setter Property="Padding" Value="12,9"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <Grid>
+                                <ToggleButton Background="Transparent"
+                                              BorderThickness="0"
+                                              Focusable="False"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              ClickMode="Press"/>
+                                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                  Margin="12,0,30,0"
+                                                  VerticalAlignment="Center"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                <Path Fill="{DynamicResource AppTextSecondary}"
+                                      Width="10"
+                                      Height="6"
+                                      Margin="0,0,12,0"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center"
+                                      Data="M 0 0 L 10 0 L 5 5 Z"/>
+                                <Popup IsOpen="{TemplateBinding IsDropDownOpen}"
+                                       Placement="Bottom"
+                                       AllowsTransparency="True"
+                                       Focusable="False">
+                                    <Border Background="{DynamicResource AppCardBg}"
+                                            BorderBrush="{DynamicResource AppBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            MinWidth="{TemplateBinding ActualWidth}">
+                                        <ScrollViewer MaxHeight="200" Margin="4">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Padding" Value="22,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeleteButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#EF4444"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <TextBlock Text="✕" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsToggleSwitchStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border" CornerRadius="12" Background="#CBD5E1" BorderThickness="2" BorderBrush="Transparent">
+                            <Ellipse x:Name="Knob" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#2563EB"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="30,26,30,30">
+            <Border Style="{StaticResource PanelCardStyle}" Padding="26,22" Margin="0,0,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="الإعدادات" FontSize="28" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <TextBlock Text="اضبط القيم التي تؤثر على الحسابات وسير العمل في العيادة" Style="{StaticResource HintStyle}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="#142563EB" CornerRadius="12" Padding="14,10" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" FontSize="20" Foreground="#2563EB" Margin="0,0,8,0"/>
+                            <TextBlock Text="مركز التحكم" FontWeight="SemiBold" Foreground="#2563EB" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="ضبط وقت التطبيق" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="حدد التاريخ والوقت اللذين سيستخدمهما التطبيق في الشاشات والسجلات، دون تغيير ساعة الكمبيوتر." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <DatePicker x:Name="DpAppDate" Grid.Column="0" Height="44" VerticalContentAlignment="Center"/>
+                        <TextBox x:Name="TxtAppClockTime" Grid.Column="2" Style="{StaticResource InputBoxStyle}" ToolTip="الوقت بصيغة ساعة:دقيقة (مثال 14:30)"/>
+                        <Button Grid.Column="3" Content="حفظ الوقت" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveAppTime_Click" Margin="12,0,0,0"/>
+                        <Button Grid.Column="4" Content="الوقت الافتراضي" Style="{StaticResource PrimaryButtonStyle}" Click="BtnResetAppTime_Click" Margin="8,0,0,0"/>
+                    </Grid>
+                    <TextBlock Text="سيُحفظ الضبط ويُطبّق على التواريخ والأوقات الجديدة في جميع أقسام التطبيق. يعيد زر الوقت الافتراضي إلى ساعة التطبيق الأساسية دون تغيير ساعة الكمبيوتر." Style="{StaticResource HintStyle}" Margin="0,12,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="المظهر" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="اختر تصميم واجهة التطبيق." Style="{StaticResource HintStyle}" Margin="0,8,0,10"/>
+                        <ComboBox x:Name="InterfaceThemeComboBox"
+                                  Style="{StaticResource ComboBoxStyle}"
+                                  SelectionChanged="InterfaceThemeComboBox_SelectionChanged"
+                                  Margin="0,0,0,10">
+                            <ComboBoxItem Content="التصميم الجديد" Tag="Modern"/>
+                            <ComboBoxItem Content="التصميم الأصلي" Tag="Original"/>
+                        </ComboBox>
+                        <TextBlock Text="الوضع الداكن" Style="{StaticResource HintStyle}" Margin="0,0,0,8"/>
+                        <ToggleButton x:Name="ThemeToggle" Style="{StaticResource SettingsToggleSwitchStyle}" Checked="ThemeToggle_Checked" Unchecked="ThemeToggle_Unchecked" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="النسخ الاحتياطي" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="استعادة نسخة البيانات من Google Drive." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <Button x:Name="BtnRestoreDrive" Content="استعادة البيانات" Style="{StaticResource PrimaryButtonStyle}" Click="BtnRestoreDrive_Click" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="اسم المستخدم" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="غيّر الاسم المستخدم لتسجيل الدخول والظاهر في الشاشة الرئيسية." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <TextBox x:Name="TxtUsername" Style="{StaticResource InputBoxStyle}"/>
+                        <Button x:Name="BtnSaveUsername" Content="حفظ اسم المستخدم" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveUsername_Click" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="التحديثات" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="تحقق من توفر نسخة جديدة من التطبيق." Style="{StaticResource HintStyle}" Margin="0,8,0,16"/>
+                        <Button x:Name="BtnCheckForUpdates" Content="تفقد وجود نسخة جديدة" Style="{StaticResource PrimaryButtonStyle}" Click="BtnCheckForUpdates_Click" HorizontalAlignment="Left"/>
+                        <Button x:Name="BtnWhatsNew" Content="لمحة عن التحديث الجديد" Background="#16A34A" Foreground="White" Padding="16,9" BorderThickness="0" Cursor="Hand" Click="BtnWhatsNew_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.05*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="1.55*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <StackPanel>
+                        <TextBlock Text="سعر الصرف" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="القيمة المستخدمة لتحويل الدولار الأمريكي إلى الليرة السورية في الحسابات الجديدة." Style="{StaticResource HintStyle}" Margin="0,8,0,20"/>
+                        <Border Background="#142563EB" CornerRadius="12" Padding="14,12" Margin="0,0,0,18">
+                            <StackPanel>
+                                <TextBlock Text="سعر التحويل الحالي" Style="{StaticResource HintStyle}"/>
+                                <TextBlock x:Name="TxtCurrentExchangeRate" Text="—" FontSize="25" FontWeight="Bold" Foreground="#2563EB" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="1 USD يساوي" FontWeight="SemiBold" Margin="0,0,0,7"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtExchangeRate" Grid.Column="0" Style="{StaticResource InputBoxStyle}"/>
+                            <TextBlock Grid.Column="1" Text="ل.س" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </Grid>
+                        <Button x:Name="BtnSaveExchangeRate" Content="حفظ سعر الصرف" Style="{StaticResource PrimaryButtonStyle}" Click="BtnSaveExchangeRate_Click" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+                        <TextBlock Text="سيتم تحديث التبويبات المرتبطة تلقائياً بعد الحفظ." Style="{StaticResource HintStyle}" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="تكاليف العلاجات" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Grid.Row="1" Text="أضف الخدمات العلاجية وأسعارها لتظهر بسرعة عند تسجيل الزيارات." Style="{StaticResource HintStyle}" Margin="0,8,0,18"/>
+                        <Border Grid.Row="2" Background="#142563EB" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,14">
+                            <TextBlock Text="يجب أن يكون (سحب عصب) من ضمن المعالجات ويجب أن تكتب تماماً كما هي مكتوبة هنا لضمان ظهور خيار عدد الأقنية/أطوال الأقنية عند إضافة مريض واختيار سحب عصب من المعالجات."
+                                       Foreground="{DynamicResource AppTextPrimary}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                        <Grid Grid.Row="3">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="12"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="92"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtTreatmentName" Grid.Column="0" Style="{StaticResource InputBoxStyle}" ToolTip="اسم العلاج" Margin="0,0,10,0"/>
+                                <TextBox x:Name="TxtTreatmentCost" Grid.Column="1" Style="{StaticResource InputBoxStyle}" ToolTip="التكلفة" Margin="0,0,10,0"/>
+                                <ComboBox x:Name="CmbTreatmentCurrency" Grid.Column="2" Style="{StaticResource ComboBoxStyle}" Margin="0,0,10,0">
+                                    <ComboBoxItem Content="SYP"/>
+                                    <ComboBoxItem Content="USD"/>
+                                </ComboBox>
+                                <Button x:Name="BtnAddTreatment" Grid.Column="3" Content="إضافة" Style="{StaticResource PrimaryButtonStyle}" Click="BtnAddTreatment_Click"/>
+                                <Button x:Name="BtnCancelTreatmentEdit" Grid.Column="4" Content="إلغاء" Style="{StaticResource PrimaryButtonStyle}" Margin="8,0,0,0" Click="BtnCancelTreatmentEdit_Click" Visibility="Collapsed"/>
+                            </Grid>
+                            <Border Grid.Row="2" Background="{DynamicResource AppInputBg}" CornerRadius="10" Padding="12,8">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="TreatmentItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="9" Padding="12,9" Margin="0,0,0,7">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="105"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="40"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding TreatmentName}" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Cost, StringFormat={}{0:N0}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Currency}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                        <Button Grid.Column="3" Content="تعديل السعر" Padding="10,4" Margin="8,0,8,0" Style="{StaticResource PrimaryButtonStyle}" Tag="{Binding Id}" Click="BtnEditTreatment_Click"/>
+                                                        <Button Grid.Column="4" Style="{StaticResource DeleteButtonStyle}" Tag="{Binding Id}" Click="BtnDeleteTreatment_Click"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+            <TextBlock Text="تلميح: غيّر سعر الصرف عند الحاجة فقط؛ القيم المسجلة سابقاً تحتفظ بسعرها وقت الحفظ." Style="{StaticResource HintStyle}" Margin="4,0,0,0"/>
+
+            <Border Style="{StaticResource PanelCardStyle}" Padding="24" Margin="0,20,0,0">
+                <StackPanel>
+                    <TextBlock Text="تواصل مع المطور" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="إذا كان لديك أي اقتراحات أو استفسارات أو أخطاء في التطبيق يمكنك التواصل مع المطور على الواتس أب" Style="{StaticResource HintStyle}" Margin="0,8,0,14"/>
+                    <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                        <Button Style="{StaticResource PrimaryButtonStyle}" Click="BtnContactDeveloper_Click" Background="#25D366">
+                            <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight">
+                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                    <Canvas Width="24" Height="24">
+                                        <Path Fill="White" Data="M12,1 C5.93,1 1,5.93 1,12 C1,14.13 1.61,16.12 2.67,17.8 L1.5,23 L6.83,21.88 C8.4,22.74 10.16,23.2 12,23.2 C18.07,23.2 23,18.27 23,12.2 C23,6.13 18.07,1.2 12,1.2 Z M12,3.2 C16.97,3.2 21,7.23 21,12.2 C21,17.17 16.97,21.2 12,21.2 C10.34,21.2 8.75,20.75 7.38,19.91 L7,19.68 L4.25,20.26 L4.85,17.59 L4.6,17.2 C3.55,15.74 3,14.01 3,12.2 C3,7.23 7.03,3.2 12,3.2 Z"/>
+                                        <Path Fill="White" Data="M9.05,7.1 C8.78,6.5 8.49,6.49 8.23,6.48 C8.02,6.47 7.77,6.47 7.52,6.47 C7.27,6.47 6.86,6.56 6.51,6.94 C6.16,7.32 5.17,8.24 5.17,10.12 C5.17,12 6.54,13.82 6.73,14.07 C6.92,14.32 9.38,18.31 13.28,19.85 C16.52,21.13 17.18,20.88 17.88,20.82 C18.58,20.76 20.14,19.9 20.46,19 C20.78,18.1 20.78,17.33 20.68,17.17 C20.58,17.01 20.32,17.01 19.94,16.72 C19.56,16.53 17.68,15.61 17.33,15.48 C16.98,15.35 16.73,15.29 16.48,15.67 C16.23,16.05 15.52,16.88 15.3,17.13 C15.08,17.38 14.86,17.41 14.48,17.22 C14.1,17.03 12.88,16.61 11.43,15.31 C10.3,14.3 9.54,13.05 9.32,12.67 C9.1,12.29 9.3,12.14 9.49,11.95 C9.66,11.78 9.87,11.51 10.06,11.29 C10.25,11.07 10.31,10.91 10.44,10.66 C10.57,10.41 10.5,10.19 10.4,10 C10.3,9.81 9.56,7.93 9.21,7.18 Z"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <TextBlock Text="تواصل عبر واتساب" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="د.أحمد خليف  •  +963935606912" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

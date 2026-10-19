@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace MyClinic
@@ -74,7 +75,54 @@ namespace MyClinic
         {
             GlobalEvents.OnFinancialRecordAdded -= GlobalEvents_OnFinancialRecordAdded;
             GlobalEvents.OnFinancialRecordAdded += GlobalEvents_OnFinancialRecordAdded;
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplyThemeVisuals(IsDarkThemeActive());
+            SetRangeMode(_rangeMode);
             RefreshFinancialData();
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+            SetRangeMode(_rangeMode);
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (FinancialSpotlightCanvas is not null)
+                FinancialSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Financial_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || FinancialSpotlightCanvas is null || FinancialSpotlightTransform is null)
+                return;
+
+            if (FinancialSpotlightCanvas.Visibility != Visibility.Visible)
+                FinancialSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(FinancialRootGrid);
+            FinancialSpotlightTransform.X = pos.X - (FinancialSpotlightEllipse.Width / 2.0);
+            FinancialSpotlightTransform.Y = pos.Y - (FinancialSpotlightEllipse.Height / 2.0);
+        }
+
+        private void Financial_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (FinancialSpotlightTransform is not null)
+            {
+                FinancialSpotlightTransform.X = -1200;
+                FinancialSpotlightTransform.Y = -1200;
+            }
         }
 
         private void FinancialRecordsView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -88,6 +136,7 @@ namespace MyClinic
         private void FinancialRecordsView_Unloaded(object sender, RoutedEventArgs e)
         {
             GlobalEvents.OnFinancialRecordAdded -= GlobalEvents_OnFinancialRecordAdded;
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
         }
 
         private void GlobalEvents_OnFinancialRecordAdded()
@@ -612,9 +661,10 @@ namespace MyClinic
             TxtTotalIncome.Text = FormatMoney(totalIncome);
             TxtTotalExpenses.Text = FormatMoney(totalExpenses);
             TxtNetAmount.Text = FormatMoney(netAmount);
+            bool isDark = IsDarkThemeActive();
             TxtNetAmount.Foreground = netAmount < 0
-                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C81E1E"))
-                : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2447E4"));
+                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#F87171" : "#DC2626"))
+                : new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#2DD4BF" : "#2250DF"));
 
             TxtVisitCount.Text = filteredVisits.Count.ToString(CultureInfo.CurrentCulture);
             TxtIncomeFooterTotal.Text = FormatMoney(totalIncome);
@@ -667,18 +717,27 @@ namespace MyClinic
             ApplyFilters();
         }
 
-        private static void ApplyRangeButtonState(Button button, bool isActive)
+        private void ApplyRangeButtonState(Button button, bool isActive)
         {
-            button.Background = isActive
-                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFFFF"))
-                : Brushes.Transparent;
-            button.Foreground = isActive
-                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"))
-                : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6C82"));
-            button.BorderBrush = isActive
-                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9E5FF"))
-                : Brushes.Transparent;
-            button.BorderThickness = isActive ? new Thickness(1) : new Thickness(0);
+            bool isDark = IsDarkThemeActive();
+            if (isActive)
+            {
+                button.Background = Application.Current.Resources["DashActiveFilterBg"] as Brush
+                    ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#14B8A6" : "#3547B7"));
+                button.Foreground = Brushes.White;
+                button.BorderBrush = isDark
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5EEAD4"))
+                    : Brushes.Transparent;
+                button.BorderThickness = isDark ? new Thickness(1) : new Thickness(0);
+            }
+            else
+            {
+                button.Background = Brushes.Transparent;
+                button.Foreground = Application.Current.Resources["AppTextSecondary"] as Brush
+                    ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#64748B"));
+                button.BorderBrush = Brushes.Transparent;
+                button.BorderThickness = new Thickness(0);
+            }
         }
 
         private bool MatchesRange(DateTime recordDate, DateTime selectedDate)

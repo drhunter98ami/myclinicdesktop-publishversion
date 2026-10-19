@@ -4,41 +4,88 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:MyClinic"
              FlowDirection="RightToLeft"
-             Background="{DynamicResource AppWindowBg}"
+             Background="Transparent"
              FontFamily="Segoe UI"
              FontSize="14"
-             x:Name="Root">
+             x:Name="Root"
+             PreviewMouseMove="AddPatient_PreviewMouseMove"
+             MouseLeave="AddPatient_MouseLeave">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <Style TargetType="Border" x:Key="Card">
-            <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="20"/>
-            <Setter Property="Margin" Value="0,0,0,15"/>
+
+        <!-- شريط التمرير (ScrollBar) -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Vertical">
+                    <Setter Property="Width" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent" Margin="2,0,2,0">
+                                    <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                        <Track.Thumb>
+                                            <Thumb>
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border Background="{DynamicResource AppBorder}" CornerRadius="4"/>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
+        <!-- البطاقة الرئيسية للأقسام -->
+        <Style TargetType="Border" x:Key="Card">
+            <Setter Property="Background" Value="{DynamicResource VisitCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitCardBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="22"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <!-- عناوين الحقول -->
         <Style TargetType="TextBlock" x:Key="FormLabel">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="14"/>
         </Style>
 
+        <!-- حقول الإدخال النصية الحديثة -->
         <Style TargetType="TextBox" x:Key="ModernTextBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="CaretBrush" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSubCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSubCardBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="6" Background="{DynamicResource AppInputBg}">
+                        <Border x:Name="InputBorder"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Background="{TemplateBinding Background}">
                             <Grid>
-                                <TextBlock Text="{TemplateBinding Tag}" Foreground="{DynamicResource AppTextSecondary}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                <TextBlock Text="{TemplateBinding Tag}"
+                                           Foreground="{DynamicResource AppTextSecondary}"
+                                           Margin="12,0"
+                                           VerticalAlignment="Center"
+                                           IsHitTestVisible="False">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -53,18 +100,24 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <ScrollViewer x:Name="PART_ContentHost" Margin="5,0"/>
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="6,0"/>
                             </Grid>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
+        <!-- القوائم المنسدلة الحديثة -->
         <Style TargetType="ComboBox" x:Key="ModernComboBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSubCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSubCardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -72,27 +125,58 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton Name="ToggleButton" 
-                                          BorderBrush="{TemplateBinding BorderBrush}" 
-                                          Background="{TemplateBinding Background}" 
-                                          BorderThickness="{TemplateBinding BorderThickness}" 
-                                          Focusable="false" 
-                                          IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" 
+                            <ToggleButton Name="ToggleButton"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="false"
+                                          IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}"
                                           ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                                            <Path x:Name="Arrow" Fill="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0" Data="M0,0 L4,4 L8,0 Z"/>
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="10">
+                                            <Path x:Name="Arrow"
+                                                  Fill="{DynamicResource AppTextSecondary}"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Center"
+                                                  Margin="12,0"
+                                                  Data="M0,0 L4,4 L8,0 Z"/>
                                         </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <ContentPresenter Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="12,0,30,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-                            <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                                <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder" Background="{DynamicResource AppCardBg}" BorderThickness="1" BorderBrush="{DynamicResource AppBorder}" CornerRadius="6" Margin="0,4,0,0">
-                                        <ScrollViewer Margin="0,4" SnapsToDevicePixels="True">
-                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                            <ContentPresenter Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="12,0,30,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"/>
+                            <Popup Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid Name="DropDown"
+                                      SnapsToDevicePixels="True"
+                                      MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder"
+                                            Background="{DynamicResource VisitCardBg}"
+                                            BorderThickness="1"
+                                            BorderBrush="{DynamicResource VisitCardBorder}"
+                                            CornerRadius="10"
+                                            Margin="0,4,0,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="2" Opacity="0.22"/>
+                                        </Border.Effect>
+                                        <ScrollViewer Margin="4,6" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                         </ScrollViewer>
                                     </Border>
                                 </Grid>
@@ -104,20 +188,24 @@
         </Style>
 
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" CornerRadius="7" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" Margin="2,1">
                             <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
-                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DashCalendarTodayBg}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -125,18 +213,24 @@
             </Setter>
         </Style>
 
+        <!-- الأزرار الأساسية والثانوية المتوافقة مع الثيم -->
         <Style TargetType="Button" x:Key="PrimaryActionButton">
             <Setter Property="Height" Value="42"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="#2563EB"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="{DynamicResource VisitPrimaryBtnBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitPrimaryBtnBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="18,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -146,17 +240,21 @@
 
         <Style TargetType="Button" x:Key="SecondaryActionButton">
             <Setter Property="Height" Value="42"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
-            <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource VisitSecondaryBtnFg}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSecondaryBtnBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSecondaryBtnBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="18,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -165,10 +263,10 @@
         </Style>
 
         <Style TargetType="Border" x:Key="SoftSectionCard">
-            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSubCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSubCardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="CornerRadius" Value="14"/>
             <Setter Property="Padding" Value="14"/>
         </Style>
 
@@ -215,90 +313,192 @@
         <Style x:Key="ModalHeaderChipStyle" TargetType="Border">
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitModalChipBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitModalChipBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
         <Style x:Key="DetailSectionStyle" TargetType="Border">
-            <Setter Property="CornerRadius" Value="24"/>
-            <Setter Property="Padding" Value="24"/>
-            <Setter Property="Margin" Value="0,0,0,18"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Padding" Value="22"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="Background" Value="{DynamicResource VisitCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitCardBorder}"/>
         </Style>
 
         <Style x:Key="MetricCardStyle" TargetType="Border">
             <Setter Property="Width" Value="146"/>
             <Setter Property="Padding" Value="16,14"/>
             <Setter Property="Margin" Value="0,0,12,12"/>
-            <Setter Property="CornerRadius" Value="16"/>
-            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Background" Value="{DynamicResource VisitSubCardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource VisitSubCardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid x:Name="AddPatientRootGrid" ClipToBounds="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,0,0,1" Padding="20">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock Text="تسجيل زيارة جديدة" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center"/>
-                <Border Width="6" Height="26" Background="#2563EB" CornerRadius="3" Margin="15,0,0,0"/>
-            </StackPanel>
+        <!-- طبقة الإضاءة الخلفية التفاعلية للوضع الداكن (Behind Cards Spotlight) -->
+        <Canvas x:Name="AddPatientBackSpotlightCanvas"
+                Grid.RowSpan="3"
+                Panel.ZIndex="0"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <Ellipse x:Name="AddPatientBackSpotlight"
+                     Width="620"
+                     Height="620"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#4514B8A6" Offset="0.0"/>
+                        <GradientStop Color="#220EA5E9" Offset="0.42"/>
+                        <GradientStop Color="#0C2DD4BF" Offset="0.72"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="AddPatientBackSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
+
+        <!-- الترويسة العلوية المنسقة بنفس ثيم بطاقة الترحيب في الصور -->
+        <Border Grid.Row="0"
+                Panel.ZIndex="2"
+                Margin="0,0,0,14"
+                Padding="26,18"
+                CornerRadius="20"
+                Background="{DynamicResource VisitBannerBg}"
+                BorderBrush="{DynamicResource VisitBannerBorder}"
+                BorderThickness="1"
+                ClipToBounds="True">
+            <Grid>
+                <!-- رسمة السن المائية في الخلفية -->
+                <Viewbox Width="110"
+                         Height="110"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center"
+                         Margin="0,-10,220,-10"
+                         IsHitTestVisible="False">
+                    <Canvas Width="120" Height="120">
+                        <Path Stroke="{DynamicResource VisitBannerToothBrush}"
+                              StrokeThickness="5.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              Data="M60,24 C47,12 24,16 22,38 C20,56 30,68 33,88 C35,103 42,108 47,96 C51,85 55,78 60,78 C65,78 69,85 73,96 C78,108 85,103 87,88 C90,68 100,56 98,38 C96,16 73,12 60,24 Z"/>
+                        <Path Stroke="{DynamicResource VisitBannerToothBrush}"
+                              StrokeThickness="3.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Data="M43,36 C52,43 68,43 77,36"/>
+                    </Canvas>
+                </Viewbox>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="تسجيل زيارة جديدة"
+                                       FontSize="26"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource VisitBannerTitleFg}"
+                                       VerticalAlignment="Center"/>
+                            <!-- أيقونة النجوم في الوضع الداكن -->
+                            <Viewbox x:Name="IconBannerSparkles"
+                                     Width="24"
+                                     Height="24"
+                                     Margin="10,0,0,0"
+                                     VerticalAlignment="Center"
+                                     Visibility="Collapsed">
+                                <Canvas Width="32" Height="32">
+                                    <Path Stroke="#38BDF8" StrokeThickness="1.8" Fill="#2238BDF8" StrokeLineJoin="Round"
+                                          Data="M18,3 L20.5,11.5 L29,14 L20.5,16.5 L18,25 L15.5,16.5 L7,14 L15.5,11.5 Z"/>
+                                    <Path Stroke="#5EEAD4" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                          Data="M7,4 L8,7.5 L11.5,8.5 L8,9.5 L7,13 L6,9.5 L2.5,8.5 L6,7.5 Z"/>
+                                </Canvas>
+                            </Viewbox>
+                        </StackPanel>
+                        <TextBlock Text="أدخل البيانات الشخصية والسريرية والمالية، أو اختر مريضاً مسجلاً لاستعراض بطاقات زياراته السابقة."
+                                   Foreground="{DynamicResource VisitBannerSubFg}"
+                                   FontSize="13.5"
+                                   FontWeight="SemiBold"
+                                   Margin="0,5,0,0"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="حفظ وإنهاء الزيارة"
+                                Style="{StaticResource PrimaryActionButton}"
+                                Height="42"
+                                Margin="0,0,10,0"
+                                Click="BtnSaveVisit_Click"/>
+                        <Button Content="إلغاء"
+                                Style="{StaticResource SecondaryActionButton}"
+                                Height="42"
+                                Width="95"
+                                Click="BtnCancel_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </Border>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20">
+        <ScrollViewer Grid.Row="1" Panel.ZIndex="2" VerticalScrollBarVisibility="Auto" Padding="4,2,4,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                                                        <Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2.5*"/>
                     <ColumnDefinition Width="1.2*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ROW 0: Top Section (Side-by-Side Layout) -->
-                
+
                 <!-- Left Column (Clinical Data Top) -->
-                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,20,0" VerticalAlignment="Top">
-                    
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Top">
+
+                    <!-- اختيار العلاجات -->
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="اختيار العلاجات" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
-                            
-                             <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="اختيار العلاجات" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+
+                            <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="TreatmentItemsControl">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="{DynamicResource AppInputBg}" 
-                                                    BorderBrush="{DynamicResource AppBorder}" 
-                                                    BorderThickness="1" 
-                                                    CornerRadius="6" 
-                                                    Padding="12,8"
+                                            <Border Background="{DynamicResource VisitSubCardBg}"
+                                                    BorderBrush="{DynamicResource VisitSubCardBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="12"
+                                                    Padding="14,10"
                                                     Margin="0,0,0,8">
-                                                 <Grid>
-                                                     <Grid.RowDefinitions>
-                                                         <RowDefinition Height="Auto"/>
-                                                         <RowDefinition Height="Auto"/>
-                                                     </Grid.RowDefinitions>
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                        <ColumnDefinition Width="50"/>
+                                                        <ColumnDefinition Width="140"/>
                                                         <ColumnDefinition Width="80"/>
-                                                        <ColumnDefinition Width="60"/>
-                                                            <ColumnDefinition Width="150"/>
-                                                            <ColumnDefinition Width="80"/>
-                                                        </Grid.ColumnDefinitions>
+                                                    </Grid.ColumnDefinitions>
 
-                                                     <CheckBox Grid.Row="0" Grid.Column="0"
+                                                    <CheckBox Grid.Row="0" Grid.Column="0"
                                                               x:Name="ChkTreatment"
                                                               IsChecked="{Binding IsSelected}"
                                                               Checked="TreatmentCheckBox_Changed"
@@ -306,98 +506,144 @@
                                                               Margin="0,0,12,0"
                                                               VerticalAlignment="Center"/>
 
-                                                     <TextBlock Grid.Row="0" Grid.Column="1"
+                                                    <TextBlock Grid.Row="0" Grid.Column="1"
                                                                Text="{Binding TreatmentName}"
+                                                               FontWeight="SemiBold"
                                                                VerticalAlignment="Center"
                                                                Foreground="{DynamicResource AppTextPrimary}"/>
 
-                                                     <StackPanel Grid.Row="0" Grid.Column="2"
+                                                    <StackPanel Grid.Row="0" Grid.Column="2"
                                                                 Orientation="Horizontal"
                                                                 FlowDirection="LeftToRight"
                                                                 VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding Cost, StringFormat={}{0:N0}}"
-                                                                   Foreground="{DynamicResource AppTextSecondary}"/>
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
                                                         <TextBlock Text="{Binding CurrencySymbol}"
                                                                    Margin="4,0,0,0"
                                                                    Foreground="{DynamicResource AppTextSecondary}"/>
                                                     </StackPanel>
 
-                                                     <TextBlock Grid.Row="0" Grid.Column="3"
+                                                    <TextBlock Grid.Row="0" Grid.Column="3"
                                                                Text="×"
                                                                VerticalAlignment="Center"
                                                                HorizontalAlignment="Center"
                                                                Foreground="{DynamicResource AppTextSecondary}"
+                                                               FontWeight="Bold"
                                                                Margin="5,0"/>
 
-                                                      <TextBox Grid.Row="0" Grid.Column="5"
-                                                              x:Name="TxtQuantity"
-                                                                     Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
-                                                                     TextAlignment="Center"
-                                                                     Style="{StaticResource ModernTextBox}"
-                                                                     Height="32"
-                                                                     TextChanged="TreatmentQuantity_TextChanged"
-                                                                     IsEnabled="{Binding IsSelected}"
-                                                                     VerticalAlignment="Center"
-                                                                     GotKeyboardFocus="TextBox_GotKeyboardFocus"
-                                                                     PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
-                                                      <StackPanel Grid.Row="1" Grid.ColumnSpan="6" Margin="0,10,0,0">
-                                                         <TextBlock Text="تفاصيل العلاج لكل سن" Foreground="#2563EB" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                                                         <ItemsControl ItemsSource="{Binding ToothDetails}">
-                                                             <ItemsControl.ItemTemplate>
-                                                                 <DataTemplate>
-                                                                     <Border Background="{DynamicResource AppCardBg}" BorderBrush="#93C5FD" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,0,0,6">
-                                                                         <StackPanel>
-                                                                             <Grid HorizontalAlignment="Right">
-                                                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                                                                 <ComboBox Tag="{Binding}" ItemsSource="{Binding ToothOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
-                                                                                           SelectedItem="{Binding ToothId, UpdateSourceTrigger=PropertyChanged}"
-                                                                                           Style="{StaticResource ModernComboBox}" Height="32" Width="140"
-                                                                                           SelectionChanged="TreatmentTooth_SelectionChanged"
-                                                                                           DropDownClosed="TreatmentTooth_DropDownClosed"
-                                                                                           IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.IsSelected}"
-                                                                                           ToolTip="رقم السن">
-                                                                                     <ComboBox.ItemContainerStyle>
-                                                                                         <Style TargetType="ComboBoxItem">
-                                                                                             <Style.Triggers>
-                                                                                                 <DataTrigger Binding="{Binding Content, RelativeSource={RelativeSource Self}}" Value="— اختر السن —">
-                                                                                                     <Setter Property="IsEnabled" Value="False"/><Setter Property="Opacity" Value="0.55"/>
-                                                                                                 </DataTrigger>
-                                                                                             </Style.Triggers>
-                                                                                         </Style>
-                                                                                     </ComboBox.ItemContainerStyle>
-                                                                                 </ComboBox>
-                                                                                 <TextBlock Grid.Column="1" Text="رقم السن" Foreground="{DynamicResource AppTextSecondary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                                                                             </Grid>
-                                                                             <Grid Margin="0,8,0,4" HorizontalAlignment="Right" Visibility="{Binding IsRootCanal, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                                                                                 <TextBlock Text="عدد الأقنية" Foreground="{DynamicResource AppTextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                                                 <TextBox Grid.Column="1" Text="{Binding CanalCount, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ModernTextBox}" Height="30" Width="74" TextAlignment="Center" TextChanged="CanalCount_TextChanged" ToolTip="عدد الأقنية"/>
-                                                                             </Grid>
-                                                                             <ItemsControl ItemsSource="{Binding Canals}" Visibility="{Binding IsRootCanal, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                                                 <ItemsControl.ItemTemplate>
-                                                                                     <DataTemplate>
-                                                                                         <Grid Margin="0,2">
-                                                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
-                                                                                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsReadOnly}" Height="30" Margin="0,0,6,0" ToolTip="اسم القناة">
-                                                                                                 <TextBox.Style>
-                                                                                                     <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
-                                                                                                         <Style.Triggers><DataTrigger Binding="{Binding Name}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
-                                                                                                     </Style>
-                                                                                                 </TextBox.Style>
-                                                                                             </TextBox>
-                                                                                             <TextBox Grid.Column="1" Text="{Binding WorkingLength, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ModernTextBox}" Height="30" TextAlignment="Center" ToolTip="طول العمل بالميليمتر"/>
-                                                                                         </Grid>
-                                                                                     </DataTemplate>
-                                                                                 </ItemsControl.ItemTemplate>
-                                                                             </ItemsControl>
-                                                                         </StackPanel>
-                                                                     </Border>
-                                                                 </DataTemplate>
-                                                             </ItemsControl.ItemTemplate>
-                                                         </ItemsControl>
-                                                     </StackPanel>
-                                                 </Grid>
+                                                    <TextBox Grid.Row="0" Grid.Column="5"
+                                                             x:Name="TxtQuantity"
+                                                             Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                                             TextAlignment="Center"
+                                                             Style="{StaticResource ModernTextBox}"
+                                                             Height="34"
+                                                             TextChanged="TreatmentQuantity_TextChanged"
+                                                             IsEnabled="{Binding IsSelected}"
+                                                             VerticalAlignment="Center"
+                                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
+                                                             PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
+
+                                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="6" Margin="0,10,0,0">
+                                                        <TextBlock Text="تفاصيل العلاج لكل سن" Foreground="{DynamicResource DashCalendarTodayNumFg}" FontWeight="Bold" Margin="0,0,0,6"/>
+                                                        <ItemsControl ItemsSource="{Binding ToothDetails}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Background="{DynamicResource VisitAccentCardBg}"
+                                                                            BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="10"
+                                                                            Padding="10"
+                                                                            Margin="0,0,0,6">
+                                                                        <StackPanel>
+                                                                            <Grid HorizontalAlignment="Right">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="140"/>
+                                                                                    <ColumnDefinition Width="Auto"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <ComboBox Tag="{Binding}"
+                                                                                          ItemsSource="{Binding ToothOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                                                          SelectedItem="{Binding ToothId, UpdateSourceTrigger=PropertyChanged}"
+                                                                                          Style="{StaticResource ModernComboBox}"
+                                                                                          Height="34"
+                                                                                          Width="140"
+                                                                                          SelectionChanged="TreatmentTooth_SelectionChanged"
+                                                                                          DropDownClosed="TreatmentTooth_DropDownClosed"
+                                                                                          IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=ItemsControl}, Path=DataContext.IsSelected}"
+                                                                                          ToolTip="رقم السن">
+                                                                                    <ComboBox.ItemContainerStyle>
+                                                                                        <Style TargetType="ComboBoxItem">
+                                                                                            <Style.Triggers>
+                                                                                                <DataTrigger Binding="{Binding Content, RelativeSource={RelativeSource Self}}" Value="— اختر السن —">
+                                                                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                                                                    <Setter Property="Opacity" Value="0.55"/>
+                                                                                                </DataTrigger>
+                                                                                            </Style.Triggers>
+                                                                                        </Style>
+                                                                                    </ComboBox.ItemContainerStyle>
+                                                                                </ComboBox>
+                                                                                <TextBlock Grid.Column="1" Text="رقم السن" Foreground="{DynamicResource AppTextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                                                            </Grid>
+                                                                            <Grid Margin="0,8,0,4" HorizontalAlignment="Right" Visibility="{Binding IsRootCanal, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="Auto"/>
+                                                                                    <ColumnDefinition Width="74"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBlock Text="عدد الأقنية" Foreground="{DynamicResource AppTextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                                <TextBox Grid.Column="1"
+                                                                                         Text="{Binding CanalCount, UpdateSourceTrigger=PropertyChanged}"
+                                                                                         Style="{StaticResource ModernTextBox}"
+                                                                                         Height="32"
+                                                                                         Width="74"
+                                                                                         TextAlignment="Center"
+                                                                                         FontWeight="Bold"
+                                                                                         Foreground="{DynamicResource VisitGlowBoxFg}"
+                                                                                         Background="{DynamicResource VisitGlowBoxBg}"
+                                                                                         BorderBrush="{DynamicResource VisitGlowBoxBorder}"
+                                                                                         TextChanged="CanalCount_TextChanged"
+                                                                                         ToolTip="عدد الأقنية"/>
+                                                                            </Grid>
+                                                                            <ItemsControl ItemsSource="{Binding Canals}" Visibility="{Binding IsRootCanal, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                                                <ItemsControl.ItemTemplate>
+                                                                                    <DataTemplate>
+                                                                                        <Grid Margin="0,2">
+                                                                                            <Grid.ColumnDefinitions>
+                                                                                                <ColumnDefinition Width="70"/>
+                                                                                                <ColumnDefinition Width="110"/>
+                                                                                            </Grid.ColumnDefinitions>
+                                                                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                     IsReadOnly="{Binding IsReadOnly}"
+                                                                                                     Height="32"
+                                                                                                     Margin="0,0,6,0"
+                                                                                                     ToolTip="اسم القناة">
+                                                                                                <TextBox.Style>
+                                                                                                    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                                                                                                        <Style.Triggers>
+                                                                                                            <DataTrigger Binding="{Binding Name}" Value="">
+                                                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                                            </DataTrigger>
+                                                                                                        </Style.Triggers>
+                                                                                                    </Style>
+                                                                                                </TextBox.Style>
+                                                                                            </TextBox>
+                                                                                            <TextBox Grid.Column="1"
+                                                                                                     Text="{Binding WorkingLength, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                     Style="{StaticResource ModernTextBox}"
+                                                                                                     Height="32"
+                                                                                                     TextAlignment="Center"
+                                                                                                     ToolTip="طول العمل بالميليمتر"/>
+                                                                                        </Grid>
+                                                                                    </DataTemplate>
+                                                                                </ItemsControl.ItemTemplate>
+                                                                            </ItemsControl>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -406,6 +652,7 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- البيانات المالية -->
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <Grid>
@@ -414,22 +661,33 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <TextBlock Text="البيانات المالية" Foreground="{DynamicResource AppTextPrimary}" FontSize="18" FontWeight="Bold"/>
-                                    <TextBlock Text="تفاصيل الدفع والتكلفة" Foreground="{DynamicResource AppTextSecondary}" FontSize="14"/>
+                                    <TextBlock Text="تفاصيل الدفع والتكلفة" Foreground="{DynamicResource AppTextSecondary}" FontSize="13.5"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Margin="10,0">
                                     <TextBlock Text="التكلفة الحالية" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
-                                    <TextBox x:Name="TxtCurrentCost" Text="0" TextAlignment="Center" Style="{StaticResource ModernTextBox}" TextChanged="FinancialInput_TextChanged"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                    <TextBox x:Name="TxtCurrentCost"
+                                             Text="0"
+                                             TextAlignment="Center"
+                                             FontWeight="Bold"
+                                             Style="{StaticResource ModernTextBox}"
+                                             TextChanged="FinancialInput_TextChanged"
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
+
                                 <StackPanel Grid.Column="0" Margin="10,0">
                                     <TextBlock Text="دفعة اليوم" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
-                                    <TextBox x:Name="TxtTodayPaid" Text="0" TextAlignment="Center" Style="{StaticResource ModernTextBox}" TextChanged="FinancialInput_TextChanged"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                    <TextBox x:Name="TxtTodayPaid"
+                                             Text="0"
+                                             TextAlignment="Center"
+                                             FontWeight="Bold"
+                                             Style="{StaticResource ModernTextBox}"
+                                             TextChanged="FinancialInput_TextChanged"
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
                             </Grid>
@@ -441,34 +699,63 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="1" Margin="10,0">
                                     <TextBlock Text="متبقي الزيارة" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
-                                    <TextBox x:Name="TxtRemainingAmount" Text="0" TextAlignment="Center" Style="{StaticResource ModernTextBox}" Background="{DynamicResource AppInputBg}" IsReadOnly="True" Foreground="#16A34A" FontWeight="Bold"/>
+                                    <Border Background="{DynamicResource VisitGlowBoxBg}"
+                                            BorderBrush="{DynamicResource VisitGlowBoxBorder}"
+                                            BorderThickness="1.5"
+                                            CornerRadius="10">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#2DD4BF"
+                                                              BlurRadius="14"
+                                                              ShadowDepth="0"
+                                                              Opacity="{DynamicResource VisitGlowOpacity}"/>
+                                        </Border.Effect>
+                                        <TextBox x:Name="TxtRemainingAmount"
+                                                 Text="0"
+                                                 Height="42"
+                                                 TextAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 IsReadOnly="True"
+                                                 Foreground="{DynamicResource VisitGlowBoxFg}"
+                                                 FontSize="16"
+                                                 FontWeight="Bold"/>
+                                    </Border>
                                 </StackPanel>
                             </Grid>
 
-                            <Border x:Name="PatientFinancialHistoryPanel" Visibility="Collapsed" Margin="0,15,0,0" Padding="15" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="8">
+                            <Border x:Name="PatientFinancialHistoryPanel"
+                                    Visibility="Collapsed"
+                                    Margin="0,16,0,0"
+                                    Padding="16,12"
+                                    Background="{DynamicResource VisitAccentCardBg}"
+                                    BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="12">
                                 <Grid>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Text="السجل المالي التراكمي للمريض:" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                                        
+                                        <TextBlock Text="السجل المالي التراكمي للمريض:" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,15,0" VerticalAlignment="Center"/>
+
                                         <TextBlock Text="إجمالي التكلفة:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TxtTotalPatientCost" Text="0" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center" FontSize="15"/>
-                                        
+
                                         <TextBlock Text="إجمالي الدفعات:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TxtTotalPatientPaid" Text="0" FontWeight="Bold" Foreground="#16A34A" VerticalAlignment="Center" FontSize="15"/>
-                                        
+                                        <TextBlock x:Name="TxtTotalPatientPaid" Text="0" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center" FontSize="15"/>
+
                                         <TextBlock Text="إجمالي المتبقي:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TxtTotalPatientRemaining" Text="0" FontWeight="Bold" Foreground="#DC2626" VerticalAlignment="Center" FontSize="15"/>
+                                        <TextBlock x:Name="TxtTotalPatientRemaining" Text="0" FontWeight="Bold" Foreground="#EF4444" VerticalAlignment="Center" FontSize="15"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
+                    <!-- عادات التدخين -->
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="عادات التدخين" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
                             <CheckBox x:Name="ChkSmoker" Content="المريض مدخن" Margin="0,10,0,0" FlowDirection="RightToLeft" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" Checked="ChkSmoker_CheckedChanged" Unchecked="ChkSmoker_CheckedChanged"/>
-                            
+
                             <StackPanel x:Name="PanelSmokerDetails" Visibility="Collapsed" Margin="0,15,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -488,14 +775,15 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="CardFemaleDetails" Visibility="Collapsed" Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
+                    <!-- الصحة الإنجابية -->
+                    <Border x:Name="CardFemaleDetails" Visibility="Collapsed" Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="الصحة الإنجابية" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <CheckBox x:Name="ChkPregnant" Content="حامل" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,0" Checked="ChkPregnant_CheckedChanged" Unchecked="ChkPregnant_CheckedChanged"/>
                                 <CheckBox x:Name="ChkNursing" Content="مرضع" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="20,0,0,0"/>
                             </StackPanel>
-                            
+
                             <StackPanel x:Name="PanelPregnancyMonth" Visibility="Collapsed" Margin="0,15,0,0">
                                 <TextBlock Text="شهر الحمل" Style="{StaticResource FormLabel}"/>
                                 <ComboBox x:Name="CmbPregnancyMonth" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
@@ -513,31 +801,33 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- الحساسية والأمراض المزمنة -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}" Margin="0,0,10,15">
+                        <Border Grid.Column="0" Style="{StaticResource Card}" BorderBrush="{DynamicResource VisitWarningCardBorder}" Margin="0,0,8,16">
                             <StackPanel>
-                                <TextBlock Text="الحساسية والتحذيرات" FontSize="17" FontWeight="Bold" Foreground="#EF4444" HorizontalAlignment="Left"/>
-                                <TextBox x:Name="TxtAllergies" Height="NaN" MinHeight="60" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" Padding="10"/>
+                                <TextBlock Text="الحساسية والتحذيرات" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource VisitWarningFg}" HorizontalAlignment="Left"/>
+                                <TextBox x:Name="TxtAllergies" Height="NaN" MinHeight="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" Padding="10"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}" Margin="10,0,0,15">
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,16">
                             <StackPanel>
-                                <TextBlock Text="الأمراض المزمنة" FontSize="17" FontWeight="Bold" Foreground="#F97316" HorizontalAlignment="Left"/>
-                                <TextBox x:Name="TxtChronicDiseases" Height="NaN" MinHeight="60" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" Padding="10"/>
+                                <TextBlock Text="الأمراض المزمنة" FontSize="17" FontWeight="Bold" Foreground="#F59E0B" HorizontalAlignment="Left"/>
+                                <TextBox x:Name="TxtChronicDiseases" Height="NaN" MinHeight="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" Padding="10"/>
                             </StackPanel>
                         </Border>
                     </Grid>
 
-                    <Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
+                    <!-- العلامات الحيوية -->
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="العلامات الحيوية (Vital Signs)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                            
+                            <TextBlock Text="العلامات الحيوية (Vital Signs)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,18"/>
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -545,46 +835,46 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0" Margin="10,0">
+
+                                <StackPanel Grid.Column="0" Margin="8,0">
                                     <TextBlock Text="ضغط الدم (BP)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtBloodPressure" Tag="120/80" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
-                                
-                                <StackPanel Grid.Column="1" Margin="10,0">
+
+                                <StackPanel Grid.Column="1" Margin="8,0">
                                     <TextBlock Text="النبض (HR)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtHeartRate" Tag="72" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2" Margin="10,0">
+                                <StackPanel Grid.Column="2" Margin="8,0">
                                     <TextBlock Text="الحرارة (Temp)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtTemperature" Tag="37.0" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="3" Margin="10,0">
+                                <StackPanel Grid.Column="3" Margin="8,0">
                                     <TextBlock Text="التنفس (RR)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtRespiratoryRate" Tag="16" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Margin="0,20,0,0">
+                            <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0" Margin="10,0">
+
+                                <StackPanel Grid.Column="0" Margin="8,0">
                                     <TextBlock Text="الوزن (Weight)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtWeight" Tag="70" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="1" Margin="10,0">
+                                <StackPanel Grid.Column="1" Margin="8,0">
                                     <TextBlock Text="الطول (Height)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtHeight" Tag="170" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2" Margin="10,0">
+                                <StackPanel Grid.Column="2" Margin="8,0">
                                     <TextBlock Text="سكر الدم (Blood Sugar)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtBloodSugar" Tag="95" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
@@ -592,44 +882,57 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid Margin="0,0,0,15">
+                    <!-- شكوى المريض والتشخيص -->
+                    <Grid Margin="0,0,0,4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
+
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,8,0">
                             <StackPanel>
                                 <TextBlock Text="شكوى المريض" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
-                                <TextBox x:Name="TxtSymptoms" Height="NaN" MinHeight="80" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" VerticalContentAlignment="Top" Padding="10"/>
+                                <TextBox x:Name="TxtSymptoms" Height="NaN" MinHeight="82" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" VerticalContentAlignment="Top" Padding="10"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
                             <StackPanel>
                                 <TextBlock Text="التشخيص (Diagnosis)" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
-                                <TextBox x:Name="TxtDiagnosis" Height="NaN" MinHeight="80" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" VerticalContentAlignment="Top" Padding="10"/>
+                                <TextBox x:Name="TxtDiagnosis" Height="NaN" MinHeight="82" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,10,0,0" Style="{StaticResource ModernTextBox}" VerticalContentAlignment="Top" Padding="10"/>
                             </StackPanel>
                         </Border>
                     </Grid>
                 </StackPanel>
 
-                <!-- Right Column (Personal Data Sidebar Top) -->
+                <!-- Right Column (Personal Data Sidebar Top + Previous Visit Cards) -->
                 <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Top">
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="البيانات الشخصية" Foreground="{DynamicResource AppTextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center"/>
-                            <Separator Background="{DynamicResource AppBorder}" Margin="0,0,0,15"/>
+                            <TextBlock Text="البيانات الشخصية" Foreground="{DynamicResource AppTextPrimary}" FontSize="19" FontWeight="Bold" Margin="0,0,0,14" HorizontalAlignment="Center"/>
+                            <Border Height="1" Background="{DynamicResource VisitCardBorder}" Margin="0,0,0,15"/>
 
                             <TextBlock Text="رقم الهاتف *" Style="{StaticResource FormLabel}"/>
-                            <TextBox x:Name="TxtPhoneNumber" Style="{StaticResource ModernTextBox}" Margin="0,0,0,15"
+                            <TextBox x:Name="TxtPhoneNumber"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,15"
                                      TextChanged="PatientLookup_TextChanged"/>
 
                             <TextBlock Text="الاسم الثلاثي" Style="{StaticResource FormLabel}"/>
-                            <TextBox x:Name="TxtFullName" Style="{StaticResource ModernTextBox}" Margin="0,0,0,15"
+                            <TextBox x:Name="TxtFullName"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,15"
                                      TextChanged="PatientLookup_TextChanged"/>
 
-                            <Border x:Name="PatientSuggestionsPanel" Style="{StaticResource SoftSectionCard}" Margin="0,0,0,15" Visibility="Collapsed">
+                            <!-- مطابقات سابقة -->
+                            <Border x:Name="PatientSuggestionsPanel"
+                                    Background="{DynamicResource VisitAccentCardBg}"
+                                    BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Padding="14"
+                                    Margin="0,0,0,15"
+                                    Visibility="Collapsed">
                                 <StackPanel>
                                     <TextBlock Text="مطابقات سابقة" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     <TextBlock x:Name="TxtPatientSuggestionsHint" Text="اختر المريض المناسب لتعبئة البيانات تلقائياً." Margin="0,4,0,10" Foreground="{DynamicResource AppTextSecondary}"/>
@@ -639,7 +942,11 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Button Style="{StaticResource FlatCardButton}" Tag="{Binding}" Click="BtnApplyPatientSuggestion_Click" Margin="0,0,0,8">
-                                                        <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="10" Padding="12">
+                                                        <Border Background="{DynamicResource VisitCardBg}"
+                                                                BorderBrush="{DynamicResource VisitCardBorder}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="12"
+                                                                Padding="12">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>
                                                                     <ColumnDefinition Width="*"/>
@@ -652,8 +959,15 @@
                                                                     <TextBlock Text="{Binding MetaLine}" Margin="0,4,0,0" Foreground="{DynamicResource AppTextSecondary}" FontSize="12"/>
                                                                 </StackPanel>
 
-                                                                <Border Grid.Column="1" Background="#2563EB" CornerRadius="999" Padding="12,6" Margin="12,0,0,0" VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding MatchReason}" Foreground="White" FontWeight="SemiBold" FontSize="12"/>
+                                                                <Border Grid.Column="1"
+                                                                        Background="{DynamicResource VisitPrimaryBtnBg}"
+                                                                        BorderBrush="{DynamicResource VisitPrimaryBtnBorder}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="999"
+                                                                        Padding="12,5"
+                                                                        Margin="12,0,0,0"
+                                                                        VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding MatchReason}" Foreground="White" FontWeight="Bold" FontSize="12"/>
                                                                 </Border>
                                                             </Grid>
                                                         </Border>
@@ -670,13 +984,15 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                <StackPanel Grid.Column="0" Margin="0,0,6,0">
                                     <TextBlock Text="العمر" Style="{StaticResource FormLabel}"/>
-                                    <TextBox x:Name="TxtAge" Text="0" Style="{StaticResource ModernTextBox}"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                    <TextBox x:Name="TxtAge"
+                                             Text="0"
+                                             Style="{StaticResource ModernTextBox}"
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                <StackPanel Grid.Column="1" Margin="6,0,0,0">
                                     <TextBlock Text="الجنس" Style="{StaticResource FormLabel}"/>
                                     <ComboBox x:Name="CmbGender" Style="{StaticResource ModernComboBox}" SelectedIndex="0" SelectionChanged="CmbGender_SelectionChanged">
                                         <ComboBoxItem Content="ذكر"/>
@@ -698,17 +1014,24 @@
                                 <ComboBoxItem Content="AB-"/>
                             </ComboBox>
 
-                            <!-- Previous Visits Panel -->
+                            <!-- بطاقات الزيارات المسجلة (Previous Visits Panel & Visit Cards) -->
                             <Border x:Name="PreviousVisitsPanel"
-                                    Margin="0,15,0,0"
+                                    Margin="0,18,0,0"
                                     Padding="0"
-                                    Background="{DynamicResource AppInputBg}"
+                                    Background="{DynamicResource VisitSubCardBg}"
+                                    BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                    BorderThickness="1"
                                     CornerRadius="18"
-                                    BorderThickness="0"
+                                    ClipToBounds="True"
                                     Visibility="Collapsed">
-                                
+
                                 <StackPanel>
-                                    <Border CornerRadius="18,18,0,0" Padding="16,14,16,10" Background="{DynamicResource AppSidebarBg}">
+                                    <!-- رأس قائمة الزيارات بنفس ثيم بطاقة العداد والترحيب -->
+                                    <Border CornerRadius="17,17,0,0"
+                                            Padding="16,13"
+                                            Background="{DynamicResource VisitHistoryHeaderBg}"
+                                            BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                            BorderThickness="0,0,0,1">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -716,15 +1039,24 @@
                                             </Grid.ColumnDefinitions>
 
                                             <Border Grid.Column="0"
-                                                    MinWidth="28" Height="28"
-                                                    Padding="8,0"
-                                                    CornerRadius="8"
-                                                    Background="{DynamicResource AppSidebarHoverBg}">
+                                                    MinWidth="32"
+                                                    Height="30"
+                                                    Padding="9,0"
+                                                    CornerRadius="9"
+                                                    Background="{DynamicResource VisitGlowBoxBg}"
+                                                    BorderBrush="{DynamicResource VisitGlowBoxBorder}"
+                                                    BorderThickness="1.5">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="#2DD4BF"
+                                                                      BlurRadius="12"
+                                                                      ShadowDepth="0"
+                                                                      Opacity="{DynamicResource VisitGlowOpacity}"/>
+                                                </Border.Effect>
                                                 <TextBlock x:Name="TxtPreviousVisitsCount"
                                                            Text="0"
                                                            FontSize="14"
                                                            FontWeight="Bold"
-                                                           Foreground="White"
+                                                           Foreground="{DynamicResource VisitGlowBoxFg}"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"/>
                                             </Border>
@@ -732,20 +1064,21 @@
                                             <TextBlock Grid.Column="1"
                                                        x:Name="TxtPreviousVisitsHint"
                                                        Text="الزيارات المسجلة"
-                                                       FontSize="14"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="White"
+                                                       FontSize="13.5"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource VisitHistoryHeaderFg}"
                                                        HorizontalAlignment="Right"
                                                        VerticalAlignment="Center"
+                                                       TextWrapping="Wrap"
                                                        Margin="0,0,10,0"/>
                                         </Grid>
                                     </Border>
 
                                     <ListBox x:Name="ItemsPreviousVisits"
-                                             MaxHeight="320"
+                                             MaxHeight="340"
                                              Background="Transparent"
                                              BorderThickness="0"
-                                             Padding="10,8"
+                                             Padding="10,10"
                                              HorizontalContentAlignment="Stretch"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                              VirtualizingStackPanel.IsVirtualizing="True"
@@ -764,103 +1097,125 @@
                                         </ListBox.ItemContainerStyle>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                        <Button Style="{StaticResource VisitEntryButtonStyle}"
-                                                                Tag="{Binding}"
-                                                                Click="BtnOpenPreviousVisit_Click">
-                                                        <Border Margin="0,0,0,14"
-                                                        Padding="16"
-                                                        CornerRadius="14"
-                                                        Background="{DynamicResource AppCardBg}"
-                                                        BorderBrush="{DynamicResource AppBorder}"
-                                                        BorderThickness="1">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
+                                                <Button Style="{StaticResource VisitEntryButtonStyle}"
+                                                        Tag="{Binding}"
+                                                        Click="BtnOpenPreviousVisit_Click">
+                                                    <Border x:Name="VisitHistoryCardBorder"
+                                                            Margin="0,0,0,12"
+                                                            Padding="14,13"
+                                                            CornerRadius="14"
+                                                            Background="{DynamicResource VisitEntryCardBg}"
+                                                            BorderBrush="{DynamicResource VisitEntryCardBorder}"
+                                                            BorderThickness="1">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="6"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
 
-                                                            <Grid Grid.Row="0" FlowDirection="LeftToRight">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                </Grid.ColumnDefinitions>
+                                                            <!-- مؤشر جانبي أنيق مثل بطاقات المواعيد في الصور -->
+                                                            <Border Grid.Column="0"
+                                                                    Width="5"
+                                                                    CornerRadius="2.5"
+                                                                    Background="{DynamicResource VisitEntryPillIndicator}"
+                                                                    Margin="0,2,0,2"/>
 
-                                                                <TextBlock Grid.Column="0"
-                                                                           Text="{Binding VisitDateText}"
-                                                                           FontSize="15"
-                                                                           Foreground="{DynamicResource AppTextSecondary}"/>
+                                                            <Grid Grid.Column="1" Margin="10,0,0,0">
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
 
-                                                                <StackPanel Grid.Column="1"
-                                                                            Orientation="Horizontal"
-                                                                            HorizontalAlignment="Right"
-                                                                            FlowDirection="RightToLeft">
-                                                                    <TextBlock Text="&#xE8A5;"
-                                                                               FontFamily="Segoe MDL2 Assets"
-                                                                               FontSize="15"
-                                                                               Foreground="{DynamicResource AppTextSecondary}"
-                                                                               Margin="0,0,8,0">
-                                                                        <TextBlock.Style>
-                                                                            <Style TargetType="TextBlock">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding HasAttachments}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </TextBlock.Style>
-                                                                    </TextBlock>
-                                                                    <TextBlock Text="{Binding AttachmentLabel}"
-                                                                               FontSize="13"
-                                                                               Foreground="{DynamicResource AppTextSecondary}">
-                                                                        <TextBlock.Style>
-                                                                            <Style TargetType="TextBlock">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding HasAttachments}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </TextBlock.Style>
-                                                                    </TextBlock>
-                                                                </StackPanel>
-                                                            </Grid>
+                                                                <Grid Grid.Row="0" FlowDirection="LeftToRight">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
 
-                                                            <TextBlock Grid.Row="1"
-                                                                       Text="{Binding Title}"
-                                                                       FontFamily="Traditional Arabic"
-                                                                       FontSize="22"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="{DynamicResource AppTextPrimary}"
-                                                                       TextWrapping="Wrap"
-                                                                       TextAlignment="Right"
-                                                                       Margin="0,10,0,6"/>
+                                                                    <Border Grid.Column="0"
+                                                                            Background="{DynamicResource VisitCostPillBg}"
+                                                                            BorderBrush="{DynamicResource VisitCostPillBorder}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="7"
+                                                                            Padding="8,2">
+                                                                        <TextBlock Text="{Binding VisitDateText}"
+                                                                                   FontSize="12.5"
+                                                                                   FontWeight="Bold"
+                                                                                   Foreground="{DynamicResource VisitCostPillFg}"/>
+                                                                    </Border>
 
-                                                            <Grid Grid.Row="2">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                </Grid.ColumnDefinitions>
+                                                                    <StackPanel Grid.Column="1"
+                                                                                Orientation="Horizontal"
+                                                                                HorizontalAlignment="Right"
+                                                                                FlowDirection="RightToLeft">
+                                                                        <TextBlock Text="&#xE8A5;"
+                                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                                   FontSize="14"
+                                                                                   Foreground="{DynamicResource DashCalendarTodayNumFg}"
+                                                                                   Margin="0,0,6,0">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasAttachments}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                        <TextBlock Text="{Binding AttachmentLabel}"
+                                                                                   FontSize="12.5"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="{DynamicResource AppTextSecondary}">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasAttachments}" Value="True">
+                                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </StackPanel>
+                                                                </Grid>
 
-                                                                <TextBlock Grid.Column="0"
-                                                                           Text="&#xE76C;"
-                                                                           FontFamily="Segoe MDL2 Assets"
-                                                                           FontSize="13"
-                                                                           Foreground="{DynamicResource AppTextSecondary}"
-                                                                           VerticalAlignment="Center"/>
-
-                                                                <TextBlock Grid.Column="1"
-                                                                           Text="{Binding Details}"
-                                                                           FontSize="13"
-                                                                           Foreground="{DynamicResource AppTextSecondary}"
+                                                                <TextBlock Grid.Row="1"
+                                                                           Text="{Binding Title}"
+                                                                           FontFamily="Traditional Arabic"
+                                                                           FontSize="22"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{DynamicResource AppTextPrimary}"
                                                                            TextWrapping="Wrap"
-                                                                           TextAlignment="Right"/>
-                                                            </Grid>
+                                                                           TextAlignment="Right"
+                                                                           Margin="0,8,0,4"/>
 
-                                                    </Grid>
-                                                </Border>
+                                                                <Grid Grid.Row="2">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="&#xE76C;"
+                                                                               FontFamily="Segoe MDL2 Assets"
+                                                                               FontSize="12"
+                                                                               Foreground="{DynamicResource DashCalendarTodayNumFg}"
+                                                                               VerticalAlignment="Center"/>
+
+                                                                    <TextBlock Grid.Column="1"
+                                                                               Text="{Binding Details}"
+                                                                               FontSize="12.5"
+                                                                               Foreground="{DynamicResource AppTextSecondary}"
+                                                                               TextWrapping="Wrap"
+                                                                               TextAlignment="Right"/>
+                                                                </Grid>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
                                                 </Button>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
@@ -868,10 +1223,10 @@
 
                                     <TextBlock x:Name="EmptyPreviousVisitsText"
                                                Text="لا توجد زيارات محفوظة لهذا المريض حتى الآن."
-                                               FontSize="15"
+                                               FontSize="14"
                                                Foreground="{DynamicResource AppTextSecondary}"
                                                HorizontalAlignment="Center"
-                                               Margin="0,12,0,0"
+                                               Margin="0,12,0,14"
                                                Visibility="Collapsed"/>
                                 </StackPanel>
                             </Border>
@@ -879,25 +1234,46 @@
                     </Border>
                 </StackPanel>
 
-                <!-- ROW 1: Bottom Section (Spans across both columns safely underneath the above rows) -->
-                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,15,0,0" VerticalAlignment="Top">
-                    <StackPanel HorizontalAlignment="Stretch" Margin="0,0,0,15">
-                        <Border Background="{DynamicResource AppInputBg}" CornerRadius="20" Padding="5" HorizontalAlignment="Center" Margin="0,0,0,20">
+                <!-- ROW 1: Bottom Section (Dental Chart + Prescriptions + Attachments & Notes) -->
+                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,4,0,0" VerticalAlignment="Top">
+                    <StackPanel HorizontalAlignment="Stretch" Margin="0,0,0,16">
+                        <!-- مبدل مخطط الأسنان (بالغين / أطفال) -->
+                        <Border Background="{DynamicResource VisitSubCardBg}"
+                                BorderBrush="{DynamicResource VisitSubCardBorder}"
+                                BorderThickness="1"
+                                CornerRadius="14"
+                                Padding="4"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16">
                             <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnAdult" Content="بالغين" Width="100" Height="40" Background="{DynamicResource AppCardBg}" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}" FontWeight="Bold" Click="BtnAdult_Click">
+                                <Button x:Name="BtnAdult"
+                                        Content="بالغين"
+                                        Width="105"
+                                        Height="38"
+                                        BorderThickness="0"
+                                        FontWeight="Bold"
+                                        Cursor="Hand"
+                                        Click="BtnAdult_Click">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" CornerRadius="15">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="10">
                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
-                                
-                                <Button x:Name="BtnChild" Content="أطفال" Width="100" Height="40" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextSecondary}" FontWeight="Bold" Click="BtnChild_Click">
+
+                                <Button x:Name="BtnChild"
+                                        Content="أطفال"
+                                        Width="105"
+                                        Height="38"
+                                        BorderThickness="0"
+                                        FontWeight="Bold"
+                                        Cursor="Hand"
+                                        Click="BtnChild_Click">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" CornerRadius="15">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="10">
                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                         </ControlTemplate>
@@ -905,8 +1281,8 @@
                                 </Button>
                             </StackPanel>
                         </Border>
-                        
-                        <Border Style="{StaticResource Card}" Margin="0" MinHeight="450" HorizontalAlignment="Stretch">
+
+                        <Border Style="{StaticResource Card}" Margin="0" MinHeight="430" HorizontalAlignment="Stretch">
                             <Grid>
                                 <local:AdultDentalChart x:Name="AdultChartControl" Visibility="Visible"/>
                                 <local:ChildrenDentalChart x:Name="ChildChartControl" Visibility="Collapsed"/>
@@ -914,18 +1290,24 @@
                         </Border>
                     </StackPanel>
 
-                    <Grid Margin="0,0,0,15">
+                    <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1.15*"/>
                             <ColumnDefinition Width="1*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Prescriptions Full Space Left -->
-                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                            <Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}" Margin="0">
+                        <!-- الوصفة الطبية -->
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <Border Style="{StaticResource Card}" Margin="0">
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,15">
-                                        <Border Width="38" Height="38" CornerRadius="10" Background="#2563EB" DockPanel.Dock="Right">
+                                        <Border Width="40"
+                                                Height="40"
+                                                CornerRadius="12"
+                                                Background="{DynamicResource VisitGlowBoxBg}"
+                                                BorderBrush="{DynamicResource VisitGlowBoxBorder}"
+                                                BorderThickness="1"
+                                                DockPanel.Dock="Right">
                                             <TextBlock Text="🧾" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <StackPanel Margin="0,0,12,0">
@@ -935,13 +1317,12 @@
                                     </DockPanel>
 
                                     <TextBlock Text="اسم الدواء" Style="{StaticResource FormLabel}"/>
-                                    <!-- Autofill implementation -->
                                     <Grid Margin="0,0,0,12">
                                         <TextBox x:Name="TxtPrescriptionMedicine" Tag="ابحث عن دواء أو اكتب دواء جديد..." Style="{StaticResource ModernTextBox}" TextChanged="TxtPrescriptionMedicine_TextChanged"/>
                                         <Popup x:Name="PopupMedicineSuggestions" PlacementTarget="{Binding ElementName=TxtPrescriptionMedicine}" Placement="Bottom" AllowsTransparency="True" IsOpen="False" StaysOpen="False" MaxHeight="200">
-                                            <Border Background="{DynamicResource AppCardBg}" BorderThickness="1" BorderBrush="{DynamicResource AppBorder}" CornerRadius="6" Margin="0,4,0,0" Width="{Binding ElementName=TxtPrescriptionMedicine, Path=ActualWidth}">
+                                            <Border Background="{DynamicResource VisitCardBg}" BorderThickness="1" BorderBrush="{DynamicResource VisitCardBorder}" CornerRadius="10" Margin="0,4,0,0" Width="{Binding ElementName=TxtPrescriptionMedicine, Path=ActualWidth}">
                                                 <Border.Effect>
-                                                    <DropShadowEffect Color="#1A000000" BlurRadius="10" ShadowDepth="4"/>
+                                                    <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.22"/>
                                                 </Border.Effect>
                                                 <ListBox x:Name="LstMedicineSuggestions" Background="Transparent" BorderThickness="0" SelectionChanged="LstMedicineSuggestions_SelectionChanged" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                                     <ListBox.ItemTemplate>
@@ -976,7 +1357,6 @@
                                     </Grid>
 
                                     <TextBlock Text="آخر وصفات سريعة (سجل تلقائي)" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,0,8"/>
-                                    <!-- Dynamic wrap panel of recent medicines -->
                                     <ItemsControl x:Name="ItemsRecentMedicines" Margin="0,0,0,12">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -986,8 +1366,12 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Style="{StaticResource FlatCardButton}" Click="BtnRecentMedicine_Click" Tag="{Binding}" Margin="0,0,8,8">
-                                                    <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="14" Padding="12,6">
-                                                        <TextBlock Text="{Binding}" Foreground="{DynamicResource AppTextPrimary}"/>
+                                                    <Border Background="{DynamicResource VisitTreatmentPillBg}"
+                                                            BorderBrush="{DynamicResource VisitTreatmentPillBorder}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="12"
+                                                            Padding="12,5">
+                                                        <TextBlock Text="{Binding}" FontWeight="SemiBold" Foreground="{DynamicResource VisitTreatmentPillFg}"/>
                                                     </Border>
                                                 </Button>
                                             </DataTemplate>
@@ -1039,8 +1423,8 @@
                                     <TextBlock Text="عناصر الوصفة" Style="{StaticResource FormLabel}"/>
                                     <ListBox x:Name="LstPrescriptionEntries"
                                              MinHeight="120"
-                                             Background="{DynamicResource AppCardBg}"
-                                             BorderBrush="{DynamicResource AppBorder}"
+                                             Background="{DynamicResource VisitSubCardBg}"
+                                             BorderBrush="{DynamicResource VisitSubCardBorder}"
                                              BorderThickness="1"
                                              Foreground="{DynamicResource AppTextPrimary}"
                                              Padding="6"/>
@@ -1048,22 +1432,26 @@
                             </Border>
                         </StackPanel>
 
-                        <!-- Attachments & Notes Full Space Right -->
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                        <!-- المرفقات والملاحظات -->
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="صور الزيارة" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     <TextBlock Text="يمكنك إرفاق حتى 5 صور للملفات أو الأشعة أو المرفقات السريرية" Foreground="{DynamicResource AppTextSecondary}" Margin="0,6,0,15"/>
 
-                                    <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="18">
+                                    <Border Background="{DynamicResource VisitAccentCardBg}"
+                                            BorderBrush="{DynamicResource VisitAccentCardBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="14"
+                                            Padding="18">
                                         <Grid>
-                                            <Rectangle Stroke="{DynamicResource AppTextSecondary}"
+                                            <Rectangle Stroke="{DynamicResource DashCalendarTodayBorder}"
                                                        StrokeThickness="1.5"
                                                        StrokeDashArray="5 4"
                                                        RadiusX="10"
                                                        RadiusY="10"/>
                                             <StackPanel Margin="12" HorizontalAlignment="Center">
-                                                <TextBlock Text="اضغط لاختيار الصور من الجهاز" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,8,0,8"/>
+                                                <TextBlock Text="اضغط لاختيار الصور من الجهاز" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,8,0,8"/>
                                                 <TextBlock x:Name="TxtImageSelectionHint" Text="لا توجد صور محددة بعد" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                                     <Button Content="اختيار الصور" Style="{StaticResource PrimaryActionButton}" Width="130" Click="BtnSelectImages_Click"/>
@@ -1076,8 +1464,8 @@
                                     <TextBlock Text="الصور المحددة" Style="{StaticResource FormLabel}" Margin="0,15,0,8"/>
                                     <ListBox x:Name="LstSelectedImages"
                                              MinHeight="120"
-                                             Background="{DynamicResource AppCardBg}"
-                                             BorderBrush="{DynamicResource AppBorder}"
+                                             Background="{DynamicResource VisitSubCardBg}"
+                                             BorderBrush="{DynamicResource VisitSubCardBorder}"
                                              BorderThickness="1"
                                              Foreground="{DynamicResource AppTextPrimary}"
                                              Padding="6"/>
@@ -1105,32 +1493,77 @@
             </Grid>
         </ScrollViewer>
 
-        <Border Grid.Row="2" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,1,0,0" Padding="20">
+        <!-- الشريط السفلي لحفظ الزيارة -->
+        <Border Grid.Row="2"
+                Panel.ZIndex="2"
+                Margin="0,10,0,0"
+                CornerRadius="18"
+                Background="{DynamicResource VisitCardBg}"
+                BorderBrush="{DynamicResource VisitCardBorder}"
+                BorderThickness="1"
+                Padding="20,14">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button x:Name="BtnSaveVisit" Content="حفظ وإنهاء الزيارة" Width="150" Height="45" Background="#2563EB" Foreground="White" FontWeight="Bold" FontSize="16" Cursor="Hand" Margin="0,0,10,0" Click="BtnSaveVisit_Click">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="6">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-                
-                <Button Content="إلغاء" Width="100" Height="45" Style="{StaticResource SecondaryActionButton}" FontSize="16" Click="BtnCancel_Click"/>
+                <Button x:Name="BtnSaveVisit"
+                        Content="حفظ وإنهاء الزيارة"
+                        Width="165"
+                        Height="44"
+                        Style="{StaticResource PrimaryActionButton}"
+                        FontSize="15.5"
+                        Margin="0,0,10,0"
+                        Click="BtnSaveVisit_Click"/>
+
+                <Button Content="إلغاء"
+                        Width="105"
+                        Height="44"
+                        Style="{StaticResource SecondaryActionButton}"
+                        FontSize="15.5"
+                        Click="BtnCancel_Click"/>
             </StackPanel>
         </Border>
 
-        <!-- Fully Rebuilt Visit Details Modal matched to PatientRecordsView style -->
-        <Grid x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
-            <Border x:Name="VisitDetailsDimmer" Background="#A3000000" MouseLeftButtonDown="VisitDetailsDimmer_MouseLeftButtonDown"/>
+        <!-- طبقة الإضاءة السطحية التفاعلية للوضع الداكن (Surface Cursor Spotlight) -->
+        <Canvas x:Name="AddPatientSurfaceSpotlightCanvas"
+                Grid.RowSpan="3"
+                Panel.ZIndex="10"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <Ellipse x:Name="AddPatientSurfaceSpotlight"
+                     Width="440"
+                     Height="440"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#222DD4BF" Offset="0.0"/>
+                        <GradientStop Color="#1238BDF8" Offset="0.45"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="AddPatientSurfaceSpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
 
-            <Border x:Name="VisitDetailsModal" Width="760" MaxHeight="900" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource AppWindowBg}" CornerRadius="28" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">
+        <!-- بطاقة تفاصيل الزيارة الطبية (Visit Card Modal) المنسقة بالكامل مع الثيم الفاتح والداكن -->
+        <Grid x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
+            <Border x:Name="VisitDetailsDimmer" Background="#B006121A" MouseLeftButtonDown="VisitDetailsDimmer_MouseLeftButtonDown"/>
+
+            <Border x:Name="VisitDetailsModal"
+                    Width="780"
+                    MaxHeight="900"
+                    Margin="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource VisitModalOuterBg}"
+                    CornerRadius="26"
+                    BorderBrush="{DynamicResource VisitModalOuterBorder}"
+                    BorderThickness="1.2"
+                    ClipToBounds="True">
                 <Border.RenderTransform>
-                    <TranslateTransform x:Name="VisitDetailsTranslate" Y="24"/>
+                    <TranslateTransform x:Name="VisitDetailsTranslate" Y="0"/>
                 </Border.RenderTransform>
                 <Border.Effect>
-                    <DropShadowEffect Color="#26000000" BlurRadius="36" ShadowDepth="10" Opacity="0.28"/>
+                    <DropShadowEffect Color="#000000" BlurRadius="40" ShadowDepth="10" Opacity="0.35"/>
                 </Border.Effect>
 
                 <Grid FlowDirection="RightToLeft">
@@ -1140,62 +1573,117 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0" Margin="28,18,28,12" FlowDirection="LeftToRight">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                    <!-- ترويسة بطاقة الزيارة بنفس ثيم بطاقة الترحيب -->
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource VisitBannerBg}"
+                            BorderBrush="{DynamicResource VisitBannerBorder}"
+                            BorderThickness="0,0,0,1"
+                            Padding="28,20,28,18">
+                        <Grid FlowDirection="LeftToRight">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0" Width="34" Height="34" Background="Transparent" BorderThickness="0" Cursor="Hand" Click="CloseVisitDetails_Click">
-                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Button>
+                            <Button Grid.Column="0"
+                                    Width="36"
+                                    Height="36"
+                                    Background="{DynamicResource VisitModalChipBg}"
+                                    BorderBrush="{DynamicResource VisitModalChipBorder}"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    VerticalAlignment="Top"
+                                    Click="CloseVisitDetails_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="12">
+                                            <TextBlock Text="&#xE711;"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       FontSize="15"
+                                                       Foreground="{DynamicResource VisitBannerTitleFg}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
 
-                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Border Width="52" Height="52" CornerRadius="16" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Margin="0,0,14,0">
-                                    <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="#2563EB" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <StackPanel>
-                                    <TextBlock Text="تفاصيل الزيارة الطبية" FontFamily="Traditional Arabic" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
-                                    <TextBlock Text="{Binding PatientName}" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right" Margin="0,-8,0,0"/>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Border Width="52"
+                                            Height="52"
+                                            CornerRadius="16"
+                                            Background="{DynamicResource VisitGlowBoxBg}"
+                                            BorderBrush="{DynamicResource VisitGlowBoxBorder}"
+                                            BorderThickness="1.5"
+                                            Margin="0,0,14,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#2DD4BF"
+                                                              BlurRadius="14"
+                                                              ShadowDepth="0"
+                                                              Opacity="{DynamicResource VisitGlowOpacity}"/>
+                                        </Border.Effect>
+                                        <TextBlock Text="&#xE8A5;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="22"
+                                                   Foreground="{DynamicResource VisitGlowBoxFg}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel>
+                                        <TextBlock Text="تفاصيل الزيارة الطبية"
+                                                   FontFamily="Traditional Arabic"
+                                                   FontSize="34"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource VisitBannerTitleFg}"
+                                                   HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{Binding PatientName}"
+                                                   FontSize="15.5"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource VisitBannerSubFg}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,-6,0,0"/>
+                                    </StackPanel>
                                 </StackPanel>
+
+                                <Grid HorizontalAlignment="Right" Margin="0,16,0,0" FlowDirection="LeftToRight">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Style="{StaticResource ModalHeaderChipStyle}">
+                                        <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
+                                            <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource VisitGlowBoxFg}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding VisitDateTimeText}" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource VisitBannerTitleFg}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Style="{StaticResource ModalHeaderChipStyle}">
+                                        <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
+                                            <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource VisitGlowBoxFg}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding DoctorName, FallbackValue='طبيب العيادة'}" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource VisitBannerTitleFg}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
                             </StackPanel>
+                        </Grid>
+                    </Border>
 
-                            <Grid HorizontalAlignment="Right" Margin="0,18,0,0" FlowDirection="LeftToRight">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource ModalHeaderChipStyle}">
-                                    <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
-                                        <TextBlock Text="&#xE823;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#0EA5A8" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding VisitDateTimeText}" FontSize="14" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Grid.Column="2" Style="{StaticResource ModalHeaderChipStyle}">
-                                    <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
-                                        <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#2563EB" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding DoctorName, FallbackValue='طبيب العيادة'}" FontSize="14" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </StackPanel>
-                    </Grid>
-
-                    <Border Grid.Row="0" Height="1" Background="{DynamicResource AppBorder}" VerticalAlignment="Bottom"/>
-
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="28,20,28,6">
+                    <!-- محتوى بطاقة الزيارة -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,20,24,8">
                         <StackPanel>
-                            
-                            <!-- Patient Information Section -->
+
+                            <!-- معلومات المريض عند وقت الزيارة -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#7C3AED" Margin="0,0,10,0"/>
-                                        <TextBlock Text="معلومات المريض عند وقت الزيارة" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#7C3AED"/>
+                                        <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="معلومات المريض عند وقت الزيارة" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
 
                                     <Grid Margin="0,0,0,12">
@@ -1207,24 +1695,24 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="16" Padding="16">
+                                        <Border Grid.Column="0" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="16">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock Text="زمرة الدم" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding BloodTypeText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0"/>
+                                                <TextBlock Text="زمرة الدم" FontSize="13.5" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding BloodTypeText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}" HorizontalAlignment="Right" Margin="0,6,0,0"/>
                                             </StackPanel>
                                         </Border>
 
-                                        <Border Grid.Column="2" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="16" Padding="16">
+                                        <Border Grid.Column="2" Background="{DynamicResource VisitWarningCardBg}" BorderBrush="{DynamicResource VisitWarningCardBorder}" BorderThickness="1" CornerRadius="14" Padding="16">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock Text="الحساسية" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding AllergiesText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="الحساسية" FontSize="13.5" Foreground="{DynamicResource VisitWarningFg}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding AllergiesText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
 
-                                        <Border Grid.Column="4" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="16" Padding="16">
+                                        <Border Grid.Column="4" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="16">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock Text="الأمراض المزمنة" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding ChronicDiseasesText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="الأمراض المزمنة" FontSize="13.5" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding ChronicDiseasesText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
@@ -1236,29 +1724,29 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="16" Padding="16">
+                                        <Border Grid.Column="0" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="16">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock Text="عادات التدخين" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding SmokingText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="عادات التدخين" FontSize="13.5" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding SmokingText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
 
-                                        <Border Grid.Column="2" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="16" Padding="16">
+                                        <Border Grid.Column="2" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="16">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock Text="الحمل والرضاعة" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding PregnancyText}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="الحمل والرضاعة" FontSize="13.5" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding PregnancyText}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Vital Signs Section -->
+                            <!-- العلامات الحيوية -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE81E;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#16A34A" Margin="0,0,10,0"/>
-                                        <TextBlock Text="العلامات الحيوية" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#16A34A"/>
+                                        <TextBlock Text="&#xE81E;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="العلامات الحيوية" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
 
                                     <WrapPanel FlowDirection="RightToLeft">
@@ -1296,7 +1784,7 @@
                                             <StackPanel>
                                                 <TextBlock Text="الطول / BMI" Foreground="{DynamicResource AppTextSecondary}" FontSize="13"/>
                                                 <TextBlock Text="{Binding HeightText}" FontWeight="Bold" FontSize="18" Foreground="{DynamicResource AppTextPrimary}" Margin="0,4,0,0"/>
-                                                <TextBlock Text="{Binding BmiText}" Foreground="#2563EB" FontSize="13" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding BmiText}" Foreground="{DynamicResource DashCalendarTodayNumFg}" FontWeight="Bold" FontSize="13" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Border>
                                         <Border Style="{StaticResource MetricCardStyle}">
@@ -1309,12 +1797,12 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Symptoms and Diagnosis Section -->
+                            <!-- شكوى المريض والتشخيص -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#DC2626" Margin="0,0,10,0"/>
-                                        <TextBlock Text="شكوى المريض والتشخيص" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#DC2626"/>
+                                        <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="شكوى المريض والتشخيص" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1322,59 +1810,70 @@
                                             <ColumnDefinition Width="12"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="شكوى المريض" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                            <TextBlock Text="{Binding SymptomsText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="التشخيص" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                            <TextBlock Text="{Binding DiagnosisText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap"/>
-                                        </StackPanel>
+                                        <Border Grid.Column="0" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="14">
+                                            <StackPanel>
+                                                <TextBlock Text="شكوى المريض" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
+                                                <TextBlock Text="{Binding SymptomsText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="2" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="14">
+                                            <StackPanel>
+                                                <TextBlock Text="التشخيص" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
+                                                <TextBlock Text="{Binding DiagnosisText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
                                     </Grid>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Treatment Plan Section -->
+                            <!-- خطة العلاج وملاحظات -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#0284C7" Margin="0,0,10,0"/>
-                                        <TextBlock Text="خطة العلاج وملاحظات" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#0284C7"/>
+                                        <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="خطة العلاج وملاحظات" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
-                                    <StackPanel>
-                                        <TextBlock Text="خطة العلاج" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                        <TextBlock Text="{Binding TreatmentPlanText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap"/>
+                                    <Border Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="14" Padding="14">
+                                        <StackPanel>
+                                            <TextBlock Text="خطة العلاج" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
+                                            <TextBlock Text="{Binding TreatmentPlanText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
 
-                                        <StackPanel Margin="0,18,0,0">
-                                            <StackPanel.Style>
-                                                <Style TargetType="StackPanel">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HasFinalTreatment}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </StackPanel.Style>
-                                            <TextBlock Text="الإجراء النهائي" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Right"/>
-                                            <TextBlock Text="{Binding FinalTreatmentText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap" TextAlignment="Right"/>
+                                            <StackPanel Margin="0,14,0,0">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasFinalTreatment}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+                                                <TextBlock Text="الإجراء النهائي" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding FinalTreatmentText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" TextAlignment="Right"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                    </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Selected Treatments Section -->
+                            <!-- العلاجات المحددة (بنفس ألوان شارات التقويم في الصور) -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#0EA5A8" Margin="0,0,10,0"/>
+                                        <TextBlock Text="&#xE8CB;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="العلاجات المحددة" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
 
                                     <ItemsControl ItemsSource="{Binding SelectedTreatments}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Margin="0,0,0,8" Padding="16,12" CornerRadius="14" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">
+                                                <Border Margin="0,0,0,10"
+                                                        Padding="16,12"
+                                                        CornerRadius="14"
+                                                        Background="{DynamicResource VisitSubCardBg}"
+                                                        BorderBrush="{DynamicResource VisitSubCardBorder}"
+                                                        BorderThickness="1">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*"/>
@@ -1383,18 +1882,41 @@
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel Grid.Column="0">
                                                             <TextBlock Text="{Binding TreatmentName}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right"/>
-                                                            <Border Background="#E0F2FE" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,6,0,0">
-                                                                <TextBlock Text="{Binding DetailsDisplay}" FontSize="14" FontWeight="SemiBold" Foreground="#075985" TextWrapping="Wrap" TextAlignment="Right"/>
+                                                            <Border Background="{DynamicResource VisitTreatmentPillBg}"
+                                                                    BorderBrush="{DynamicResource VisitTreatmentPillBorder}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="9"
+                                                                    Padding="10,7"
+                                                                    Margin="0,6,0,0">
+                                                                <TextBlock Text="{Binding DetailsDisplay}"
+                                                                           FontSize="13.5"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{DynamicResource VisitTreatmentPillFg}"
+                                                                           TextWrapping="Wrap"
+                                                                           TextAlignment="Right"/>
                                                             </Border>
                                                         </StackPanel>
-                                                        <Border Grid.Column="1" Padding="12,6" CornerRadius="10" Background="#DBEAFE" BorderBrush="#93C5FD" BorderThickness="1" Margin="0,0,12,0" VerticalAlignment="Center">
-                                                            <TextBlock FontSize="14" Foreground="#0369A1">
+                                                        <Border Grid.Column="1"
+                                                                Padding="12,6"
+                                                                CornerRadius="10"
+                                                                Background="{DynamicResource VisitQtyPillBg}"
+                                                                BorderBrush="{DynamicResource VisitQtyPillBorder}"
+                                                                BorderThickness="1"
+                                                                Margin="10,0,10,0"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock FontSize="14" FontWeight="Bold" Foreground="{DynamicResource VisitQtyPillFg}">
                                                                 <Run Text="×"/>
                                                                 <Run Text="{Binding Quantity}"/>
                                                             </TextBlock>
                                                         </Border>
-                                                        <Border Grid.Column="2" Padding="10,4" CornerRadius="8" Background="#F0FDF4" VerticalAlignment="Center">
-                                                            <TextBlock FontSize="14" Foreground="#15803D" FontWeight="SemiBold">
+                                                        <Border Grid.Column="2"
+                                                                Padding="12,6"
+                                                                CornerRadius="10"
+                                                                Background="{DynamicResource VisitCostPillBg}"
+                                                                BorderBrush="{DynamicResource VisitCostPillBorder}"
+                                                                BorderThickness="1"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock FontSize="14" Foreground="{DynamicResource VisitCostPillFg}" FontWeight="Bold">
                                                                 <Run Text="{Binding Cost, StringFormat={}{0:0.##}}"/>
                                                                 <Run Text=" "/>
                                                                 <Run Text="{Binding Currency}"/>
@@ -1415,7 +1937,7 @@
                                         </ItemsControl.Style>
                                     </ItemsControl>
 
-                                    <TextBlock Text="لا توجد علاجات محددة لهذه الزيارة." FontSize="17" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right">
+                                    <TextBlock Text="لا توجد علاجات محددة لهذه الزيارة." FontSize="16" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Right">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -1430,17 +1952,17 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Dental Record Section -->
+                            <!-- المخطط السني -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xEFA9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#9333EA" Margin="0,0,10,0"/>
-                                        <TextBlock Text="المخطط السني" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#9333EA"/>
+                                        <TextBlock Text="&#xEFA9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="المخطط السني" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
-                                    
-                                    <TextBlock Text="{Binding DentalChartCategoryText}" Margin="0,0,0,16" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold"/>
-                                    
-                                    <TextBlock Text="الأسنان المسجلة" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+
+                                    <TextBlock Text="{Binding DentalChartCategoryText}" Margin="0,0,0,14" Foreground="{DynamicResource AppTextSecondary}" FontWeight="SemiBold"/>
+
+                                    <TextBlock Text="الأسنان المسجلة" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     <ItemsControl ItemsSource="{Binding Teeth}" Margin="0,10,0,0">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -1449,8 +1971,13 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="999" Padding="12,6" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold"/>
+                                                <Border Background="{DynamicResource VisitToothBadgeBg}"
+                                                        BorderBrush="{DynamicResource VisitToothBadgeBorder}"
+                                                        BorderThickness="1.5"
+                                                        CornerRadius="12"
+                                                        Padding="14,7"
+                                                        Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding}" FontSize="15" Foreground="{DynamicResource VisitToothBadgeFg}" FontWeight="Bold"/>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -1479,20 +2006,20 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Prescriptions Section -->
+                            <!-- الوصفة الطبية -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE83D;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#D97706" Margin="0,0,10,0"/>
-                                        <TextBlock Text="الوصفة الطبية" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#D97706"/>
+                                        <TextBlock Text="&#xE83D;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="الوصفة الطبية" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     </StackPanel>
                                     <ItemsControl ItemsSource="{Binding PrescriptionItems}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,8">
+                                                <Border Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,8">
                                                     <StackPanel>
-                                                        <TextBlock Text="{Binding MedicineName}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                                        <TextBlock Text="{Binding InstructionText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding MedicineName}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
+                                                        <TextBlock Text="{Binding InstructionText}" Margin="0,6,0,0" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>
@@ -1522,28 +2049,30 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Attachments Section -->
+                            <!-- المرفقات -->
                             <Border Style="{StaticResource DetailSectionStyle}" Margin="0,0,0,0">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,16">
-                                        <TextBlock Text="&#xE723;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,10,0"/>
+                                        <TextBlock Text="&#xE723;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="{DynamicResource DashCalendarTodayNumFg}" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="المرفقات" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                                        <TextBlock Text="{Binding AttachmentCountText}" Margin="10,0,0,0" Foreground="#6366F1" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding AttachmentCountText}" Margin="10,0,0,0" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <ItemsControl ItemsSource="{Binding AttachmentItems}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Style="{StaticResource FlatCardButton}" Tag="{Binding}" Click="OpenVisitAttachment_Click" Margin="0,0,0,8">
-                                                    <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="12">
+                                                    <Border Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource VisitSubCardBorder}" BorderThickness="1" CornerRadius="12" Padding="12">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="*"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <Image Grid.Column="0" Source="{Binding Thumbnail}" Width="60" Height="60" Stretch="UniformToFill" Margin="0,0,16,0"/>
+                                                            <Border Grid.Column="0" CornerRadius="8" ClipToBounds="True" Margin="0,0,16,0">
+                                                                <Image Source="{Binding Thumbnail}" Width="60" Height="60" Stretch="UniformToFill"/>
+                                                            </Border>
                                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding FileName}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
-                                                                <TextBlock Text="اضغط لفتح الملف" Margin="0,4,0,0" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                                <TextBlock Text="{Binding FileName}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap"/>
+                                                                <TextBlock Text="اضغط لفتح الملف" Margin="0,4,0,0" Foreground="{DynamicResource DashCalendarTodayNumFg}" FontWeight="SemiBold"/>
                                                             </StackPanel>
                                                         </Grid>
                                                     </Border>
@@ -1578,11 +2107,29 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Border Grid.Row="2" CornerRadius="0,0,28,28" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,1,0,0" Padding="16">
+                    <!-- تذييل بطاقة الزيارة -->
+                    <Border Grid.Row="2"
+                            CornerRadius="0,0,25,25"
+                            Background="{DynamicResource VisitCardBg}"
+                            BorderBrush="{DynamicResource VisitCardBorder}"
+                            BorderThickness="0,1,0,0"
+                            Padding="20,14">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                            <Button Content="تعديل الزيارة" Tag="{Binding VisitId}" Click="EditVisit_Click" Padding="16,8" Margin="0,0,8,0" Background="#0D9488" Foreground="White" BorderThickness="0" Cursor="Hand"/>
-                            <Button Content="سجل التعديل" Tag="{Binding VisitId}" Click="OpenVisitEditHistory_Click" Padding="16,8" Margin="0,0,8,0" Background="Transparent" Foreground="#0D9488" BorderBrush="#0D9488" BorderThickness="1" Cursor="Hand" Visibility="{Binding HasEditHistory, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <Button Content="إغلاق" Width="96" Height="40" HorizontalAlignment="Left" Click="CloseVisitDetails_Click" Style="{StaticResource SecondaryActionButton}"/>
+                            <Button Content="تعديل الزيارة"
+                                    Tag="{Binding VisitId}"
+                                    Click="EditVisit_Click"
+                                    Style="{StaticResource PrimaryActionButton}"
+                                    Margin="0,0,10,0"/>
+                            <Button Content="سجل التعديل"
+                                    Tag="{Binding VisitId}"
+                                    Click="OpenVisitEditHistory_Click"
+                                    Style="{StaticResource SecondaryActionButton}"
+                                    Margin="0,0,10,0"
+                                    Visibility="{Binding HasEditHistory, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <Button Content="إغلاق"
+                                    Width="96"
+                                    Click="CloseVisitDetails_Click"
+                                    Style="{StaticResource SecondaryActionButton}"/>
                         </StackPanel>
                     </Border>
                 </Grid>

@@ -11,7 +11,6 @@ namespace MyClinic
             OnFinancialRecordAdded?.Invoke();
         }
 
-        // --- الكود الجديد ---
         // حدث يتم إطلاقه عند إضافة مريض جديد أو زيارة جديدة
         public static event Action? OnPatientRecordAdded;
         public static void NotifyPatientRecordAdded()
@@ -28,5 +27,9 @@ namespace MyClinic
 
         public static event Action? OnFileKitCanalCountChanged;
         public static void NotifyFileKitCanalCountChanged() => OnFileKitCanalCountChanged?.Invoke();
+
+        // حدث يتم إطلاقه عند تبديل المظهر (الوضع الفاتح / الداكن)
+        public static event Action<bool>? OnThemeChanged;
+        public static void NotifyThemeChanged(bool isDark) => OnThemeChanged?.Invoke(isDark);
     }
 }

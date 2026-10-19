@@ -21,7 +21,7 @@ namespace MyClinic
 
         private readonly ObservableCollection<AppointmentCardModel> _appointments = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
-        private readonly List<Patient> _allPatients = new(); 
+        private readonly List<Patient> _allPatients = new();
         private readonly List<VisitAttendanceRecord> _visitAttendanceRecords = new();
         private readonly List<string> _appointmentNameSuggestions = new();
         private readonly List<string> _appointmentPhoneSuggestions = new();
@@ -49,16 +49,164 @@ namespace MyClinic
             _statusFilter = StatusFilter.Upcoming;
 
             AppointmentsItemsControl.ItemsSource = _appointments;
-            
+
             DateTime syrianNow = GetSyrianTime();
             DpAppointmentsFilter.SelectedDate = syrianNow.Date;
             DpAppointmentDate.SelectedDate = syrianNow.Date;
-            
+
             PopulateTimeOptions();
+            ApplyThemeVisuals(IsDarkThemeActive());
             UpdateButtonStyles();
 
             GlobalEvents.OnPatientRecordAdded += HandlePatientRecordAdded;
             GlobalEvents.OnFileKitCanalCountChanged += HandleFileKitCanalCountChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            Loaded += DashboardView_Loaded;
+        }
+
+        private void DashboardView_Loaded(object sender, RoutedEventArgs e)
+        {
+            ApplyThemeVisuals(IsDarkThemeActive());
+            UpdateButtonStyles();
+            if (_hasLoadedData)
+            {
+                ApplyAppointmentsFilter();
+            }
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
+        private static LinearGradientBrush CreateGradient(string startHex, string endHex)
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 0)
+            };
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(startHex), 0.0));
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(endHex), 1.0));
+            return brush;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+            UpdateButtonStyles();
+            if (_hasLoadedData)
+            {
+                ApplyAppointmentsFilter();
+            }
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            // تبديل عناصر الترحيب والإضاءة بين الوضعين الفاتح والداكن
+            if (TxtWelcomeWave is not null)
+                TxtWelcomeWave.Visibility = isDark ? Visibility.Collapsed : Visibility.Visible;
+            if (IconWelcomeSparkles is not null)
+                IconWelcomeSparkles.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+            if (WelcomeDarkGlow is not null)
+                WelcomeDarkGlow.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+
+            // تفعيل/إخفاء طبقات إضاءة مؤشر الفأرة (Spotlight) في الوضع الداكن
+            if (DashboardBackSpotlightCanvas is not null)
+                DashboardBackSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+            if (DashboardSurfaceSpotlightCanvas is not null)
+                DashboardSurfaceSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+
+            // تنسيق وترتيب أزرار بطاقة الإجراءات السريعة لتطابق الصور المرفقة تماماً
+            if (BtnAddPatient is not null && BtnAddAppointment is not null)
+            {
+                if (isDark)
+                {
+                    // في الوضع الداكن: زر (+ إضافة موعد جديد) يميناً بالأخضر الزمردي المضيء، وزر (+ إضافة مريض) يساراً بالرمادي الداكن
+                    Grid.SetColumn(BtnAddAppointment, 0);
+                    Grid.SetColumn(BtnAddPatient, 2);
+
+                    BtnAddAppointment.Background = CreateGradient("#14B8A6", "#0D9488");
+                    BtnAddAppointment.BorderBrush = CreateBrush("#5EEAD4");
+                    BtnAddAppointment.BorderThickness = new Thickness(1);
+                    BtnAddAppointment.Foreground = Brushes.White;
+
+                    BtnAddPatient.Background = CreateBrush("#47535E");
+                    BtnAddPatient.BorderBrush = CreateBrush("#64748B");
+                    BtnAddPatient.BorderThickness = new Thickness(1);
+                    BtnAddPatient.Foreground = Brushes.White;
+
+                    if (IconAddAppointment is not null) IconAddAppointment.Visibility = Visibility.Visible;
+                    if (IconAddPatient is not null) IconAddPatient.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // في الوضع الفاتح: زر (+ إضافة مريض) يميناً بالأخضر النعناعي الفاتح، وزر (+ إضافة موعد جديد) يساراً بالأزرق الملكي
+                    Grid.SetColumn(BtnAddPatient, 0);
+                    Grid.SetColumn(BtnAddAppointment, 2);
+
+                    BtnAddPatient.Background = CreateBrush("#C3DCD8");
+                    BtnAddPatient.BorderBrush = CreateBrush("#8EB4AE");
+                    BtnAddPatient.BorderThickness = new Thickness(1);
+                    BtnAddPatient.Foreground = CreateBrush("#284B46");
+
+                    BtnAddAppointment.Background = CreateBrush("#3348BD");
+                    BtnAddAppointment.BorderBrush = Brushes.Transparent;
+                    BtnAddAppointment.BorderThickness = new Thickness(0);
+                    BtnAddAppointment.Foreground = Brushes.White;
+
+                    if (IconAddAppointment is not null) IconAddAppointment.Visibility = Visibility.Collapsed;
+                    if (IconAddPatient is not null) IconAddPatient.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        private void Dashboard_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive())
+                return;
+
+            Point pos = e.GetPosition(DashboardRootGrid);
+
+            if (DashboardBackSpotlightCanvas is not null && DashboardBackSpotlightTransform is not null)
+            {
+                if (DashboardBackSpotlightCanvas.Visibility != Visibility.Visible)
+                    DashboardBackSpotlightCanvas.Visibility = Visibility.Visible;
+
+                DashboardBackSpotlightTransform.X = pos.X - (DashboardBackSpotlight.Width / 2.0);
+                DashboardBackSpotlightTransform.Y = pos.Y - (DashboardBackSpotlight.Height / 2.0);
+            }
+
+            if (DashboardSurfaceSpotlightCanvas is not null && DashboardSurfaceSpotlightTransform is not null)
+            {
+                if (DashboardSurfaceSpotlightCanvas.Visibility != Visibility.Visible)
+                    DashboardSurfaceSpotlightCanvas.Visibility = Visibility.Visible;
+
+                DashboardSurfaceSpotlightTransform.X = pos.X - (DashboardSurfaceSpotlight.Width / 2.0);
+                DashboardSurfaceSpotlightTransform.Y = pos.Y - (DashboardSurfaceSpotlight.Height / 2.0);
+            }
+        }
+
+        private void Dashboard_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (DashboardBackSpotlightTransform is not null)
+            {
+                DashboardBackSpotlightTransform.X = -1200;
+                DashboardBackSpotlightTransform.Y = -1200;
+            }
+
+            if (DashboardSurfaceSpotlightTransform is not null)
+            {
+                DashboardSurfaceSpotlightTransform.X = -1200;
+                DashboardSurfaceSpotlightTransform.Y = -1200;
+            }
         }
 
         public void RefreshWelcomeName()
@@ -345,7 +493,7 @@ namespace MyClinic
 
                 _allAppointments.Clear();
                 _allAppointments.AddRange(appointments);
-                
+
                 _allPatients.Clear();
                 _allPatients.AddRange(patients);
 
@@ -360,7 +508,7 @@ namespace MyClinic
                 }
                 foreach (AppointmentEntry appointment in _allAppointments)
                     UpdateAppointmentAttendance(appointment);
-                
+
                 ApplyAppointmentsFilter();
                 UpdateSearchSuggestions();
 
@@ -458,10 +606,6 @@ namespace MyClinic
                 CmbAppointmentPhoneNumber.IsDropDownOpen =
                     phoneHasFocus && phoneQuery.Length > 0 && matchingPhones.Count > 0;
 
-                // Replacing ItemsSource on an editable ComboBox can cause WPF to
-                // select all text in PART_EditableTextBox. Keep the user's caret
-                // at the end so continued typing edits the existing name instead
-                // of replacing it.
                 CollapsePatientNameSelection();
             }
             finally
@@ -478,8 +622,6 @@ namespace MyClinic
             if (CmbAppointmentPatientName.Template.FindName("PART_EditableTextBox", CmbAppointmentPatientName) is not TextBox textBox)
                 return;
 
-            // Defer until ComboBox finishes applying the new item source, which
-            // is when its default select-all behavior can run.
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (CmbAppointmentPatientName.IsKeyboardFocusWithin)
@@ -629,7 +771,6 @@ namespace MyClinic
                 return;
             }
 
-            // تجميع الوقت من منتقي الوقت (Time Picker)
             string hourStr = CmbHour.SelectedItem?.ToString() ?? "12";
             string minStr = CmbMinute.SelectedItem?.ToString() ?? "00";
             string amPmStr = CmbAmPm.SelectedItem?.ToString() ?? "AM";
@@ -664,9 +805,8 @@ namespace MyClinic
                 UpdateAppointmentAttendance(newAppointment);
                 _allAppointments.Add(newAppointment);
 
-                // إخفاء النافذة يقوم بالتصفير تلقائياً بفضل استدعاء ResetAppointmentForm بداخلها
                 HideAppointmentDialog();
-                
+
                 UpdateSearchSuggestions();
                 ApplyAppointmentsFilter();
             }
@@ -691,9 +831,9 @@ namespace MyClinic
         {
             if (_viewMode == ViewMode.Monthly)
             {
-                if (sender is DatePicker datePicker && 
-                    datePicker.Template.FindName("PART_Popup", datePicker) is Popup popup && 
-                    popup.Child is System.Windows.Controls.Calendar calendar) 
+                if (sender is DatePicker datePicker &&
+                    datePicker.Template.FindName("PART_Popup", datePicker) is Popup popup &&
+                    popup.Child is System.Windows.Controls.Calendar calendar)
                 {
                     calendar.DisplayMode = CalendarMode.Year;
                     calendar.DisplayModeChanged += Calendar_DisplayModeChanged;
@@ -703,7 +843,7 @@ namespace MyClinic
 
         private void Calendar_DisplayModeChanged(object? sender, CalendarModeChangedEventArgs e)
         {
-            if (_viewMode == ViewMode.Monthly && sender is System.Windows.Controls.Calendar calendar && calendar.DisplayMode == CalendarMode.Month) 
+            if (_viewMode == ViewMode.Monthly && sender is System.Windows.Controls.Calendar calendar && calendar.DisplayMode == CalendarMode.Month)
             {
                 calendar.SelectedDate = calendar.DisplayDate;
                 DpAppointmentsFilter.IsDropDownOpen = false;
@@ -713,9 +853,9 @@ namespace MyClinic
 
         private void DpAppointmentsFilter_CalendarClosed(object sender, RoutedEventArgs e)
         {
-            if (sender is DatePicker datePicker && 
-                datePicker.Template.FindName("PART_Popup", datePicker) is Popup popup && 
-                popup.Child is System.Windows.Controls.Calendar calendar) 
+            if (sender is DatePicker datePicker &&
+                datePicker.Template.FindName("PART_Popup", datePicker) is Popup popup &&
+                popup.Child is System.Windows.Controls.Calendar calendar)
             {
                 calendar.DisplayModeChanged -= Calendar_DisplayModeChanged;
             }
@@ -773,7 +913,6 @@ namespace MyClinic
             if (sender is not Border dayBorder || dayBorder.Tag is not DateTime selectedDate)
                 return;
 
-            // Clicking an appointment's delete button must not also open the add dialog.
             DependencyObject? source = e.OriginalSource as DependencyObject;
             while (source is not null)
             {
@@ -916,17 +1055,16 @@ namespace MyClinic
                 CmbHour.Items.Add(i.ToString("00"));
 
             CmbMinute.Items.Clear();
-            for (int i = 0; i < 60; i += 15) // فواصل كل 15 دقيقة 
+            for (int i = 0; i < 60; i += 15)
                 CmbMinute.Items.Add(i.ToString("00"));
 
             CmbAmPm.Items.Clear();
             CmbAmPm.Items.Add("AM");
             CmbAmPm.Items.Add("PM");
 
-            // القيم الافتراضية
-            if (CmbHour.Items.Count > 0) CmbHour.SelectedIndex = 7; // الساعة 08 الافتراضية
-            if (CmbMinute.Items.Count > 0) CmbMinute.SelectedIndex = 0; // الدقيقة 00
-            if (CmbAmPm.Items.Count > 0) CmbAmPm.SelectedIndex = 0; // ص AM
+            if (CmbHour.Items.Count > 0) CmbHour.SelectedIndex = 7;
+            if (CmbMinute.Items.Count > 0) CmbMinute.SelectedIndex = 0;
+            if (CmbAmPm.Items.Count > 0) CmbAmPm.SelectedIndex = 0;
         }
 
         private void ReplaceAppointments(IEnumerable<AppointmentCardModel> items)
@@ -942,7 +1080,7 @@ namespace MyClinic
         {
             DateTime syrianNow = GetSyrianTime();
             DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? syrianNow.Date).Date;
-            
+
             string searchText = CmbAppointmentsSearch.Text?.Trim().ToLowerInvariant() ?? "";
             bool isSearching = !string.IsNullOrWhiteSpace(searchText);
 
@@ -974,12 +1112,12 @@ namespace MyClinic
 
             if (isSearching)
             {
-                query = query.Where(a => (a.PatientName?.ToLowerInvariant().Contains(searchText) == true) || 
+                query = query.Where(a => (a.PatientName?.ToLowerInvariant().Contains(searchText) == true) ||
                                          (a.PhoneNumber?.Contains(searchText) == true));
             }
 
             List<AppointmentCardModel> visibleAppointments = query
-                .OrderBy(a => Math.Abs((a.AppointmentDateTime - syrianNow).TotalSeconds)) 
+                .OrderBy(a => Math.Abs((a.AppointmentDateTime - syrianNow).TotalSeconds))
                 .ThenBy(a => a.AppointmentDateTime)
                 .Select(MapAppointment)
                 .ToList();
@@ -1004,9 +1142,6 @@ namespace MyClinic
             for (int column = 0; column < 7; column++)
                 CalendarDaysGrid.ColumnDefinitions.Add(new ColumnDefinition());
 
-            for (int row = 0; row < 6; row++)
-                CalendarDaysGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(112) });
-
             IEnumerable<AppointmentEntry> monthAppointments = _allAppointments
                 .Where(a => a.AppointmentDateTime.Year == selectedDate.Year
                          && a.AppointmentDateTime.Month == selectedDate.Month);
@@ -1025,19 +1160,16 @@ namespace MyClinic
             DateTime firstDay = new DateTime(selectedDate.Year, selectedDate.Month, 1);
             int daysInMonth = DateTime.DaysInMonth(selectedDate.Year, selectedDate.Month);
             int firstColumn = (int)firstDay.DayOfWeek;
+            int weekCount = (firstColumn + daysInMonth + 6) / 7;
 
-            for (int index = 0; index < 42; index++)
+            for (int row = 0; row < weekCount; row++)
+                CalendarDaysGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(116) });
+
+            for (int dayNumber = 1; dayNumber <= daysInMonth; dayNumber++)
             {
+                int index = firstColumn + dayNumber - 1;
                 int column = index % 7;
                 int row = index / 7;
-                int dayNumber = index - firstColumn + 1;
-
-                if (dayNumber < 1 || dayNumber > daysInMonth)
-                {
-                    AddCalendarPlaceholder(column, row);
-                    continue;
-                }
-
                 DateTime day = new DateTime(selectedDate.Year, selectedDate.Month, dayNumber);
                 AddCalendarDay(day, column, row, appointmentsByDay.TryGetValue(day, out var dayAppointments)
                     ? dayAppointments
@@ -1045,43 +1177,37 @@ namespace MyClinic
             }
         }
 
-        private void AddCalendarPlaceholder(int column, int row)
-        {
-            var placeholder = new Border
-            {
-                Margin = new Thickness(4),
-                Background = Brushes.Transparent
-            };
-            Grid.SetColumn(placeholder, column);
-            Grid.SetRow(placeholder, row);
-            CalendarDaysGrid.Children.Add(placeholder);
-        }
-
-        private void AddCalendarDay(DateTime day, int column, int row, IEnumerable<AppointmentEntry> dayAppointments)
+        private void AddCalendarDay(DateTime day, int column, int row, IReadOnlyList<AppointmentEntry> dayAppointments)
         {
             DateTime today = GetSyrianTime().Date;
             bool isToday = day == today;
+            bool isDark = IsDarkThemeActive();
 
             var dayBorder = new Border
             {
                 Tag = day,
                 Margin = new Thickness(4),
-                Padding = new Thickness(8),
+                Padding = new Thickness(8, 6, 8, 6),
                 CornerRadius = new CornerRadius(12),
                 Background = isToday
-                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1A235DF6"))
-                    : (Brush)FindResource("AppInputBg"),
+                    ? (Brush)FindResource("DashCalendarTodayBg")
+                    : (Brush)FindResource("DashCalendarDayBg"),
                 BorderBrush = isToday
-                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#235DF6"))
-                    : (Brush)FindResource("AppBorder"),
-                BorderThickness = new Thickness(isToday ? 2 : 1),
+                    ? (Brush)FindResource("DashCalendarTodayBorder")
+                    : (Brush)FindResource("DashCalendarDayBorder"),
+                BorderThickness = new Thickness(isToday ? 1.6 : 1.0),
                 Cursor = System.Windows.Input.Cursors.Hand
             };
             dayBorder.MouseLeftButtonUp += CalendarDay_MouseLeftButtonUp;
 
-            var dayGrid = new Grid { FlowDirection = FlowDirection.RightToLeft };
+            var dayGrid = new Grid { FlowDirection = FlowDirection.LeftToRight };
             dayGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             dayGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            // ترويسة خلية اليوم: رقم اليوم في اليسار، وشارة (اليوم) في اليمين عند الحاجة
+            var headerGrid = new Grid();
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var dayNumberText = new TextBlock
             {
@@ -1089,75 +1215,144 @@ namespace MyClinic
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Foreground = isToday
-                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#235DF6"))
+                    ? (Brush)FindResource("DashCalendarTodayNumFg")
                     : (Brush)FindResource("AppTextPrimary"),
-                HorizontalAlignment = HorizontalAlignment.Right
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetRow(dayNumberText, 0);
-            dayGrid.Children.Add(dayNumberText);
+            Grid.SetColumn(dayNumberText, 0);
+            headerGrid.Children.Add(dayNumberText);
 
-            var appointmentsPanel = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+            if (isToday && !isDark)
+            {
+                var todayBadge = new Border
+                {
+                    Background = (Brush)FindResource("DashCalendarTodayBadgeBg"),
+                    CornerRadius = new CornerRadius(9),
+                    Padding = new Thickness(8, 2, 8, 2),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock
+                    {
+                        Text = "اليوم",
+                        Foreground = Brushes.White,
+                        FontSize = 10.5,
+                        FontWeight = FontWeights.Bold
+                    }
+                };
+                Grid.SetColumn(todayBadge, 1);
+                headerGrid.Children.Add(todayBadge);
+            }
+
+            Grid.SetRow(headerGrid, 0);
+            dayGrid.Children.Add(headerGrid);
+
+            // قائمة المواعيد داخل اليوم
+            var contentGrid = new Grid { Margin = new Thickness(0, 5, 0, 0), FlowDirection = FlowDirection.LeftToRight };
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var appointmentsPanel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
             foreach (AppointmentEntry appointment in dayAppointments)
             {
-                string statusLine = appointment.ShowAttendanceStatus
-                    ? $"\n{appointment.AttendanceStatusText}"
-                    : string.Empty;
-                Brush appointmentForeground = appointment.AttendanceStatus switch
-                {
-                    "Attended" when appointment.ShowAttendanceStatus =>
-                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#15803D")),
-                    "Absent" when appointment.ShowAttendanceStatus =>
-                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B91C1C")),
-                    "Waiting" when appointment.ShowAttendanceStatus =>
-                        new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A16207")),
-                    _ => (Brush)FindResource("AppTextPrimary")
-                };
+                bool isAbsent = appointment.ShowAttendanceStatus
+                    && string.Equals(appointment.AttendanceStatus, "Absent", StringComparison.Ordinal);
+                bool isWaiting = appointment.ShowAttendanceStatus
+                    && string.Equals(appointment.AttendanceStatus, "Waiting", StringComparison.Ordinal);
+                bool isGreenVariant = !isAbsent && !isWaiting && (
+                    string.Equals(appointment.Reason, "معاينة جديدة", StringComparison.Ordinal)
+                    || (appointment.ShowAttendanceStatus && string.Equals(appointment.AttendanceStatus, "Attended", StringComparison.Ordinal))
+                    || appointment.IsVisitRecord);
 
-                var appointmentRow = new Grid
+                Brush pillBg;
+                Brush pillBorder;
+                Brush pillFg;
+                Brush deleteFg;
+
+                if (isAbsent)
                 {
-                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#14235DF6")),
+                    pillBg = CreateBrush(isDark ? "#BA6571" : "#FB7A6D");
+                    pillBorder = CreateBrush(isDark ? "#D47A87" : "#F06457");
+                    pillFg = CreateBrush(isDark ? "#FFF1F2" : "#2B0908");
+                    deleteFg = CreateBrush(isDark ? "#FFE4E6" : "#5C110E");
+                }
+                else if (isWaiting)
+                {
+                    pillBg = CreateBrush(isDark ? "#514511" : "#FEF9C3");
+                    pillBorder = CreateBrush(isDark ? "#806C0E" : "#FDE68A");
+                    pillFg = CreateBrush(isDark ? "#FEF3C7" : "#713F12");
+                    deleteFg = CreateBrush(isDark ? "#FDE68A" : "#A16207");
+                }
+                else if (isGreenVariant)
+                {
+                    pillBg = CreateBrush(isDark ? "#0D514F" : "#B2DCCC");
+                    pillBorder = CreateBrush(isDark ? "#14857E" : "#96CEB8");
+                    pillFg = CreateBrush(isDark ? "#E6FFFA" : "#0F291E");
+                    deleteFg = CreateBrush(isDark ? "#F87171" : "#B91C1C");
+                }
+                else
+                {
+                    pillBg = CreateBrush(isDark ? "#15203E" : "#CAD4F0");
+                    pillBorder = CreateBrush(isDark ? "#25386B" : "#B2C0E8");
+                    pillFg = CreateBrush(isDark ? "#E2E8F0" : "#1E293B");
+                    deleteFg = CreateBrush(isDark ? "#F87171" : "#B91C1C");
+                }
+
+                string statusLine = isAbsent ? "\nلم يحضر" : string.Empty;
+
+                var appointmentBorder = new Border
+                {
+                    Background = pillBg,
+                    BorderBrush = pillBorder,
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(7),
+                    Padding = new Thickness(5, 3, 6, 3),
                     Margin = new Thickness(0, 0, 0, 4)
                 };
+
+                var appointmentRow = new Grid();
                 appointmentRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 appointmentRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 var appointmentText = new TextBlock
                 {
-                    Text = $"{appointment.AppointmentDateTime:hh\\:mm tt} - {appointment.Reason}\\n{appointment.PatientName}{statusLine}",
-                    FontSize = 10,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = appointmentForeground,
+                    Text = $"{appointment.AppointmentDateTime.ToString("hh:mm tt", CultureInfo.InvariantCulture)} - {appointment.Reason}\n{appointment.PatientName}{statusLine}",
+                    FontSize = 9.8,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = pillFg,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextWrapping = TextWrapping.Wrap,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(5, 3, 0, 3),
+                    TextAlignment = TextAlignment.Right,
                     ToolTip = $"{appointment.PatientName} - {appointment.Reason}{statusLine}"
                 };
                 Grid.SetColumn(appointmentText, 0);
-
                 appointmentRow.Children.Add(appointmentText);
+
                 if (!appointment.IsVisitRecord)
                 {
                     var deleteButton = new Button
                     {
                         Content = "×",
                         Tag = appointment.Id,
-                        Width = 20,
-                        Height = 20,
+                        Width = 18,
+                        Height = 18,
                         Padding = new Thickness(0),
                         Background = Brushes.Transparent,
-                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
+                        Foreground = deleteFg,
                         BorderThickness = new Thickness(0),
-                        FontSize = 16,
+                        FontSize = 13,
                         FontWeight = FontWeights.Bold,
                         Cursor = System.Windows.Input.Cursors.Hand,
+                        VerticalAlignment = VerticalAlignment.Center,
                         ToolTip = "حذف الموعد"
                     };
                     deleteButton.Click += BtnDeleteAppointment_Click;
                     Grid.SetColumn(deleteButton, 1);
                     appointmentRow.Children.Add(deleteButton);
                 }
-                appointmentsPanel.Children.Add(appointmentRow);
+
+                appointmentBorder.Child = appointmentRow;
+                appointmentsPanel.Children.Add(appointmentBorder);
             }
 
             var appointmentsScroll = new ScrollViewer
@@ -1166,8 +1361,11 @@ namespace MyClinic
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
             };
-            Grid.SetRow(appointmentsScroll, 1);
-            dayGrid.Children.Add(appointmentsScroll);
+            Grid.SetColumn(appointmentsScroll, 1);
+            contentGrid.Children.Add(appointmentsScroll);
+
+            Grid.SetRow(contentGrid, 1);
+            dayGrid.Children.Add(contentGrid);
 
             dayBorder.Child = dayGrid;
             Grid.SetColumn(dayBorder, column);
@@ -1177,30 +1375,36 @@ namespace MyClinic
 
         private void UpdateButtonStyles()
         {
-            Brush activeBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#235DF6"));
+            bool isDark = IsDarkThemeActive();
+
+            Brush activeFilterBg = (Brush)FindResource("DashActiveFilterBg");
             Brush inactiveBg = Brushes.Transparent;
             Brush activeFg = Brushes.White;
-            Brush inactiveFg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C6C82"));
+            Brush primaryText = (Brush)FindResource("AppTextPrimary");
+            Brush secondaryText = (Brush)FindResource("AppTextSecondary");
 
-            BtnMonthlyView.Background = _viewMode == ViewMode.Monthly ? activeBg : inactiveBg;
-            BtnMonthlyView.Foreground = _viewMode == ViewMode.Monthly ? activeFg : inactiveFg;
-            
-            BtnDailyView.Background = _viewMode == ViewMode.Daily ? activeBg : inactiveBg;
-            BtnDailyView.Foreground = _viewMode == ViewMode.Daily ? activeFg : inactiveFg;
+            // أزرار التصفية (القادمة | السابقة | الكل)
+            BtnFilterUpcoming.Background = _statusFilter == StatusFilter.Upcoming ? activeFilterBg : inactiveBg;
+            BtnFilterUpcoming.Foreground = _statusFilter == StatusFilter.Upcoming ? activeFg : primaryText;
 
-            BtnFilterUpcoming.Background = _statusFilter == StatusFilter.Upcoming ? activeBg : inactiveBg;
-            BtnFilterUpcoming.Foreground = _statusFilter == StatusFilter.Upcoming ? activeFg : inactiveFg;
+            BtnFilterPast.Background = _statusFilter == StatusFilter.Past ? activeFilterBg : inactiveBg;
+            BtnFilterPast.Foreground = _statusFilter == StatusFilter.Past ? activeFg : primaryText;
 
-            BtnFilterPast.Background = _statusFilter == StatusFilter.Past ? activeBg : inactiveBg;
-            BtnFilterPast.Foreground = _statusFilter == StatusFilter.Past ? activeFg : inactiveFg;
+            BtnFilterAll.Background = _statusFilter == StatusFilter.All ? activeFilterBg : inactiveBg;
+            BtnFilterAll.Foreground = _statusFilter == StatusFilter.All ? activeFg : primaryText;
 
-            BtnFilterAll.Background = _statusFilter == StatusFilter.All ? activeBg : inactiveBg;
-            BtnFilterAll.Foreground = _statusFilter == StatusFilter.All ? activeFg : inactiveFg;
+            // أزرار العرض (شهري | يومي) كما في الصور المرفقة
+            Brush activeViewBg = isDark ? Brushes.Transparent : Brushes.White;
+            BtnMonthlyView.Background = _viewMode == ViewMode.Monthly ? activeViewBg : inactiveBg;
+            BtnMonthlyView.Foreground = _viewMode == ViewMode.Monthly ? primaryText : secondaryText;
+
+            BtnDailyView.Background = _viewMode == ViewMode.Daily ? activeViewBg : inactiveBg;
+            BtnDailyView.Foreground = _viewMode == ViewMode.Daily ? primaryText : secondaryText;
 
             DateTime syrianToday = GetSyrianTime().Date;
             DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? syrianToday).Date;
-            
-            bool isCurrent = _viewMode == ViewMode.Monthly 
+
+            bool isCurrent = _viewMode == ViewMode.Monthly
                 ? (selectedDate.Month == syrianToday.Month && selectedDate.Year == syrianToday.Year)
                 : (selectedDate == syrianToday);
 
@@ -1345,7 +1549,7 @@ namespace MyClinic
         private void HideAppointmentDialog()
         {
             AppointmentDialogOverlay.Visibility = Visibility.Collapsed;
-            ResetAppointmentForm(); // تم وضع التصفير هنا ليعمل في كافة طرق الإغلاق
+            ResetAppointmentForm();
         }
 
         private void ResetAppointmentForm()
@@ -1355,8 +1559,7 @@ namespace MyClinic
             CmbAppointmentPhoneNumber.Text = string.Empty;
             CmbAppointmentReason.SelectedIndex = 0;
             DpAppointmentDate.SelectedDate = GetSyrianTime().Date;
-            
-            // تصفير وقت الموعد
+
             if (CmbHour.Items.Count > 0) CmbHour.SelectedIndex = 7;
             if (CmbMinute.Items.Count > 0) CmbMinute.SelectedIndex = 0;
             if (CmbAmPm.Items.Count > 0) CmbAmPm.SelectedIndex = 0;

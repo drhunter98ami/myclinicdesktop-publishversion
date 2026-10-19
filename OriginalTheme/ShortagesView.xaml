@@ -1,0 +1,387 @@
+<UserControl x:Class="MyClinic.OriginalTheme.ShortagesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="RightToLeft"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <Style x:Key="RoundedButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ShortageComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="SnapsToDevicePixels" Value="true"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          Background="{TemplateBinding Background}"
+                                          Focusable="false"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="24"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Grid.Column="1" Background="Transparent">
+                                                    <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="10,0,24,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Right"/>
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="{DynamicResource AppCardBg}" BorderThickness="1" BorderBrush="{DynamicResource AppBorder}" CornerRadius="8" Margin="0,4,0,8">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="2" Opacity="0.2"/>
+                                        </Border.Effect>
+                                        <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ShortageComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border CornerRadius="6" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" Margin="2">
+                            <ContentPresenter HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#1A10B981"/>
+                                <Setter Property="Foreground" Value="#10B981"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TextBlock" x:Key="FormLabel">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <DataTemplate x:Key="ShortageItemTemplate">
+            <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8" Padding="12,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Item}" Foreground="{DynamicResource AppTextPrimary}" FontSize="15" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding PriceText}" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,2,0,0"
+                                   FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Right"/>
+                    </StackPanel>
+
+                    <Border Grid.Column="1" CornerRadius="6" Padding="8,4" Margin="10,0,6,0" Background="#1A2563EB" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
+                            <TextBlock Text="العدد" Foreground="#2563EB" FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Quantity}" Foreground="#2563EB" FontSize="11" FontWeight="SemiBold" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" CornerRadius="6" Padding="10,4" Margin="4,0,10,0" Background="#1A10B981" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CurrencyBadge}" Foreground="#10B981" FontSize="11" FontWeight="SemiBold"/>
+                    </Border>
+
+                    <Button Grid.Column="3" Content="تعديل" Background="#F59E0B" Foreground="White" Width="60" Height="30" Margin="0,0,8,0"
+                            CommandParameter="{Binding}" Click="BtnEdit_Click"
+                            Style="{StaticResource RoundedButtonStyle}"/>
+
+                    <Button Grid.Column="4" Content="تم الشراء" Background="#10B981" Foreground="White" Width="80" Height="30" Margin="0,0,8,0"
+                            CommandParameter="{Binding}" Click="BtnPurchased_Click"
+                            Style="{StaticResource RoundedButtonStyle}"/>
+
+                    <Button Grid.Column="5" Content="حذف" Background="#EF4444" Foreground="White" Width="60" Height="30"
+                            CommandParameter="{Binding}" Click="BtnDelete_Click"
+                            Style="{StaticResource RoundedButtonStyle}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="إدارة النواقص" Foreground="{DynamicResource AppTextPrimary}" FontSize="28" FontWeight="Bold" Margin="0,0,0,20"/>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- قسم النواقص المستعجلة (أخضر) -->
+            <Border Grid.Column="0" Background="{DynamicResource AppCardBg}" CornerRadius="12" Padding="20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="نواقص مستعجلة" Foreground="#10B981" FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtUrgentInput" Height="40" FontSize="15" Padding="10,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" KeyDown="TxtUrgentInput_KeyDown"/>
+                        <TextBox Grid.Column="1" x:Name="TxtUrgentPrice" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="السعر"/>
+                        <TextBox Grid.Column="2" x:Name="TxtUrgentQuantity" Text="1" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="العدد"/>
+                        <ComboBox Grid.Column="3" x:Name="CmbUrgentCurrency" Height="40" Margin="8,0,0,0"
+                                  Style="{StaticResource ShortageComboBoxStyle}"
+                                  ItemContainerStyle="{StaticResource ShortageComboBoxItemStyle}"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="USD"/>
+                            <ComboBoxItem Content="SYP"/>
+                        </ComboBox>
+                        <Button Grid.Column="4" Content="إضافة" Height="40" Margin="8,0,0,0"
+                                Background="#10B981" Foreground="White" Style="{StaticResource RoundedButtonStyle}"
+                                Click="BtnAddUrgent_Click"/>
+                    </Grid>
+
+                    <ListBox x:Name="ListUrgent" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                             ItemTemplate="{StaticResource ShortageItemTemplate}" HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+
+                    <Border Grid.Row="3" Background="#1A10B981" CornerRadius="8" Padding="14,10" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="المجموع" Foreground="#10B981" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" x:Name="TxtUrgentTotal" Text="0 ل.س" Foreground="{DynamicResource AppTextPrimary}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- قسم النواقص غير المستعجلة -->
+            <Border Grid.Column="2" Background="{DynamicResource AppCardBg}" CornerRadius="12" Padding="20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="نواقص غير مستعجلة" Foreground="#F59E0B" FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="80"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtNonUrgentInput" Height="40" FontSize="15" Padding="10,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" KeyDown="TxtNonUrgentInput_KeyDown"/>
+                        <TextBox Grid.Column="1" x:Name="TxtNonUrgentPrice" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="السعر"/>
+                        <TextBox Grid.Column="2" x:Name="TxtNonUrgentQuantity" Text="1" Height="40" FontSize="15" Padding="10,0" Margin="8,0,0,0" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}"
+                                 BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" ToolTip="العدد"/>
+                        <ComboBox Grid.Column="3" x:Name="CmbNonUrgentCurrency" Height="40" Margin="8,0,0,0"
+                                  Style="{StaticResource ShortageComboBoxStyle}"
+                                  ItemContainerStyle="{StaticResource ShortageComboBoxItemStyle}"
+                                  SelectedIndex="0">
+                            <ComboBoxItem Content="USD"/>
+                            <ComboBoxItem Content="SYP"/>
+                        </ComboBox>
+                        <Button Grid.Column="4" Content="إضافة" Height="40" Margin="8,0,0,0"
+                                Background="#F59E0B" Foreground="White" Style="{StaticResource RoundedButtonStyle}"
+                                Click="BtnAddNonUrgent_Click"/>
+                    </Grid>
+
+                    <ListBox x:Name="ListNonUrgent" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                             ItemTemplate="{StaticResource ShortageItemTemplate}" HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+
+                    <Border Grid.Row="3" Background="#1AF59E0B" CornerRadius="8" Padding="14,10" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="المجموع" Foreground="#F59E0B" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" x:Name="TxtNonUrgentTotal" Text="0 ل.س" Foreground="{DynamicResource AppTextPrimary}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Edit Price Dialog Overlay -->
+        <Grid x:Name="EditPriceDialogOverlay" Panel.ZIndex="20" Visibility="Collapsed" Grid.RowSpan="2">
+        <Border Background="#A00F172A" MouseLeftButtonDown="EditPriceDialogBackdrop_MouseLeftButtonDown"/>
+
+        <Border Width="400" Padding="32" Background="{DynamicResource AppCardBg}" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border.Effect>
+                <DropShadowEffect Color="#0F172A" BlurRadius="40" ShadowDepth="10" Opacity="0.15"/>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Dialog Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Width="36" Height="36" Background="{DynamicResource AppInputBg}" BorderThickness="0" Click="BtnCloseEditPriceDialog_Click" Cursor="Hand">
+                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="18">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <TextBlock Grid.Column="1" Text="تعديل السعر" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,36,0"/>
+                </Grid>
+
+                <!-- Dialog Content -->
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="الصنف" Style="{StaticResource FormLabel}"/>
+                    <TextBlock x:Name="TxtEditItemName" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,0,15"/>
+
+                    <TextBlock Text="السعر" Style="{StaticResource FormLabel}"/>
+                    <TextBox x:Name="TxtEditPrice" Margin="0,0,0,15"/>
+
+                    <TextBlock Text="العدد" Style="{StaticResource FormLabel}"/>
+                    <TextBox x:Name="TxtEditQuantity" Margin="0,0,0,15"/>
+
+                    <TextBlock Text="العملة" Style="{StaticResource FormLabel}"/>
+                    <ComboBox x:Name="CmbEditCurrency" Style="{StaticResource ShortageComboBoxStyle}"
+                              ItemContainerStyle="{StaticResource ShortageComboBoxItemStyle}"
+                              SelectedIndex="0">
+                        <ComboBoxItem Content="USD"/>
+                        <ComboBoxItem Content="SYP"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Dialog Actions -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                    <Button x:Name="BtnCancelEditPrice" Content="إلغاء" Width="100" Height="40" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextSecondary}" BorderThickness="0" FontWeight="SemiBold" Cursor="Hand" Margin="0,0,10,0" Click="BtnCancelEditPrice_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="BtnConfirmEditPrice" Content="حفظ" Width="100" Height="40" Background="#2563EB" Foreground="White" BorderThickness="0" FontWeight="SemiBold" Cursor="Hand" Click="BtnConfirmEditPrice_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+    </Grid>
+</UserControl>

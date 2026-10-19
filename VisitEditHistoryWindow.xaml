@@ -11,20 +11,83 @@
         Background="{DynamicResource AppWindowBg}"
         Foreground="{DynamicResource AppTextPrimary}"
         FontFamily="Segoe UI"
-        FontSize="14">
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="سجل تعديل الزيارة" FontFamily="Traditional Arabic" FontSize="34" FontWeight="Bold"/>
-            <TextBlock Text="يعرض كل تعديل محفوظ بوقته الدقيق والقيم السابقة والجديدة." Foreground="{DynamicResource AppTextSecondary}"/>
-        </StackPanel>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="HistoryItems"/>
-        </ScrollViewer>
-        <Button Grid.Row="2" Content="إغلاق" Width="100" Height="40" HorizontalAlignment="Left" Margin="0,14,0,0" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Click="Close_Click"/>
+        FontSize="14"
+        PreviewMouseMove="Window_PreviewMouseMove"
+        MouseLeave="Window_MouseLeave">
+    <Grid x:Name="RootHistoryGrid" ClipToBounds="True">
+        <!-- إضاءة مؤشر الفأرة في الوضع الداكن -->
+        <Canvas x:Name="HistorySpotlightCanvas"
+                IsHitTestVisible="False"
+                Panel.ZIndex="0"
+                Visibility="Collapsed">
+            <Ellipse x:Name="HistorySpotlightEllipse"
+                     Width="520"
+                     Height="520"
+                     IsHitTestVisible="False">
+                <Ellipse.Fill>
+                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                        <GradientStop Color="#3814B8A6" Offset="0.0"/>
+                        <GradientStop Color="#1C0EA5E9" Offset="0.45"/>
+                        <GradientStop Color="#00000000" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.RenderTransform>
+                    <TranslateTransform x:Name="HistorySpotlightTransform" X="-1000" Y="-1000"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+        </Canvas>
+
+        <Grid Margin="22" Panel.ZIndex="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    x:Name="HistoryHeaderBanner"
+                    CornerRadius="20"
+                    Padding="24,18"
+                    BorderThickness="1"
+                    Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock x:Name="TxtHistoryHeaderTitle"
+                               Text="سجل تعديل الزيارة"
+                               FontFamily="Traditional Arabic"
+                               FontSize="32"
+                               FontWeight="Bold"/>
+                    <TextBlock x:Name="TxtHistoryHeaderSub"
+                               Text="يعرض كل تعديل محفوظ بوقته الدقيق والقيم السابقة والجديدة."
+                               FontWeight="SemiBold"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="HistoryItems"/>
+            </ScrollViewer>
+
+            <Button x:Name="BtnCloseHistory"
+                    Grid.Row="2"
+                    Content="إغلاق"
+                    Width="105"
+                    Height="42"
+                    HorizontalAlignment="Left"
+                    Margin="0,14,0,0"
+                    FontWeight="Bold"
+                    Cursor="Hand"
+                    Click="Close_Click">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </Grid>
     </Grid>
 </Window>

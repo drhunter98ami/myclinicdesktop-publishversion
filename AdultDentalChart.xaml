@@ -4,32 +4,35 @@
              Width="850" Height="300">
 
     <UserControl.Resources>
-        <SolidColorBrush x:Key="ToothOutline" Color="#1E293B"/>
-        <SolidColorBrush x:Key="ToothFill" Color="White"/>
-        <SolidColorBrush x:Key="ToothHover" Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="ToothSelected" Color="#3B82F6"/>
-        
         <Style x:Key="UpperToothStyle" TargetType="ToggleButton">
-            <Setter Property="Background" Value="{StaticResource ToothFill}"/>
+            <Setter Property="Background" Value="{DynamicResource DashFilterGroupBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="45" Height="70">
+                        <Grid Width="45" Height="74">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            
-                            <TextBlock Text="{TemplateBinding Content}" FontWeight="Bold" Foreground="#1E293B" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                            
+
+                            <TextBlock x:Name="ToothLabel"
+                                       Text="{TemplateBinding Content}"
+                                       FontWeight="Bold"
+                                       FontSize="13.5"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+
                             <Grid Grid.Row="1" Width="40" Height="40" x:Name="ToothBody">
                                 <Path x:Name="ToothPath"
-                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z" 
-                                      Fill="{TemplateBinding Background}" 
-                                      Stroke="{StaticResource ToothOutline}" 
-                                      StrokeThickness="1.5" 
+                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z"
+                                      Fill="{TemplateBinding Background}"
+                                      Stroke="{TemplateBinding BorderBrush}"
+                                      StrokeThickness="1.6"
                                       StrokeLineJoin="Round"
                                       RenderTransformOrigin="0.5,0.5">
                                     <Path.RenderTransform>
@@ -40,11 +43,13 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.7"/>
+                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashCalendarTodayBg}"/>
+                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.92"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{StaticResource ToothSelected}"/>
-                                <Setter Property="Foreground" Value="{StaticResource ToothSelected}"/>
+                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashActiveFilterBg}"/>
+                                <Setter TargetName="ToothPath" Property="Stroke" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                                <Setter TargetName="ToothLabel" Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -56,29 +61,39 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="45" Height="70">
+                        <Grid Width="45" Height="74">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            
+
                             <Grid Grid.Row="0" Width="40" Height="40" x:Name="ToothBody">
                                 <Path x:Name="ToothPath"
-                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z" 
-                                      Fill="{TemplateBinding Background}" 
-                                      Stroke="{StaticResource ToothOutline}" 
-                                      StrokeThickness="1.5" 
+                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z"
+                                      Fill="{TemplateBinding Background}"
+                                      Stroke="{TemplateBinding BorderBrush}"
+                                      StrokeThickness="1.6"
                                       StrokeLineJoin="Round"/>
                             </Grid>
-                            
-                            <TextBlock Grid.Row="1" Text="{TemplateBinding Content}" FontWeight="Bold" Foreground="#1E293B" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+
+                            <TextBlock x:Name="ToothLabel"
+                                       Grid.Row="1"
+                                       Text="{TemplateBinding Content}"
+                                       FontWeight="Bold"
+                                       FontSize="13.5"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,8,0,0"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.7"/>
+                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashCalendarTodayBg}"/>
+                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.92"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{StaticResource ToothSelected}"/>
+                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashActiveFilterBg}"/>
+                                <Setter TargetName="ToothPath" Property="Stroke" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                                <Setter TargetName="ToothLabel" Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -91,7 +106,7 @@
         <Grid Margin="20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="40"/> 
+                <RowDefinition Height="40"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -103,7 +118,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="30"/> 
+                <ColumnDefinition Width="30"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -149,8 +164,8 @@
             <ToggleButton Style="{StaticResource LowerToothStyle}" Content="46" Grid.Row="2" Grid.Column="14"/>
             <ToggleButton Style="{StaticResource LowerToothStyle}" Content="47" Grid.Row="2" Grid.Column="15"/>
             <ToggleButton Style="{StaticResource LowerToothStyle}" Content="48" Grid.Row="2" Grid.Column="16"/>
-            
-            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="8" BorderBrush="#CBD5E1" BorderThickness="2,0,0,0" Margin="14,10,0,10"/>
+
+            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="8" BorderBrush="{DynamicResource DashCalendarTodayBorder}" BorderThickness="2,0,0,0" Margin="14,10,0,10" Opacity="0.6"/>
         </Grid>
     </Viewbox>
 </UserControl>

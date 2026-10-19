@@ -70,7 +70,54 @@ namespace MyClinic
         {
             GlobalEvents.OnPatientRecordAdded -= HandlePatientAdded;
             GlobalEvents.OnPatientRecordAdded += HandlePatientAdded;
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplySpotlightTheme(IsDarkThemeActive());
             RefreshPatientData();
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplySpotlightTheme(isDark);
+        }
+
+        private void ApplySpotlightTheme(bool isDark)
+        {
+            if (PatientRecordsSpotlightCanvas is not null)
+            {
+                PatientRecordsSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void PatientRecords_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (!IsDarkThemeActive() || PatientRecordsSpotlightCanvas is null || PatientRecordsSpotlightTransform is null)
+                return;
+
+            if (PatientRecordsSpotlightCanvas.Visibility != Visibility.Visible)
+                PatientRecordsSpotlightCanvas.Visibility = Visibility.Visible;
+
+            Point pos = e.GetPosition(PatientRecordsRootGrid);
+            PatientRecordsSpotlightTransform.X = pos.X - (PatientRecordsSpotlightEllipse.Width / 2.0);
+            PatientRecordsSpotlightTransform.Y = pos.Y - (PatientRecordsSpotlightEllipse.Height / 2.0);
+        }
+
+        private void PatientRecords_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (PatientRecordsSpotlightTransform is not null)
+            {
+                PatientRecordsSpotlightTransform.X = -1200;
+                PatientRecordsSpotlightTransform.Y = -1200;
+            }
         }
 
         private void PatientRecordsView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -87,6 +134,7 @@ namespace MyClinic
         private void PatientRecordsView_Unloaded(object sender, RoutedEventArgs e)
         {
             GlobalEvents.OnPatientRecordAdded -= HandlePatientAdded;
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
         }
 
         private void HandlePatientAdded()
