@@ -40,6 +40,8 @@ namespace MyClinic
                         PhoneNumber = source.Patient.PhoneNumber,
                         FullName = source.Patient.FullName,
                         Age = source.Patient.Age,
+                        DateOfBirth = source.Patient.DateOfBirth,
+                        BirthYear = source.Patient.BirthYear,
                         Gender = source.Patient.Gender,
                         BloodType = source.Patient.BloodType,
                         IsSmoker = source.Patient.IsSmoker,

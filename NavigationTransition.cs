@@ -27,20 +27,27 @@ public static class NavigationTransition
     public static int GetOrder(DependencyObject element) => (int)element.GetValue(OrderProperty);
     public static void SetOrder(DependencyObject element, int value) => element.SetValue(OrderProperty, value);
 
-    public static void Show(ContentControl host, object content)
+    public static bool Show(ContentControl host, object content)
     {
         if (ReferenceEquals(host.Content, content))
-            return;
+            return true;
+
+        if (host.Content is IRecoverableClinicForm form && !form.PreserveDraft())
+        {
+            UiFeedback.Notify(host, "تعذر حفظ المسودة. احفظ البيانات أو تجاهل المسودة من النموذج قبل مغادرته.");
+            return false;
+        }
 
         (host.GetValue(SessionProperty) as EntranceSession)?.Stop();
         bool animate = host.IsLoaded && host.Content != null && MotionPreferences.Enabled;
         host.Content = content;
         if (!animate || content is not FrameworkElement page)
-            return;
+            return true;
 
         var session = new EntranceSession(host, page);
         host.SetValue(SessionProperty, session);
         session.Queue();
+        return true;
     }
 
     private sealed class EntranceSession
@@ -203,8 +210,8 @@ public static class NavigationTransition
                     outer.Children[outer.Children.IndexOf(group)] = original;
             });
 
-            int duration = motion == NavigationMotion.Header ? 380 : 440;
-            element.BeginAnimation(UIElement.OpacityProperty, Track(0, element.Opacity, delay, 300));
+            int duration = motion == NavigationMotion.Header ? 220 : 240;
+            element.BeginAnimation(UIElement.OpacityProperty, Track(0, element.Opacity, delay, 180));
             if (motion == NavigationMotion.Toolbar)
                 translation.BeginAnimation(TranslateTransform.XProperty,
                     Track(MotionPreferences.Distance(element.FlowDirection == FlowDirection.RightToLeft ? -14 : 14), 0, delay, duration));

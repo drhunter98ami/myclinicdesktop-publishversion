@@ -21,6 +21,9 @@ namespace MyClinic
         private readonly int _visitId;
         private readonly List<string> _selectedImagePaths = new();
         private List<string> _existingImagePaths = new();
+        private string? _initialEditState;
+        private bool _saved;
+        private bool _saving;
 
         public VisitEditWindow(int visitId)
         {
@@ -29,6 +32,13 @@ namespace MyClinic
             ApplyThemeVisuals(IsDarkThemeActive());
             RefreshSelectedImages();
             LoadVisit();
+            Closing += (_, args) =>
+            {
+                if (_saved) return;
+                if (_saving) { args.Cancel = true; return; }
+                if (_initialEditState is not null && _initialEditState != CaptureEditState())
+                    args.Cancel = MessageBox.Show(this, "توجد تعديلات لم تُحفظ. هل تريد إغلاق الزيارة وتجاهلها؟", "تعديلات غير محفوظة", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
+            };
             GlobalEvents.OnThemeChanged += ApplyThemeVisuals;
             Closed += (_, _) => GlobalEvents.OnThemeChanged -= ApplyThemeVisuals;
         }
@@ -154,6 +164,26 @@ namespace MyClinic
             FinalTreatmentText.Text = visit.FinalTreatment ?? string.Empty;
             _existingImagePaths = DeserializeAttachmentPaths(visit.AttachedImagePathsJson);
             RefreshSelectedImages();
+            _initialEditState = CaptureEditState();
+        }
+
+        private TextBox[] EditableTextFields() => new[] { PregnancyMonthText, BloodPressureText, HeartRateText, TemperatureText, RespiratoryRateText, WeightText, HeightText, BloodSugarText, SymptomsText, DiagnosisText, TreatmentPlanText, FinalTreatmentText };
+        private string CaptureEditState() => JsonSerializer.Serialize(new { Text = EditableTextFields().Select(t => t.Text).ToArray(), Pregnant = IsPregnantCheckBox.IsChecked, Nursing = IsNursingCheckBox.IsChecked, Images = _selectedImagePaths.ToArray() });
+
+        private bool ValidateNumericFields()
+        {
+            foreach (TextBox field in new[] { HeartRateText, TemperatureText, RespiratoryRateText, WeightText, HeightText, BloodSugarText })
+            {
+                string value = ClinicInput.NormalizeDigits(field.Text).Trim();
+                if (value.Length == 0) { ValidationAssist.SetError(field, ""); continue; }
+                if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal number) || number <= 0)
+                {
+                    ValidationAssist.Show(field, "أدخل رقماً موجباً أو اترك الحقل فارغاً إذا لم يُسجّل."); field.Focus(); return false;
+                }
+                ValidationAssist.SetError(field, "");
+                field.Text = value;
+            }
+            return true;
         }
 
         private void SelectImages_Click(object sender, RoutedEventArgs e)
@@ -212,7 +242,8 @@ namespace MyClinic
 
         private async void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (!int.TryParse(PregnancyMonthText.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out int pregnancyMonth) &&
+            if (_saving || !ValidateNumericFields()) return;
+            if (!int.TryParse(ClinicInput.NormalizeDigits(PregnancyMonthText.Text).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int pregnancyMonth) &&
                 !string.IsNullOrWhiteSpace(PregnancyMonthText.Text))
             {
                 ValidationAssist.Show(PregnancyMonthText, "يرجى إدخال شهر حمل صحيح من 1 إلى 9 أو تركه فارغاً.");
@@ -227,11 +258,12 @@ namespace MyClinic
             }
             using var saveFeedback = SaveFeedback.Begin(this, sender);
             if (!saveFeedback.CanStart) return;
-            await saveFeedback.ShowBusyAsync();
+            _saving = true;
 
 
             try
             {
+                await saveFeedback.ShowBusyAsync();
                 using AppDbContext db = new();
                 Visit? visit = await db.Visits
                     .Include(item => item.ToothRecords)
@@ -240,6 +272,7 @@ namespace MyClinic
                 if (visit is null)
                 {
                     MessageBox.Show("لم تعد الزيارة موجودة في قاعدة البيانات.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _saved = true;
                     DialogResult = false;
                     return;
                 }
@@ -274,6 +307,7 @@ namespace MyClinic
                 if (changes.Count == 0)
                 {
                     MessageBox.Show("لم يتم إجراء أي تغييرات على الزيارة.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _saved = true;
                     DialogResult = false;
                     return;
                 }
@@ -311,12 +345,14 @@ namespace MyClinic
                 AppRuntimeCache.AddOrUpdateVisit(visit);
 
                 saveFeedback.Success("تم حفظ تعديلات الزيارة.");
+                _saved = true;
                 DialogResult = true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"تعذر حفظ تعديل الزيارة:\n{ex.Message}", "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally { _saving = false; }
         }
 
         private static string? Normalize(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

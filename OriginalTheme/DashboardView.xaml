@@ -334,7 +334,7 @@
                 </StackPanel>
 
                 <StackPanel motion:NavigationTransition.Motion="Toolbar" motion:NavigationTransition.Order="2" Grid.Column="2" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
-                    <Button Name="BtnAddPatient" Content="+ إضافة مريض" Width="150" Height="45" Background="White" Foreground="#235DF6" FontSize="16" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddPatient_Click"/>
+                    <Button Name="BtnAddPatient" Content="+ مريض / زيارة" Width="150" Height="45" Background="White" Foreground="#235DF6" FontSize="16" Margin="0,0,12,0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddPatient_Click"/>
                     <Button Name="BtnAddAppointment" Content="+ إضافة موعد جديد" Width="170" Height="45" Background="#153DA7" Foreground="White" FontSize="15" BorderThickness="0" Style="{StaticResource RoundedButtonStyle}" Click="BtnAddAppointment_Click"/>
                 </StackPanel>
             </Grid>
@@ -475,7 +475,7 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" HorizontalAlignment="Right">
-                                                        <TextBlock motion:SearchAssist.Text="{Binding PatientName}" FontFamily="Traditional Arabic" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock motion:SearchAssist.Text="{Binding PatientName}" FontFamily="Segoe UI" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
                                                         <TextBlock motion:SearchAssist.Text="{Binding PhoneNumber}" motion:SearchAssist.Kind="Phone" Margin="0,-4,0,0" FontSize="12" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
                                                     </StackPanel>
                                                     <Border Grid.Column="1" Padding="8,5" CornerRadius="9" Background="{Binding ReasonBackground}" VerticalAlignment="Top">
@@ -822,7 +822,7 @@
 
                         <StackPanel Grid.Column="2" HorizontalAlignment="Right">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock Text="إضافة موعد جديد" FontFamily="Traditional Arabic" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,10,0"/>
+                                <TextBlock Text="إضافة موعد جديد" FontFamily="Segoe UI" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,10,0"/>
                                 <Border Width="38" Height="38" Background="#1A235DF6" CornerRadius="12">
                                     <TextBlock Text="&#xE783;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#235DF6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>

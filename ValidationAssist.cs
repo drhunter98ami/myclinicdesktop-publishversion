@@ -107,20 +107,43 @@ public static class ValidationAssist
     }
     private sealed class ErrorAdorner : Adorner
     {
-        private readonly string _message;
+        private readonly TextBlock _label;
+        private readonly VisualCollection _visuals;
         public ErrorAdorner(UIElement input, string message) : base(input)
         {
-            _message = message; IsHitTestVisible = false;
+            IsHitTestVisible = false;
+            // Keep the adorner's coordinate system unmirrored; the label handles Arabic layout itself.
+            FlowDirection = FlowDirection.LeftToRight;
+            _label = new TextBlock
+            {
+                Text = message, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right,
+                FontFamily = new FontFamily("Segoe UI"), FontSize = 12, Foreground = Brushes.IndianRed,
+                TextWrapping = TextWrapping.Wrap, IsHitTestVisible = false
+            };
+            _visuals = new VisualCollection(this) { _label };
         }
-        private FormattedText Text(double width) => new(_message, CultureInfo.CurrentUICulture,
-            FlowDirection.RightToLeft, new Typeface("Segoe UI"), 12, Brushes.IndianRed, VisualTreeHelper.GetDpi(this).PixelsPerDip)
-            { MaxTextWidth = Math.Max(100, width), TextAlignment = TextAlignment.Right };
-        public double MessageHeight(double width) => Text(width).Height;
+        protected override int VisualChildrenCount => _visuals?.Count ?? 0;
+        protected override Visual GetVisualChild(int index) => _visuals[index];
+        public double MessageHeight(double width)
+        {
+            _label.Measure(new Size(Math.Max(100, width), double.PositiveInfinity));
+            return _label.DesiredSize.Height;
+        }
+        protected override Size MeasureOverride(Size constraint)
+        {
+            MessageHeight(AdornedElement.RenderSize.Width);
+            return AdornedElement.RenderSize;
+        }
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            double width = Math.Max(100, AdornedElement.RenderSize.Width);
+            _label.Arrange(new Rect(0, AdornedElement.RenderSize.Height + 4, width, MessageHeight(width)));
+            return finalSize;
+        }
         protected override void OnRender(DrawingContext context)
         {
             Size size = AdornedElement.RenderSize;
             context.DrawRoundedRectangle(null, new Pen(Brushes.IndianRed, 1.5), new Rect(0, 0, size.Width, size.Height), 6, 6);
-            context.DrawText(Text(size.Width), new Point(0, size.Height + 4));
         }
     }
 }

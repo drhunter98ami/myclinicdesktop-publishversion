@@ -12,6 +12,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.ComponentModel;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -20,10 +23,6 @@ namespace MyClinic
 {
     public partial class PatientRecordsView : UserControl
     {
-        private static string VisitDoctorName => string.IsNullOrWhiteSpace(LoginSessionStore.CurrentUsername)
-            ? "د."
-            : $"د. {LoginSessionStore.CurrentUsername}";
-
         private readonly List<PatientCardModel> _allPatients = new();
 
         // Bulk resets avoid per-row layout work during filtering and refreshes.
@@ -50,6 +49,8 @@ namespace MyClinic
 
             PatientsListBox.ItemsSource = _filteredPatients;
             VisitsListBox.ItemsSource = _selectedPatientVisits;
+            CollectionViewSource.GetDefaultView(_selectedPatientVisits).GroupDescriptions.Add(new PropertyGroupDescription(nameof(VisitHistoryItem.MonthGroup)));
+            _experienceReady = true;
 
             // Pre-render overlay at Collapsed so the first open is instant (avoids cold Measure/Arrange)
             MedicalRecordOverlay.Visibility = Visibility.Collapsed;
@@ -82,6 +83,7 @@ namespace MyClinic
                 return mainWindow.IsDarkTheme;
             if (Application.Current?.MainWindow is MainWindow appMainWindow)
                 return appMainWindow.IsDarkTheme;
+            if (Window.GetWindow(this) is OriginalTheme.MainWindow original) return original.IsDarkTheme;
             return false;
         }
 
@@ -94,7 +96,7 @@ namespace MyClinic
         {
             if (PatientRecordsSpotlightCanvas is not null)
             {
-                PatientRecordsSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
+                PatientRecordsSpotlightCanvas.Visibility = isDark && SpotlightToggle.IsChecked == true && MotionPreferences.Enabled ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -106,7 +108,7 @@ namespace MyClinic
                 return;
             }
 
-            if (!IsDarkThemeActive() || PatientRecordsSpotlightCanvas is null || PatientRecordsSpotlightTransform is null)
+            if (!IsDarkThemeActive() || SpotlightToggle.IsChecked != true || PatientRecordsSpotlightCanvas is null || PatientRecordsSpotlightTransform is null)
                 return;
 
             if (PatientRecordsSpotlightCanvas.Visibility != Visibility.Visible)
@@ -224,12 +226,17 @@ namespace MyClinic
             if (sender is not FrameworkElement { Tag: PatientCardModel patient })
                 return;
 
+            _patientReturnFocus = Keyboard.FocusedElement;
             _selectedPatient = patient;
+            PatientsListBox.SelectedItem = patient;
+            _allPatientVisits.Clear();
+            ClearVisitFilters_Click(this, e);
             DrawerPatientInfoCard.DataContext = patient;
             VisitCounterBadge.Text = patient.VisitCount.ToString(CultureInfo.CurrentCulture);
             VisitScopeText.Text = patient.VisitCount == 1 ? "زيارة محفوظة" : "الزيارات المسجلة";
 
             ShowMedicalRecordDrawer();
+            CloseDrawerButton.Focus();
             HideVisitDetailsOverlay(immediate: true);
 
             _selectedPatientVisits.Clear();
@@ -256,12 +263,14 @@ namespace MyClinic
                         attachmentCollection.Add(item);
                 }
 
+                _visitReturnFocus = Keyboard.FocusedElement;
+                VisitsListBox.SelectedItem = visit;
                 VisitDetailsViewModel viewModel = new()
                 {
+                IsLoadingAttachments = !alreadyCached && visit.AttachmentPaths.Count > 0,
                 VisitId        = visit.VisitId,
                 HasEditHistory = visit.HasEditHistory,
                 PatientName    = _selectedPatient.DisplayName,
-                DoctorName     = VisitDoctorName,
                 VisitDateTimeText      = visit.VisitDateTimeText,
                 BloodTypeText          = _selectedPatient.BloodType,
                 AllergiesText          = _selectedPatient.Allergies,
@@ -289,6 +298,8 @@ namespace MyClinic
 
                 VisitDetailsModal.DataContext = viewModel;
                 ShowVisitDetailsOverlay();
+                VisitTabs.SelectedIndex = 0;
+                VisitTabs.Focus();
 
             // Load attachments on background only if not cached yet
                 if (!alreadyCached && visit.AttachmentPaths.Count > 0)
@@ -306,6 +317,7 @@ namespace MyClinic
                     {
                         foreach (VisitAttachmentItem item in items)
                             viewModel.AttachmentItems.Add(item);
+                        viewModel.IsLoadingAttachments = false;
                     }
                 }
             }
@@ -333,6 +345,9 @@ namespace MyClinic
                 UpdateSelectedPatientState();
                 if (_selectedPatient is not null)
                     await LoadPatientVisitsAsync(_selectedPatient.Id);
+                var updatedVisit = _allPatientVisits.FirstOrDefault(v => v.VisitId == visitId);
+                if (updatedVisit is not null) OpenVisitDetails_Click(new Button { Tag = updatedVisit }, new RoutedEventArgs());
+                ShowRecordsStatus("تم حفظ التعديلات ✓");
 
                 GlobalEvents.NotifyFinancialRecordAdded();
                 if (Window.GetWindow(this) is MainWindow mainWindow)
@@ -407,29 +422,8 @@ namespace MyClinic
 
         private void OpenAttachment_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not FrameworkElement { Tag: VisitAttachmentItem attachment })
-                return;
-
-            if (!File.Exists(attachment.FilePath))
-            {
-                MessageBox.Show("تعذر العثور على الملف المطلوب.", "المرفقات",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = attachment.FilePath,
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                MessageBox.Show("تعذر فتح الملف حالياً.", "المرفقات",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            if (sender is not FrameworkElement { Tag: VisitAttachmentItem attachment } || VisitDetailsModal.DataContext is not VisitDetailsViewModel vm) return;
+            new PatientImageViewer(vm.AttachmentItems, attachment.FilePath, vm.PatientName) { Owner = Window.GetWindow(this) }.ShowDialog();
         }
 
         private void OverlayDimmer_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -459,6 +453,7 @@ namespace MyClinic
 
                 _allPatients.Clear();
                 _allPatients.AddRange(loaded);
+                _loadFailed = false;
                 _hasLoadedData     = true;
                 refreshSucceeded   = true;
 
@@ -473,12 +468,14 @@ namespace MyClinic
             }
             catch
             {
+                _loadFailed = true;
                 _allPatients.Clear();
                 _filteredPatients.Clear();
                 PatientsListBox.Visibility    = Visibility.Collapsed;
                 EmptyStateTitle.Text          = "تعذر تحميل السجلات";
-                EmptyStateDescription.Text    = "حدث خطأ أثناء تحميل بيانات المرضى. حاول فتح السجل مرة أخرى.";
+                EmptyStateDescription.Text    = "حدث خطأ أثناء تحميل بيانات المرضى. اضغط إعادة المحاولة.";
                 EmptyStateCard.Visibility     = Visibility.Visible;
+                EmptyAction.Content = "إعادة المحاولة";
             }
             finally
             {
@@ -498,29 +495,20 @@ namespace MyClinic
 
         private void ApplyFilters()
         {
-            string nameFilter  = TxtNameSearch.Text.Trim();
-            string phoneFilter = TxtPhoneSearch.Text.Trim();
-            using var scrollState = ScrollState.Updating(PatientsListBox, nameFilter + "\0" + phoneFilter);
-            SearchAssist.SetNameQuery(this, nameFilter);
-            SearchAssist.SetPhoneQuery(this, phoneFilter);
-
-            // Build the result list first, then do a single batched UI update
-            List<PatientCardModel> result = _allPatients
-                .Where(p =>
-                    (string.IsNullOrWhiteSpace(nameFilter)  || p.DisplayName.Contains(nameFilter,  StringComparison.CurrentCultureIgnoreCase)) &&
-                    (string.IsNullOrWhiteSpace(phoneFilter) || p.PhoneNumber.Contains(phoneFilter, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            // Keep the exact filtered order, with one UI notification and linear work.
+            if (!_experienceReady || _clearingFilters || _loadFailed) return;
+            string query = TxtNameSearch.Text.Trim();
+            using var scrollState = ScrollState.Updating(PatientsListBox, query + "/" + SortBox.SelectedIndex + "/" + VisitFilterBox.SelectedIndex + "/" + RecentFilterBox.SelectedIndex);
+            SearchAssist.SetNameQuery(this, query);
+            SearchAssist.SetPhoneQuery(this, query);
+            var result = PatientRecordSearch.Filter(_allPatients, query, VisitFilterBox.SelectedIndex, RecentFilterBox.SelectedIndex, SortBox.SelectedIndex, AppClock.Today);
             _filteredPatients.ReplaceAll(result);
-            SearchAssist.Summary(PatientsListBox, result.Count, ("الاسم", TxtNameSearch), ("الهاتف", TxtPhoneSearch));
-
-            EmptyStateTitle.Text       = "لا توجد نتائج مطابقة";
-            EmptyStateDescription.Text = "جرّب البحث باسم مختلف أو رقم هاتف آخر.";
-
-            bool hasItems = _filteredPatients.Count > 0;
-            PatientsListBox.Visibility = hasItems ? Visibility.Visible   : Visibility.Collapsed;
-            EmptyStateCard.Visibility  = hasItems ? Visibility.Collapsed : Visibility.Visible;
+            RenderPatientFilters(result.Count);
+            bool emptyRegister = _allPatients.Count == 0;
+            EmptyStateTitle.Text = emptyRegister ? "لا يوجد مرضى مسجلون بعد" : "لا توجد نتائج مطابقة";
+            EmptyStateDescription.Text = emptyRegister ? "أضف المريض الأول لبدء متابعة الزيارات والعلاج." : "جرّب تغيير البحث أو مسح عوامل التصفية.";
+            EmptyAction.Content = emptyRegister ? "إضافة مريض" : "مسح التصفية";
+            PatientsListBox.Visibility = result.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyStateCard.Visibility = result.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ── DB loading ────────────────────────────────────────────────────────────
@@ -544,6 +532,8 @@ namespace MyClinic
                     FullName         = p.FullName,
                     PhoneNumber      = p.PhoneNumber,
                     Age              = p.Age,
+                    DateOfBirth      = p.DateOfBirth,
+                    BirthYear        = p.BirthYear,
                     Gender           = p.Gender,
                     BloodType        = p.BloodType,
                     Allergies        = p.Allergies,
@@ -572,6 +562,10 @@ namespace MyClinic
         private async Task LoadPatientVisitsAsync(int patientId)
         {
             int loadVersion = ++_visitLoadVersion;
+            _visitsLoading = true;
+            RetryVisitsButton.Visibility = Visibility.Collapsed;
+            EmptyVisitsText.Text = "جارٍ تحميل الزيارات…";
+            EmptyVisitsText.Visibility = Visibility.Visible;
             try
             {
                 List<Visit> dbVisits = await Task.Run(async () =>
@@ -601,11 +595,12 @@ namespace MyClinic
 
                 // Show the list immediately — user sees visits right away
                 if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
-                _selectedPatientVisits.ReplaceAll(mapped);
+                _allPatientVisits.Clear();
+                _allPatientVisits.AddRange(mapped);
+                _visitsLoading = false;
+                ApplyVisitFilters();
 
-                EmptyVisitsText.Text       = "لا توجد زيارات محفوظة لهذا المريض حتى الآن.";
-                EmptyVisitsText.Visibility = _selectedPatientVisits.Count == 0
-                    ? Visibility.Visible : Visibility.Collapsed;
+
 
                 // Attachment thumbnails are loaded by OpenVisitDetails_Click on demand.
                 // Opening a patient's history no longer decodes every historical image.
@@ -614,7 +609,10 @@ namespace MyClinic
             {
                 if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
                 _selectedPatientVisits.Clear();
-                EmptyVisitsText.Text       = $"تعذر تحميل الزيارات: {ex.Message}";
+                _allPatientVisits.Clear();
+                _visitsLoading = false;
+                RetryVisitsButton.Visibility = Visibility.Visible;
+                EmptyVisitsText.Text = "تعذر تحميل الزيارات. حاول مرة أخرى.";
                 EmptyVisitsText.Visibility = Visibility.Visible;
             }
         }
@@ -623,16 +621,18 @@ namespace MyClinic
 
         private void ShowMedicalRecordDrawer()
         {
+            RecordsHeader.IsEnabled = PatientsListBox.IsEnabled = false;
             MedicalRecordOverlay.Visibility = Visibility.Visible;
+            MedicalRecordDrawer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, MotionPreferences.Duration(170)));
             OverlayDimmer.Opacity    = 0;
-            DrawerTranslate.X        = -48;
+            DrawerTranslate.X        = -MotionPreferences.Distance(32);
 
             OverlayDimmer.BeginAnimation(OpacityProperty,
                 new DoubleAnimation(0, 1, MotionPreferences.Duration(170)));
 
             DrawerTranslate.BeginAnimation(
                 System.Windows.Media.TranslateTransform.XProperty,
-                new DoubleAnimation(-48, 0, MotionPreferences.Duration(210))
+                new DoubleAnimation(-MotionPreferences.Distance(32), 0, MotionPreferences.Duration(210))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
@@ -647,27 +647,29 @@ namespace MyClinic
 
             var fade = new DoubleAnimation(OverlayDimmer.Opacity, 0, MotionPreferences.Duration(140));
             OverlayDimmer.BeginAnimation(OpacityProperty, fade);
+            MedicalRecordDrawer.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0, MotionPreferences.Duration(160)));
 
-            var slide = new DoubleAnimation(DrawerTranslate.X, -48, MotionPreferences.Duration(160))
+            var slide = new DoubleAnimation(DrawerTranslate.X, -MotionPreferences.Distance(32), MotionPreferences.Duration(160))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
-            slide.Completed += (_, _) => MedicalRecordOverlay.Visibility = Visibility.Collapsed;
+            slide.Completed += (_, _) => { MedicalRecordOverlay.Visibility = Visibility.Collapsed; RecordsHeader.IsEnabled = PatientsListBox.IsEnabled = true; _patientReturnFocus?.Focus(); };
             DrawerTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slide);
         }
 
         private void ShowVisitDetailsOverlay()
         {
+            MedicalRecordDrawer.IsEnabled = false;
             VisitDetailsOverlay.Visibility = Visibility.Visible;
             VisitDetailsDimmer.Opacity     = 0;
-            VisitDetailsTranslate.Y        = 24;
+            VisitDetailsTranslate.Y        = MotionPreferences.Distance(16);
 
             VisitDetailsDimmer.BeginAnimation(OpacityProperty,
                 new DoubleAnimation(0, 1, MotionPreferences.Duration(170)));
 
             VisitDetailsTranslate.BeginAnimation(
                 System.Windows.Media.TranslateTransform.YProperty,
-                new DoubleAnimation(24, 0, MotionPreferences.Duration(210))
+                new DoubleAnimation(MotionPreferences.Distance(16), 0, MotionPreferences.Duration(210))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
@@ -684,8 +686,9 @@ namespace MyClinic
                 VisitDetailsTranslate.BeginAnimation(
                     System.Windows.Media.TranslateTransform.YProperty, null);
                 VisitDetailsDimmer.Opacity  = 0;
-                VisitDetailsTranslate.Y     = 24;
+                VisitDetailsTranslate.Y     = MotionPreferences.Distance(16);
                 VisitDetailsOverlay.Visibility = Visibility.Collapsed;
+                MedicalRecordDrawer.IsEnabled = true;
 
                 // Explicitly free BitmapImage references to release memory sooner
                 if (VisitDetailsModal.DataContext is VisitDetailsViewModel vm)
@@ -698,16 +701,18 @@ namespace MyClinic
             var fade = new DoubleAnimation(VisitDetailsDimmer.Opacity, 0, MotionPreferences.Duration(140));
             VisitDetailsDimmer.BeginAnimation(OpacityProperty, fade);
 
-            var slide = new DoubleAnimation(VisitDetailsTranslate.Y, 24, MotionPreferences.Duration(160))
+            var slide = new DoubleAnimation(VisitDetailsTranslate.Y, MotionPreferences.Distance(16), MotionPreferences.Duration(160))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
             slide.Completed += (_, _) =>
             {
                 VisitDetailsOverlay.Visibility = Visibility.Collapsed;
+                MedicalRecordDrawer.IsEnabled = true;
                 if (VisitDetailsModal.DataContext is VisitDetailsViewModel vm)
                     vm.AttachmentItems.Clear();
                 VisitDetailsModal.DataContext = null;
+                _visitReturnFocus?.Focus();
             };
             VisitDetailsTranslate.BeginAnimation(
                 System.Windows.Media.TranslateTransform.YProperty, slide);
@@ -742,7 +747,7 @@ namespace MyClinic
             PatientsListBox.Visibility = !firstLoad && _filteredPatients.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             EmptyStateCard.Visibility = !firstLoad && _filteredPatients.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             TxtNameSearch.IsEnabled = !firstLoad;
-            TxtPhoneSearch.IsEnabled = !firstLoad;
+            SortBox.IsEnabled = VisitFilterBox.IsEnabled = RecentFilterBox.IsEnabled = !firstLoad;
         }
 
         // ── Static mapping helpers ────────────────────────────────────────────────
@@ -766,6 +771,8 @@ namespace MyClinic
                     existing.FullName        = string.IsNullOrWhiteSpace(existing.FullName)        ? v.Patient.FullName        : existing.FullName;
                     existing.PhoneNumber     = string.IsNullOrWhiteSpace(existing.PhoneNumber)     ? v.Patient.PhoneNumber     : existing.PhoneNumber;
                     existing.Age             ??= v.Patient.Age;
+                    existing.DateOfBirth     ??= v.Patient.DateOfBirth;
+                    existing.BirthYear       ??= v.Patient.BirthYear;
                     existing.Gender          ??= v.Patient.Gender;
                     existing.BloodType       ??= v.Patient.BloodType;
                     existing.Allergies       ??= v.Patient.Allergies;
@@ -782,6 +789,8 @@ namespace MyClinic
                     FullName         = v.Patient.FullName,
                     PhoneNumber      = v.Patient.PhoneNumber,
                     Age              = v.Patient.Age,
+                    DateOfBirth      = v.Patient.DateOfBirth,
+                    BirthYear        = v.Patient.BirthYear,
                     Gender           = v.Patient.Gender,
                     BloodType        = v.Patient.BloodType,
                     Allergies        = v.Patient.Allergies,
@@ -802,8 +811,8 @@ namespace MyClinic
             Id              = p.Id,
             DisplayName     = string.IsNullOrWhiteSpace(p.FullName) ? "مريض بدون اسم" : p.FullName.Trim(),
             PhoneNumber     = p.PhoneNumber,
-            AgeText         = p.Age?.ToString(CultureInfo.CurrentCulture) ?? "--",
-            AgeWithUnit     = p.Age.HasValue ? $"{p.Age.Value} سنة" : "العمر غير محدد",
+            AgeText         = PatientAge(p)?.ToString(CultureInfo.CurrentCulture) ?? "--",
+            AgeWithUnit     = PatientAge(p) is int age ? $"{age} سنة{(p.DateOfBirth is null && p.BirthYear.HasValue ? " تقريباً" : "")}" : "العمر غير محدد",
             GenderLabel     = string.IsNullOrWhiteSpace(p.Gender) ? "غير محدد" : p.Gender.Trim(),
             VisitCount      = p.VisitCount,
             LatestVisitDate = p.LatestVisitDate ?? DateTime.MinValue,
@@ -812,6 +821,8 @@ namespace MyClinic
             ChronicDiseases = NormalizeOrFallback(p.ChronicDiseases,  "غير محددة"),
             SmokingSummary  = BuildSmokingSummary(p)
         };
+
+        private static int? PatientAge(PatientSummarySnapshot p) => p.DateOfBirth is DateTime birth ? ClinicInput.AgeOn(birth, AppClock.Today) : p.BirthYear is int year ? AppClock.Today.Year - year : p.Age;
 
         private static VisitHistoryItem MapVisit(Visit v)
         {
@@ -989,6 +1000,10 @@ namespace MyClinic
                     .Select(i => new PrescriptionDisplayItem
                     {
                         MedicineName    = i.MedicineName.Trim(),
+                        DosageText      = NormalizeOrFallback(i.Dosage, "غير مسجلة"),
+                        FrequencyText   = string.IsNullOrWhiteSpace(i.FrequencyHours) ? "غير مسجل" : $"كل {i.FrequencyHours.Trim()} ساعات",
+                        TimingText      = NormalizeOrFallback(i.Timing, "غير مسجل"),
+                        NotesText       = NormalizeOrFallback(i.Notes, "لا توجد تعليمات إضافية"),
                         InstructionText = BuildPrescriptionInstruction(i)
                     })
                     .ToList();
@@ -1073,7 +1088,7 @@ namespace MyClinic
             }
             catch
             {
-                return null;
+                return new VisitAttachmentItem { FilePath = filePath, FileName = Path.GetFileName(filePath) };
             }
         }
 
@@ -1102,6 +1117,8 @@ namespace MyClinic
             public string?  FullName         { get; set; }
             public string   PhoneNumber      { get; set; } = string.Empty;
             public int?     Age              { get; set; }
+            public DateTime? DateOfBirth      { get; set; }
+            public int? BirthYear             { get; set; }
             public string?  Gender           { get; set; }
             public string?  BloodType        { get; set; }
             public bool     IsSmoker         { get; set; }
@@ -1131,12 +1148,18 @@ namespace MyClinic
         public string   ChronicDiseases { get; init; } = "غير محددة";
         public string   SmokingSummary  { get; init; } = "غير مدخن";
 
+        public string DemographicsText => $"{AgeWithUnit} · {GenderLabel}";
+        public string FileNumberText => $"رقم الملف: {Id}";
+        public string LatestVisitLabel => VisitCount == 0 ? "لا توجد زيارات سابقة" : $"آخر زيارة: {LatestVisitDate:dd/MM/yyyy}";
+        public string AllergySummary => $"⚠ الحساسية: {Allergies}";
         public string VisitCountLabel =>
             VisitCount == 1 ? "1 زيارة" : $"{VisitCount} زيارات";
     }
 
     public sealed class VisitHistoryItem
     {
+        public string MonthGroup => VisitDate.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("ar"));
+        public string MetadataText => string.Join(" · ", new[] { HasAttachments ? AttachmentLabel : null, HasEditHistory ? "تم تعديلها" : null }.Where(s => s is not null));
         public int      VisitId             { get; init; }       // unique DB id — used as cache key
         public bool     HasEditHistory      { get; init; }
         public DateTime VisitDate           { get; init; }
@@ -1166,8 +1189,30 @@ namespace MyClinic
         public IReadOnlyList<SelectedTreatment>       SelectedTreatments { get; init; } = Array.Empty<SelectedTreatment>();
     }
 
-    public sealed class VisitDetailsViewModel
+    public sealed class VisitDetailsViewModel : INotifyPropertyChanged
     {
+        public VisitDetailsViewModel()
+        {
+            AttachmentItems.CollectionChanged += (_, _) => NotifyAttachments();
+        }
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private bool _loadingAttachments;
+        public bool IsLoadingAttachments { get => _loadingAttachments; set { _loadingAttachments = value; NotifyAttachments(); } }
+        private void NotifyAttachments()
+        {
+            foreach (string property in new[] { nameof(IsLoadingAttachments), nameof(HasAttachments), nameof(AttachmentCountText), nameof(AttachmentStatusText) })
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+        }
+        public string AttachmentStatusText => IsLoadingAttachments ? "جارٍ تحميل معاينات الصور…" : AttachmentItems.Count == 0 ? "لا توجد مرفقات لهذه الزيارة." : AttachmentItems.Any(i => i.Thumbnail is null) ? "تعذر عرض بعض المعاينات. الملفات الأصلية متاحة في العارض للتصدير أو الفتح." : "اختر صورة للعرض والتكبير أو افتح العارض لتصدير عدة صور.";
+        private IEnumerable<RecordedTooth> ChartRow(bool upper)
+        {
+            bool child = DentalChartCategoryText.Contains("Child") || DentalChartCategoryText.Contains("أطفال");
+            int count = child ? 5 : 8;
+            int first = child ? (upper ? 5 : 8) : (upper ? 1 : 4), second = child ? (upper ? 6 : 7) : (upper ? 2 : 3);
+            return Enumerable.Range(1, count).Reverse().Select(n => (first * 10 + n).ToString()).Concat(Enumerable.Range(1, count).Select(n => (second * 10 + n).ToString())).Select(id => new RecordedTooth(id, Teeth.Contains(id)));
+        }
+        public IEnumerable<RecordedTooth> UpperTeeth => ChartRow(true);
+        public IEnumerable<RecordedTooth> LowerTeeth => ChartRow(false);
         public int VisitId { get; init; }
         public bool HasEditHistory { get; init; }
         public string PatientName           { get; init; } = string.Empty;
@@ -1209,6 +1254,10 @@ namespace MyClinic
 
     public sealed class PrescriptionDisplayItem
     {
+        public string DosageText { get; init; } = "غير مسجلة";
+        public string FrequencyText { get; init; } = "غير مسجل";
+        public string TimingText { get; init; } = "غير مسجل";
+        public string NotesText { get; init; } = "لا توجد تعليمات إضافية";
         public string MedicineName    { get; init; } = string.Empty;
         public string InstructionText { get; init; } = "بدون تعليمات إضافية";
     }
@@ -1217,6 +1266,6 @@ namespace MyClinic
     {
         public string      FilePath  { get; init; } = string.Empty;
         public string      FileName  { get; init; } = string.Empty;
-        public BitmapImage Thumbnail { get; init; } = null!;
+        public BitmapImage? Thumbnail { get; init; }
     }
 }

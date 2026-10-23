@@ -46,8 +46,16 @@ namespace MyClinic
         private PatientLookupSnapshot? _selectedPatientLookup;
         private bool _isApplyingPatientLookup;
 
-        public AddPatientView()
+        public AddPatientView() : this(() => new AppDbContext(), true) { }
+
+        public AddPatientView(Func<AppDbContext> contextFactory, bool enableLocalPersistence) : this(contextFactory, enableLocalPersistence, null) { }
+
+        public AddPatientView(Func<AppDbContext> contextFactory, bool enableLocalPersistence, string? draftPath)
         {
+            _createContext = contextFactory;
+            _draftPathOverride = draftPath;
+            _medicinePersistenceEnabled = enableLocalPersistence;
+            _draftsEnabled = enableLocalPersistence || draftPath != null;
             InitializeComponent();
             ItemsPatientSuggestions.ItemsSource = _patientSuggestions;
             ItemsPreviousVisits.ItemsSource = _previousVisits;
@@ -56,8 +64,8 @@ namespace MyClinic
 
             ApplyThemeVisuals(IsDarkThemeActive());
 
-            LoadMedicines();
-            LoadTreatments();
+            if (_medicinePersistenceEnabled) LoadMedicines();
+            _treatmentsTask = LoadTreatments();
 
             UpdateRemainingVisitAmount();
             UpdateFemaleDetailsVisibility();
@@ -65,18 +73,23 @@ namespace MyClinic
             RefreshPrescriptionList();
             RefreshSelectedImagesList();
 
-            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            InitializeWorkflow();
             Loaded += AddPatientView_Loaded;
             Unloaded += AddPatientView_Unloaded;
         }
 
-        private void AddPatientView_Loaded(object sender, RoutedEventArgs e)
+        private async void AddPatientView_Loaded(object sender, RoutedEventArgs e)
         {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
             ApplyThemeVisuals(IsDarkThemeActive());
+            if (!_workflowReady) await StartWorkflowAsync();
         }
 
         private void AddPatientView_Unloaded(object sender, RoutedEventArgs e)
         {
+            _draftTimer.Stop();
+            PreserveDraft();
             GlobalEvents.OnThemeChanged -= HandleThemeChanged;
         }
 
@@ -243,15 +256,15 @@ namespace MyClinic
                 Resources["VisitWarningFg"] = CreateBrush("#B91C1C");
             }
 
-            if (IconBannerSparkles is not null)
-                IconBannerSparkles.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
-
-            if (AddPatientBackSpotlightCanvas is not null)
-                AddPatientBackSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
-            if (AddPatientSurfaceSpotlightCanvas is not null)
-                AddPatientSurfaceSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
-
+            Resources["VisitMainSectionBg"] = CreateBrush(isDark ? "#18345A" : "#DFE8FF");
+            Resources["VisitMainSectionBorder"] = CreateBrush(isDark ? "#345B89" : "#9BB6F0");
+            Resources["VisitMainSectionFg"] = CreateBrush(isDark ? "#DDEAFF" : "#183C79");
+            Resources["VisitSecondarySectionBg"] = CreateBrush(isDark ? "#123333" : "#E3F2F0");
+            Resources["VisitSecondarySectionBorder"] = CreateBrush(isDark ? "#2C6860" : "#A4D3C9");
+            Resources["VisitSecondarySectionFg"] = CreateBrush(isDark ? "#BCF2DF" : "#155B53");
+            Resources["VisitPrimaryBtnFg"] = Brushes.White;
             UpdateChartModeButtons();
+            if (_workflowReady) SetActiveSection(_currentSection);
         }
 
         private void UpdateChartModeButtons()
@@ -270,53 +283,6 @@ namespace MyClinic
 
             BtnChild.Background = !isAdultActive ? activeBg : inactiveBg;
             BtnChild.Foreground = !isAdultActive ? activeFg : inactiveFg;
-        }
-
-        private void AddPatient_PreviewMouseMove(object sender, MouseEventArgs e)
-        {
-            if (!MotionPreferences.Enabled)
-            {
-                AddPatient_MouseLeave(sender, e);
-                return;
-            }
-
-            if (!IsDarkThemeActive())
-                return;
-
-            Point pos = e.GetPosition(AddPatientRootGrid);
-
-            if (AddPatientBackSpotlightCanvas is not null && AddPatientBackSpotlightTransform is not null)
-            {
-                if (AddPatientBackSpotlightCanvas.Visibility != Visibility.Visible)
-                    AddPatientBackSpotlightCanvas.Visibility = Visibility.Visible;
-
-                AddPatientBackSpotlightTransform.X = pos.X - (AddPatientBackSpotlight.Width / 2.0);
-                AddPatientBackSpotlightTransform.Y = pos.Y - (AddPatientBackSpotlight.Height / 2.0);
-            }
-
-            if (AddPatientSurfaceSpotlightCanvas is not null && AddPatientSurfaceSpotlightTransform is not null)
-            {
-                if (AddPatientSurfaceSpotlightCanvas.Visibility != Visibility.Visible)
-                    AddPatientSurfaceSpotlightCanvas.Visibility = Visibility.Visible;
-
-                AddPatientSurfaceSpotlightTransform.X = pos.X - (AddPatientSurfaceSpotlight.Width / 2.0);
-                AddPatientSurfaceSpotlightTransform.Y = pos.Y - (AddPatientSurfaceSpotlight.Height / 2.0);
-            }
-        }
-
-        private void AddPatient_MouseLeave(object sender, MouseEventArgs e)
-        {
-            if (AddPatientBackSpotlightTransform is not null)
-            {
-                AddPatientBackSpotlightTransform.X = -1200;
-                AddPatientBackSpotlightTransform.Y = -1200;
-            }
-
-            if (AddPatientSurfaceSpotlightTransform is not null)
-            {
-                AddPatientSurfaceSpotlightTransform.X = -1200;
-                AddPatientSurfaceSpotlightTransform.Y = -1200;
-            }
         }
 
         #region Medicine Persistence & Autofill Logic
@@ -341,6 +307,7 @@ namespace MyClinic
 
         private void SaveMedicines()
         {
+            if (!_medicinePersistenceEnabled) return;
             try
             {
                 File.WriteAllText(MedicinesFilePath, JsonSerializer.Serialize(_allMedicines));
@@ -420,11 +387,11 @@ namespace MyClinic
 
         #region Treatment Selection Logic
 
-        private async void LoadTreatments()
+        private async Task LoadTreatments()
         {
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
                 var treatments = await db.TreatmentCosts
                     .OrderBy(t => t.TreatmentName)
                     .ToListAsync();
@@ -432,7 +399,7 @@ namespace MyClinic
                 _treatmentSelectionItems.Clear();
                 foreach (var treatment in treatments)
                 {
-                    _treatmentSelectionItems.Add(new TreatmentSelectionItem
+                    var item = new TreatmentSelectionItem
                     {
                         TreatmentId = treatment.Id,
                         TreatmentName = treatment.TreatmentName,
@@ -440,22 +407,42 @@ namespace MyClinic
                         Currency = treatment.Currency,
                         IsSelected = false,
                         Quantity = 1
-                    });
+                    };
+                    _treatmentSelectionItems.Add(item);
+                    SubscribeTreatment(item);
                 }
+                var recentJson = await db.Visits.AsNoTracking().OrderByDescending(v => v.VisitDate)
+                    .Select(v => v.SelectedTreatmentsJson).Take(200).ToListAsync();
+                foreach (var json in recentJson)
+                    foreach (var t in ParseSelectedTreatments(json))
+                        _treatmentFrequency[t.TreatmentId] = _treatmentFrequency.GetValueOrDefault(t.TreatmentId) + 1;
+                foreach (var id in _treatmentSelectionItems.OrderByDescending(t => _treatmentFrequency.GetValueOrDefault(t.TreatmentId)).ThenBy(t => t.TreatmentName).Take(6).Select(t => t.TreatmentId))
+                    _frequentTreatmentIds.Add(id);
             }
             catch (Exception)
             {
+                UiFeedback.Notify(this, "تعذر تحميل قائمة العلاجات. أعد فتح النموذج للمحاولة مجدداً.");
             }
         }
 
         private void TreatmentCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            if (sender is CheckBox { DataContext: TreatmentSelectionItem selected } checkbox)
+                selected.IsSelected = checkbox.IsChecked == true;
+            if (!_suspendDraft && sender is CheckBox { DataContext: TreatmentSelectionItem chosen } && chosen.IsSelected && _activeTooth != null)
+            {
+                var empty = chosen.ToothDetails.FirstOrDefault(d => string.IsNullOrWhiteSpace(d.ToothId));
+                if (empty != null) empty.ToothId = _activeTooth;
+            }
             if (sender is CheckBox { DataContext: TreatmentSelectionItem item } && item.IsSelected && item.IsRootCanal)
             {
                 foreach (var detail in item.ToothDetails.Where(d => !string.IsNullOrWhiteSpace(d.ToothId)))
                     ConfigureCanalsForTooth(detail);
             }
             CalculateTotalCost();
+            UpdateSelectedTreatmentSummary();
+            ScheduleDraft();
+            if (sender is FrameworkElement element) FormMotion.Reveal(element);
         }
 
         private void TreatmentTooth_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -528,7 +515,7 @@ namespace MyClinic
         private void CanalCount_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (sender is TextBox { DataContext: TreatmentToothDetail detail }
-                && int.TryParse(sender is TextBox box ? box.Text : null, out int count))
+                && int.TryParse(ClinicInput.NormalizeDigits(sender is TextBox box ? box.Text : null), out int count))
             {
                 detail.CanalCount = Math.Max(0, count);
                 ResizeCanals(detail);
@@ -588,6 +575,7 @@ namespace MyClinic
 
         private void CalculateTotalCost()
         {
+            if (_suspendDraft) return;
             decimal total = 0;
             foreach (var item in _treatmentSelectionItems)
             {
@@ -600,7 +588,7 @@ namespace MyClinic
                     {
                         try
                         {
-                            using var db = new AppDbContext();
+                            using var db = _createContext();
                             var settings = db.AppSettings.FirstOrDefault();
                             if (settings != null)
                             {
@@ -743,6 +731,7 @@ namespace MyClinic
             AdultChartControl.Visibility = Visibility.Visible;
             ChildChartControl.Visibility = Visibility.Collapsed;
             UpdateChartModeButtons();
+            FormMotion.Reveal(AdultChartControl); ScheduleDraft();
         }
 
         private void BtnChild_Click(object sender, RoutedEventArgs e)
@@ -750,17 +739,21 @@ namespace MyClinic
             AdultChartControl.Visibility = Visibility.Collapsed;
             ChildChartControl.Visibility = Visibility.Visible;
             UpdateChartModeButtons();
+            FormMotion.Reveal(ChildChartControl); ScheduleDraft();
         }
 
         private void PatientLookup_TextChanged(object sender, TextChangedEventArgs e)
         {
-            RefreshPatientSuggestions();
+            if (!_suspendDraft && !_isApplyingPatientLookup && _selectedPatientLookup == null) RefreshPatientSuggestions();
         }
 
         private void BtnApplyPatientSuggestion_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement { Tag: PatientLookupSuggestion suggestion })
             {
+                if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id &&
+                    MessageBox.Show("اختيار مريض مختلف يمسح بيانات الزيارة الحالية. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id) ResetWorkflowForm();
                 ApplyPatientSuggestion(suggestion.Snapshot);
             }
         }
@@ -816,6 +809,7 @@ namespace MyClinic
 
             VisitDetailsModal.DataContext = viewModel;
             VisitDetailsOverlay.Visibility = Visibility.Visible;
+            if (sender is FrameworkElement source) FormMotion.OpenDetails(source, VisitDetailsModal);
 
             if (!alreadyCached && visit.AttachmentPaths.Count > 0)
             {
@@ -922,7 +916,7 @@ namespace MyClinic
                 return;
             }
 
-            string phoneQuery = TxtPhoneNumber.Text.Trim();
+            string phoneQuery = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
             string nameQuery = TxtFullName.Text.Trim();
 
             if (phoneQuery.Length == 0 && nameQuery.Length < 2)
@@ -938,7 +932,7 @@ namespace MyClinic
                 return;
             }
 
-            using var db = new AppDbContext();
+            using var db = _createContext();
             List<PatientLookupSnapshot> candidates = db.Patients
                 .AsNoTracking()
                 .Select(patient => new PatientLookupSnapshot
@@ -947,6 +941,8 @@ namespace MyClinic
                     PhoneNumber = patient.PhoneNumber,
                     FullName = patient.FullName,
                     Age = patient.Age,
+                    DateOfBirth = patient.DateOfBirth,
+                    BirthYear = patient.BirthYear,
                     Gender = patient.Gender,
                     BloodType = patient.BloodType,
                     IsSmoker = patient.IsSmoker,
@@ -981,11 +977,7 @@ namespace MyClinic
                 ? "اختر المريض المناسب لتعبئة البيانات تلقائياً."
                 : "لا توجد نتائج مطابقة حالياً.";
 
-            if (!hasSuggestions && !MatchesSelectedPatient(phoneQuery, nameQuery))
-            {
-                _selectedPatientLookup = null;
-                ClearPreviousVisits();
-            }
+
         }
 
         private void ApplyPatientSuggestion(PatientLookupSnapshot snapshot)
@@ -998,7 +990,9 @@ namespace MyClinic
                 TxtPhoneNumber.Text = snapshot.PhoneNumber;
                 TxtFullName.Text = snapshot.FullName ?? string.Empty;
                 TxtAge.Text = snapshot.Age?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
-
+                _legacyBirthDate = snapshot.DateOfBirth;
+                TxtBirthYear.Text = (snapshot.BirthYear ?? snapshot.DateOfBirth?.Year)?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+                CmbGender.SelectedIndex = -1;
                 TrySelectComboBoxItemByText(CmbGender, snapshot.Gender);
                 if (string.IsNullOrWhiteSpace(snapshot.BloodType))
                 {
@@ -1009,8 +1003,10 @@ namespace MyClinic
                     TrySelectComboBoxItemByText(CmbBloodType, snapshot.BloodType);
                 }
 
-                TxtAllergies.Text = snapshot.Allergies ?? string.Empty;
-                TxtChronicDiseases.Text = snapshot.ChronicDiseases ?? string.Empty;
+                CmbAllergyStatus.SelectedIndex = ClinicInput.AllergyState(snapshot.Allergies);
+                TxtAllergies.Text = CmbAllergyStatus.SelectedIndex == 2 ? snapshot.Allergies ?? string.Empty : string.Empty;
+                CmbChronicDiseaseStatus.SelectedIndex = ClinicInput.ChronicDiseaseState(snapshot.ChronicDiseases);
+                TxtChronicDiseases.Text = CmbChronicDiseaseStatus.SelectedIndex == 2 ? snapshot.ChronicDiseases ?? string.Empty : string.Empty;
 
                 ChkSmoker.IsChecked = snapshot.IsSmoker;
                 TxtSmokingType.Text = snapshot.SmokingType ?? string.Empty;
@@ -1018,6 +1014,9 @@ namespace MyClinic
 
                 LoadPreviousVisits(snapshot);
                 ClearPatientSuggestions();
+                UpdateIdentity();
+                foreach (var field in new Control[] { TxtFullName, TxtPhoneNumber, TxtAge, CmbGender, CmbBloodType }) FormMotion.Highlight(field);
+                ScheduleDraft();
             }
             finally
             {
@@ -1029,7 +1028,7 @@ namespace MyClinic
         {
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
 
                 var rawVisits = db.Visits
                     .AsNoTracking()
@@ -1048,7 +1047,7 @@ namespace MyClinic
                 if (TxtTotalPatientRemaining != null) TxtTotalPatientRemaining.Text = totalRemaining.ToString("0.##", CultureInfo.CurrentCulture);
                 if (PatientFinancialHistoryPanel != null) PatientFinancialHistoryPanel.Visibility = Visibility.Visible;
 
-                List<VisitHistoryItem> visits = rawVisits.Select(MapVisit).ToList();
+                List<VisitHistoryItem> visits = rawVisits.Take(10).Select(MapVisit).ToList();
 
                 _previousVisits.Clear();
                 foreach (VisitHistoryItem visit in visits)
@@ -1064,7 +1063,7 @@ namespace MyClinic
                 if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = visits.Count.ToString(CultureInfo.CurrentCulture);
                 if (TxtPreviousVisitsHint != null)
                 {
-                    TxtPreviousVisitsHint.Text = visits.Count == 1
+                    TxtPreviousVisitsHint.Text = rawVisits.Count > 10 ? "آخر 10 زيارات · السجل الكامل في سجل المرضى." : visits.Count == 1
                         ? "تم العثور على زيارة سابقة واحدة. اضغط عليها لعرض التفاصيل."
                         : $"تم العثور على {visits.Count} زيارات سابقة. اضغط على أي زيارة لعرض التفاصيل.";
                 }
@@ -1233,17 +1232,22 @@ namespace MyClinic
 
         private async void BtnSaveVisit_Click(object sender, RoutedEventArgs e)
         {
-            string phoneNumber = TxtPhoneNumber.Text.Trim();
-            bool valid = ValidationAssist.Check(TxtPhoneNumber, !string.IsNullOrWhiteSpace(phoneNumber), "رقم الهاتف مطلوب لحفظ بيانات المريض.");
-            bool ageValid = TryParseNullableInt(TxtAge.Text, out int? age);
-            valid &= ValidationAssist.Check(TxtAge, ageValid, "يرجى إدخال عمر صحيح أو ترك الحقل فارغاً.");
+            if (_visitCommitted) { UiFeedback.Notify(this, "تم حفظ هذه الزيارة بالفعل. احذف المسودة المتبقية قبل بدء زيارة أخرى."); return; }
+            bool valid = ValidatePatientFields();
+            string phoneNumber = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
             bool costValid = TryParseMoney(TxtCurrentCost.Text, out decimal currentCost) && currentCost >= 0;
             valid &= ValidationAssist.Check(TxtCurrentCost, costValid, "يرجى إدخال تكلفة صحيحة للزيارة.");
-            bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && todayPaid >= 0;
-            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "يرجى إدخال دفعة صحيحة لليوم.");
+            bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && ClinicInput.ValidPayment(currentCost, todayPaid);
+            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "الدفعة يجب أن تكون بين صفر وتكلفة الزيارة. سجّل دفعات الديون السابقة من الشؤون المالية.");
+            valid &= ValidationAssist.Check(CmbPregnancyMonth, ChkPregnant.IsChecked != true || CmbPregnancyMonth.SelectedIndex >= 0, "اختر شهر الحمل.");
             if (!valid)
             {
-                ValidationAssist.FocusFirst(TxtPhoneNumber, TxtAge, TxtCurrentCost, TxtTodayPaid);
+                ValidationAssist.FocusFirst(TxtFullName, TxtPhoneNumber, TxtAge, TxtBirthYear, TxtAllergies, TxtChronicDiseases, TxtCurrentCost, TxtTodayPaid, CmbPregnancyMonth);
+                return;
+            }
+            if (_selectedImagePaths.Any(path => !File.Exists(path)))
+            {
+                UiFeedback.Notify(this, "إحدى الصور المحددة لم تعد موجودة. أعد اختيار الصور قبل حفظ الزيارة.");
                 return;
             }
 
@@ -1258,13 +1262,15 @@ namespace MyClinic
 
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
+                using var transaction = await db.Database.BeginTransactionAsync();
 
                 Patient? patient = null;
 
                 if (_selectedPatientLookup != null)
                 {
                     patient = db.Patients.FirstOrDefault(existingPatient => existingPatient.Id == _selectedPatientLookup.Id);
+                    if (patient == null) { UiFeedback.Notify(this, "لم يعد ملف المريض موجوداً. اختر المريض مجدداً."); return; }
                 }
 
                 bool isExistingPatient = patient is not null;
@@ -1283,15 +1289,7 @@ namespace MyClinic
                     patient.PhoneNumber = phoneNumber;
                 }
 
-                patient.FullName = NullIfWhiteSpace(TxtFullName.Text);
-                patient.Age = age;
-                patient.Gender = GetSelectedComboBoxText(CmbGender);
-                patient.BloodType = NormalizeBloodType(GetSelectedComboBoxText(CmbBloodType));
-                patient.IsSmoker = ChkSmoker.IsChecked == true;
-                patient.SmokingType = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingType.Text) : null;
-                patient.SmokingFrequency = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingFrequency.Text) : null;
-                patient.Allergies = NullIfWhiteSpace(TxtAllergies.Text);
-                patient.ChronicDiseases = NullIfWhiteSpace(TxtChronicDiseases.Text);
+                WritePatientFields(patient);
 
                 double usdToSypRateSnapshot = 15000;
                 var appSettings = db.AppSettings.FirstOrDefault();
@@ -1372,6 +1370,8 @@ namespace MyClinic
                     await db.SaveChangesAsync();
                 }
 
+                await transaction.CommitAsync();
+                _visitCommitted = true;
                 AppRuntimeCache.AddOrUpdateVisit(visit);
 
                 if (Window.GetWindow(this) is MainWindow mainWindow)
@@ -1384,7 +1384,8 @@ namespace MyClinic
                 GlobalEvents.NotifyFileKitCanalCountChanged();
 
                 saveFeedback.Success("تم حفظ المريض والزيارة بنجاح.");
-                ResetForm();
+                if (DeleteDraft()) ResetWorkflowForm();
+                else { _baseline = Fingerprint(CaptureDraft()); _lastSavedDraft = _baseline; }
                 NavigateToDashboard(visit, patient, isExistingPatient, savedVisitDateTime);
             }
             catch (Exception ex)
@@ -1395,7 +1396,14 @@ namespace MyClinic
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
-            ResetForm();
+            if (HasUnsavedChanges())
+            {
+                var answer = MessageBox.Show("هل تريد حفظ التغييرات كمسودة قبل الإغلاق؟\nنعم: حفظ مسودة · لا: تجاهل التغييرات · إلغاء: متابعة التحرير",
+                    "تغييرات غير محفوظة", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (answer == MessageBoxResult.Cancel) return;
+                if (answer == MessageBoxResult.Yes) { if (!PreserveDraft()) return; }
+                else { if (!DeleteDraft()) return; ResetWorkflowForm(); }
+            }
             NavigateToDashboard();
         }
 
@@ -1408,6 +1416,12 @@ namespace MyClinic
             if (TxtRemainingAmount != null)
             {
                 TxtRemainingAmount.Text = remainingAmount.ToString("0.##", CultureInfo.CurrentCulture);
+            }
+            if (TxtPaymentHint != null)
+            {
+                TxtPaymentHint.Text = todayPaid > currentCost ? "الدفعة تتجاوز تكلفة الزيارة. سجّل دفعات الديون السابقة في الشؤون المالية." :
+                    "المبالغ المحاسبية بالليرة السورية (SYP). رصيد الزيارات السابقة معروض بشكل منفصل.";
+                TxtPaymentHint.SetResourceReference(TextBlock.ForegroundProperty, todayPaid > currentCost ? "VisitWarningFg" : "AppTextSecondary");
             }
         }
 
@@ -1447,9 +1461,7 @@ namespace MyClinic
 
         private List<string> GetSelectedToothIds()
         {
-            IEnumerable<string> selectedTeeth = AdultChartControl.Visibility == Visibility.Visible
-                ? AdultChartControl.GetSelectedTeeth()
-                : ChildChartControl.GetSelectedTeeth();
+            IEnumerable<string> selectedTeeth = AdultChartControl.GetSelectedTeeth().Concat(ChildChartControl.GetSelectedTeeth());
 
             return selectedTeeth
                 .Distinct(StringComparer.Ordinal)
@@ -1501,7 +1513,7 @@ namespace MyClinic
                 return true;
             }
 
-            if (int.TryParse(value.Trim(), out int parsedValue))
+            if (int.TryParse(ClinicInput.NormalizeDigits(value), out int parsedValue))
             {
                 result = parsedValue;
                 return true;
@@ -1519,7 +1531,7 @@ namespace MyClinic
                 return true;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
                    decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
@@ -1532,7 +1544,7 @@ namespace MyClinic
                 return 0;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal currentCultureValue)
                 ? currentCultureValue
@@ -1635,6 +1647,7 @@ namespace MyClinic
 
             LstPrescriptionEntries.ItemsSource = null;
             LstPrescriptionEntries.ItemsSource = _prescriptionItems.Select(FormatPrescriptionItem).ToList();
+            FormMotion.Reveal(LstPrescriptionEntries); ScheduleDraft();
         }
 
         private void RefreshSelectedImagesList()
@@ -1652,6 +1665,7 @@ namespace MyClinic
             TxtImageSelectionHint.Text = _selectedImagePaths.Count == 0
                 ? "لا توجد صور محددة بعد"
                 : $"تم اختيار {_selectedImagePaths.Count} من {MaxVisitImages} صور";
+            ScheduleDraft();
         }
 
         private static string FormatPrescriptionItem(PrescriptionItem item)
@@ -1951,7 +1965,7 @@ namespace MyClinic
                 return false;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
                    decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
@@ -2096,8 +2110,8 @@ namespace MyClinic
         {
             TxtPhoneNumber.Clear();
             TxtFullName.Clear();
-            TxtAge.Text = "0";
-            CmbGender.SelectedIndex = 0;
+            TxtAge.Clear();
+            CmbGender.SelectedIndex = -1;
             CmbBloodType.SelectedIndex = 0;
 
             TxtCurrentCost.Text = "0";
@@ -2110,7 +2124,7 @@ namespace MyClinic
 
             ChkPregnant.IsChecked = false;
             ChkNursing.IsChecked = false;
-            CmbPregnancyMonth.SelectedIndex = 0;
+            CmbPregnancyMonth.SelectedIndex = -1;
 
             TxtAllergies.Clear();
             TxtChronicDiseases.Clear();
@@ -2166,6 +2180,8 @@ namespace MyClinic
             public string PhoneNumber { get; init; } = string.Empty;
             public string? FullName { get; init; }
             public int? Age { get; init; }
+            public DateTime? DateOfBirth { get; init; }
+            public int? BirthYear { get; init; }
             public string? Gender { get; init; }
             public string? BloodType { get; init; }
             public bool IsSmoker { get; init; }

@@ -174,6 +174,12 @@ namespace MyClinic.Migrations
                     b.Property<string>("ChronicDiseases")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("BirthYear")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FullName")
                         .HasColumnType("TEXT");
 

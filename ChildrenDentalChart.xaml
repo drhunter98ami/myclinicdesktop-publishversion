@@ -1,153 +1,62 @@
-<UserControl x:Class="MyClinic.ChildrenDentalChart"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="550" Height="300">
-
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="MyClinic.ChildrenDentalChart" FlowDirection="LeftToRight" MinHeight="320" HorizontalAlignment="Stretch">
     <UserControl.Resources>
-        <Style x:Key="UpperToothStyle" TargetType="ToggleButton">
-            <Setter Property="Background" Value="{DynamicResource DashFilterGroupBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Margin" Value="4"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="45" Height="74">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock x:Name="ToothLabel"
-                                       Text="{TemplateBinding Content}"
-                                       FontWeight="Bold"
-                                       FontSize="13.5"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,0,0,8"/>
-
-                            <Grid Grid.Row="1" Width="40" Height="40" x:Name="ToothBody">
-                                <Path x:Name="ToothPath"
-                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z"
-                                      Fill="{TemplateBinding Background}"
-                                      Stroke="{TemplateBinding BorderBrush}"
-                                      StrokeThickness="1.6"
-                                      StrokeLineJoin="Round"
-                                      RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform>
-                                        <ScaleTransform ScaleY="-1"/>
-                                    </Path.RenderTransform>
-                                </Path>
-                            </Grid>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashCalendarTodayBg}"/>
-                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.92"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashActiveFilterBg}"/>
-                                <Setter TargetName="ToothPath" Property="Stroke" Value="{DynamicResource DashCalendarTodayBorder}"/>
-                                <Setter TargetName="ToothLabel" Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="LowerToothStyle" TargetType="ToggleButton" BasedOn="{StaticResource UpperToothStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="45" Height="74">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Grid Grid.Row="0" Width="40" Height="40" x:Name="ToothBody">
-                                <Path x:Name="ToothPath"
-                                      Data="M 10,3 C 5,3 5,18 8,23 C 10,33 10,38 12,38 C 15,38 18,28 20,23 C 22,28 25,38 28,38 C 30,38 30,33 32,23 C 35,18 35,3 30,3 C 25,3 22,10 20,10 C 18,10 15,3 10,3 Z"
-                                      Fill="{TemplateBinding Background}"
-                                      Stroke="{TemplateBinding BorderBrush}"
-                                      StrokeThickness="1.6"
-                                      StrokeLineJoin="Round"/>
-                            </Grid>
-
-                            <TextBlock x:Name="ToothLabel"
-                                       Grid.Row="1"
-                                       Text="{TemplateBinding Content}"
-                                       FontWeight="Bold"
-                                       FontSize="13.5"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,8,0,0"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashCalendarTodayBg}"/>
-                                <Setter TargetName="ToothBody" Property="Opacity" Value="0.92"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="ToothPath" Property="Fill" Value="{DynamicResource DashActiveFilterBg}"/>
-                                <Setter TargetName="ToothPath" Property="Stroke" Value="{DynamicResource DashCalendarTodayBorder}"/>
-                                <Setter TargetName="ToothLabel" Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/MyClinic;component/DentalChartStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </UserControl.Resources>
-
-    <Viewbox Stretch="Uniform">
-        <Grid Margin="20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="40"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="30"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="65" Grid.Row="0" Grid.Column="0"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="64" Grid.Row="0" Grid.Column="1"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="63" Grid.Row="0" Grid.Column="2"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="62" Grid.Row="0" Grid.Column="3"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="61" Grid.Row="0" Grid.Column="4"/>
-
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="51" Grid.Row="0" Grid.Column="6"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="52" Grid.Row="0" Grid.Column="7"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="53" Grid.Row="0" Grid.Column="8"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="54" Grid.Row="0" Grid.Column="9"/>
-            <ToggleButton Style="{StaticResource UpperToothStyle}" Content="55" Grid.Row="0" Grid.Column="10"/>
-
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="75" Grid.Row="2" Grid.Column="0"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="74" Grid.Row="2" Grid.Column="1"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="73" Grid.Row="2" Grid.Column="2"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="72" Grid.Row="2" Grid.Column="3"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="71" Grid.Row="2" Grid.Column="4"/>
-
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="81" Grid.Row="2" Grid.Column="6"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="82" Grid.Row="2" Grid.Column="7"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="83" Grid.Row="2" Grid.Column="8"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="84" Grid.Row="2" Grid.Column="9"/>
-            <ToggleButton Style="{StaticResource LowerToothStyle}" Content="85" Grid.Row="2" Grid.Column="10"/>
-
-            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="5" BorderBrush="{DynamicResource DashCalendarTodayBorder}" BorderThickness="2,0,0,0" Margin="14,10,0,10" Opacity="0.6"/>
+    <StackPanel>
+        <Grid Margin="8,0,8,8">
+            <TextBlock Text="يمين المريض" HorizontalAlignment="Left" Foreground="{DynamicResource AppTextSecondary}" />
+            <TextBlock Text="يسار المريض" HorizontalAlignment="Right" Foreground="{DynamicResource AppTextSecondary}" />
         </Grid>
-    </Viewbox>
+        <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="24" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="20" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="48" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.ColumnSpan="11" Text="الفك العلوي" HorizontalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}" FontSize="13" />
+                <TextBlock Grid.Row="2" Grid.ColumnSpan="11" Text="الفك السفلي" HorizontalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}" FontSize="13" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="55" Tag="Upper" Grid.Row="1" Grid.Column="0" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="54" Tag="Upper" Grid.Row="1" Grid.Column="1" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="53" Tag="Upper" Grid.Row="1" Grid.Column="2" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="52" Tag="Upper" Grid.Row="1" Grid.Column="3" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="51" Tag="Upper" Grid.Row="1" Grid.Column="4" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="61" Tag="Upper" Grid.Row="1" Grid.Column="6" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="62" Tag="Upper" Grid.Row="1" Grid.Column="7" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="63" Tag="Upper" Grid.Row="1" Grid.Column="8" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="64" Tag="Upper" Grid.Row="1" Grid.Column="9" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="65" Tag="Upper" Grid.Row="1" Grid.Column="10" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="85" Tag="Lower" Grid.Row="3" Grid.Column="0" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="84" Tag="Lower" Grid.Row="3" Grid.Column="1" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="83" Tag="Lower" Grid.Row="3" Grid.Column="2" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="82" Tag="Lower" Grid.Row="3" Grid.Column="3" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="81" Tag="Lower" Grid.Row="3" Grid.Column="4" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="71" Tag="Lower" Grid.Row="3" Grid.Column="6" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="72" Tag="Lower" Grid.Row="3" Grid.Column="7" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="73" Tag="Lower" Grid.Row="3" Grid.Column="8" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="74" Tag="Lower" Grid.Row="3" Grid.Column="9" />
+                <ToggleButton Style="{StaticResource AnatomicalTooth}" Content="75" Tag="Lower" Grid.Row="3" Grid.Column="10" />
+                <Border Grid.Row="1" Grid.RowSpan="3" Grid.Column="5" Width="1" Background="{DynamicResource AppBorder}" Margin="0,8" />
+            </Grid>
+        </Viewbox>
+        <TextBlock Text="ترقيم FDI · انقر على السن لتحديده · مرّر المؤشر لعرض نوع السن" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,8,0,0" />
+    </StackPanel>
 </UserControl>

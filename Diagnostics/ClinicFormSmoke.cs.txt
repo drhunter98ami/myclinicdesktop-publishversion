@@ -1,0 +1,237 @@
+using System.Globalization;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using MyClinic;
+using MyClinic.Models;
+
+static class ClinicChecks
+{
+    static int checks;
+    static readonly string output = System.IO.Path.GetFullPath("obj/ClinicFormSmoke/previews");
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); checks++; }
+    static void Pump(int ms = 80)
+    {
+        var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static void Until(Func<bool> condition)
+    { for (int i = 0; i < 80 && !condition(); i++) Pump(50); Assert(condition(), "Asynchronous form operation completed"); }
+    static object? Call(object target, string method, params object?[] args) => target.GetType().GetMethod(method, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(target, args);
+    static T Field<T>(UserControl form, string name) => (T)form.FindName(name);
+    static void Theme(bool dark)
+    {
+        string code = System.IO.File.ReadAllText("MainWindow.xaml.cs");
+        int start = code.IndexOf("private void SetTheme(bool isDark)");
+        int first = code.IndexOf("res[\"AppWindowBg\"]", start), second = code.IndexOf("res[\"AppWindowBg\"]", first+1);
+        string section = dark ? code[first..second] : code[second..];
+        foreach (Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\""))
+            Application.Current.Resources[m.Groups[1].Value] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value));
+        foreach (Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateGradient\\(\"([^\"]+)\",\\s*\"([^\"]+)\""))
+            Application.Current.Resources[m.Groups[1].Value] = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value),(Color)ColorConverter.ConvertFromString(m.Groups[3].Value),45);
+    }
+    static Window Host(UIElement content, double width=1300, double height=900)
+    {
+        var root = new Grid { Background = Application.Current.TryFindResource("AppWindowBg") as Brush ?? Brushes.White };
+        root.Children.Add(new AdornerDecorator { Child = content, Margin = new Thickness(18) });
+        var w = new Window { Content=root, Width=width, Height=height, Left=-12000, Top=-12000, ShowInTaskbar=false, ShowActivated=false };
+        w.Show(); Pump(140); return w;
+    }
+    static void Capture(Window w, string name)
+    {
+        foreach (var close in Find<Button>(w).Where(b=>b.Content?.ToString()=="×").ToArray()) close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Pump(280); var root=(FrameworkElement)w.Content;
+        var bitmap=new RenderTargetBitmap((int)root.ActualWidth,(int)root.ActualHeight,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
+        var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream=System.IO.File.Create(System.IO.Path.Combine(output,name+".png"));png.Save(stream);
+    }
+    static IEnumerable<T> Find<T>(DependencyObject root) where T:DependencyObject
+    {
+        if(root is T found)yield return found;
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++)foreach(var c in Find<T>(VisualTreeHelper.GetChild(root,i)))yield return c;
+    }
+    static void Dentistry()
+    {
+        Assert(ToothGlyph.CrownGeometry(11).ToString()!=ToothGlyph.CrownGeometry(12).ToString(),"Central and lateral incisors differ");
+        Assert(ToothGlyph.CrownGeometry(11).ToString()!=ToothGlyph.CrownGeometry(31).ToString(),"Upper and lower incisors differ");
+        Assert(ToothGlyph.RootGeometry(16).ToString()!=ToothGlyph.RootGeometry(46).ToString(),"Upper and lower molar roots differ");
+        Assert(ToothGlyph.RootGeometry(14).ToString()!=ToothGlyph.RootGeometry(15).ToString(),"First and second upper premolar roots differ");
+        Assert(ToothGlyph.CrownGeometry(54).ToString()!=ToothGlyph.CrownGeometry(14).ToString(),"Primary molars are not drawn as premolars");
+        Assert(ToothGlyph.RootGeometry(55).ToString()!=ToothGlyph.RootGeometry(16).ToString(),"Primary molars have different root proportions");
+        foreach(var type in new[]{typeof(AdultDentalChart),typeof(ChildrenDentalChart),typeof(MyClinic.OriginalTheme.AdultDentalChart),typeof(MyClinic.OriginalTheme.ChildrenDentalChart)})
+        {
+            var chart=(UserControl)Activator.CreateInstance(type)!;var window=Host(chart,1050,520);
+            var buttons=Find<ToggleButton>(chart).ToList();bool child=type.Name.Contains("Children");
+            Assert(buttons.Count==(child?20:32),"Chart has every FDI tooth exactly once");
+            Assert(buttons.Select(b=>b.Content.ToString()).Distinct().Count()==buttons.Count,"FDI identities are unique");
+            Assert(buttons.All(b=>ToothGlyph.IsValidId(int.Parse(b.Content.ToString()!))),"All FDI identities are valid");
+            foreach(var b in buttons){b.IsChecked=true;}
+            Assert(((System.Collections.IEnumerable)type.GetMethod("GetSelectedTeeth")!.Invoke(chart,null)!).Cast<string>().Count()==buttons.Count,"Every chart tooth can be selected");
+            type.GetMethod("ClearSelection")!.Invoke(chart,null);Assert(buttons.All(b=>b.IsChecked==false),"Clear selection resets every tooth");
+            buttons[0].IsChecked=true;Capture(window,(type.Namespace!.Contains("Original")?"original":"modern")+(child?"-primary-chart":"-adult-chart"));window.Close();
+        }
+        CultureInfo previous=CultureInfo.CurrentCulture;
+        try { CultureInfo.CurrentCulture=new CultureInfo("fr-FR"); for(int q=1;q<=8;q++)for(int n=1;n<=(q<=4?8:5);n++){ToothGlyph.CrownGeometry(q*10+n);ToothGlyph.RootGeometry(q*10+n);} }
+        finally { CultureInfo.CurrentCulture=previous; }
+        Assert(true,"All geometries parse in decimal-comma locales");
+    }
+    static void UpgradeAndRecovery()
+    {
+        string databasePath=System.IO.Path.GetFullPath("obj/ClinicFormSmoke/upgrade-"+Guid.NewGuid().ToString("N")+".db");
+        var options=new DbContextOptionsBuilder<AppDbContext>().UseSqlite("Data Source="+databasePath).Options;
+        using(var db=new AppDbContext(options))db.Database.ExecuteSqlRaw("CREATE TABLE Patients (Id INTEGER PRIMARY KEY, FullName TEXT); INSERT INTO Patients VALUES (1, 'Synthetic existing patient');");
+        for(int i=0;i<2;i++)using(var db=new AppDbContext(options))typeof(MyClinic.App).GetMethod("EnsureColumnExists",BindingFlags.NonPublic|BindingFlags.Static)!.Invoke(null,new object[]{db,"Patients","DateOfBirth","TEXT NULL"});
+        for(int i=0;i<2;i++)using(var db=new AppDbContext(options))typeof(MyClinic.App).GetMethod("EnsureColumnExists",BindingFlags.NonPublic|BindingFlags.Static)!.Invoke(null,new object[]{db,"Patients","BirthYear","INTEGER NULL"});
+        using(var connection=new SqliteConnection("Data Source="+databasePath))
+        {
+            connection.Open();using var command=connection.CreateCommand();command.CommandText="SELECT FullName FROM Patients WHERE Id=1 AND DateOfBirth IS NULL AND BirthYear IS NULL";
+            Assert((string?)command.ExecuteScalar()=="Synthetic existing patient","DOB upgrade is idempotent and preserves existing patient data");
+        }
+        using var memory=new SqliteConnection("Data Source=:memory:");memory.Open();
+        var memoryOptions=new DbContextOptionsBuilder<AppDbContext>().UseSqlite(memory).Options;
+        AppDbContext Context()=>new(memoryOptions);using(var db=Context())db.Database.EnsureCreated();
+        string draftPath=System.IO.Path.GetFullPath("obj/ClinicFormSmoke/recovery.draft");if(System.IO.File.Exists(draftPath))System.IO.File.Delete(draftPath);
+        var form=new AddPatientView(Context,false,draftPath);var window=Host(form);Until(()=>Field<TextBox>(form,"TxtFullName").IsEnabled);
+        Field<TextBox>(form,"TxtFullName").Text="Recoverable synthetic patient";
+        Field<TextBox>(form,"TxtDiagnosis").Text="Unfinished clinical note";
+        Assert(form.PreserveDraft()&&System.IO.File.Exists(draftPath),"Leaving an edited form writes an encrypted draft");window.Close();
+        var reopened=new AddPatientView(Context,false,draftPath);window=Host(reopened);Until(()=>Field<TextBox>(reopened,"TxtFullName").IsEnabled);
+        Assert(Field<TextBox>(reopened,"TxtFullName").Text=="Recoverable synthetic patient"&&Field<TextBox>(reopened,"TxtDiagnosis").Text=="Unfinished clinical note","Reopening recovers unsaved identity and clinical notes");
+        Field<TextBox>(reopened,"TxtFullName").Clear();Field<TextBox>(reopened,"TxtDiagnosis").Clear();
+        Assert(reopened.PreserveDraft()&&!System.IO.File.Exists(draftPath),"Reverting to the empty baseline removes obsolete recovered draft data");window.Close();
+        var blocked=new DraftGuard();var host=new ContentControl{Content=blocked};
+        Assert(!NavigationTransition.Show(host,new Border())&&ReferenceEquals(host.Content,blocked),"Failed draft preservation keeps the current form visible");
+        blocked.Allow=true;Assert(NavigationTransition.Show(host,new Border())&&host.Content is Border,"Navigation proceeds after draft preservation succeeds");
+    }
+    sealed class DraftGuard:UserControl,IRecoverableClinicForm { public bool Allow; public bool PreserveDraft()=>Allow; }
+    static void Form(Type type, bool dark)
+    {
+        using var connection=new SqliteConnection("Data Source=:memory:");connection.Open();
+        var options=new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        AppDbContext Context()=>new(options);
+        using(var db=Context())
+        {
+            db.Database.EnsureCreated();db.TreatmentCosts.Add(new TreatmentCost {TreatmentName="حشو تجريبي",Cost=100,Currency="SYP"});
+            db.TreatmentCosts.Add(new TreatmentCost {TreatmentName="تنظيف تجريبي",Cost=50,Currency="SYP"});db.SaveChanges();
+        }
+        Theme(dark);
+        var form=(UserControl)Activator.CreateInstance(type,new object[]{(Func<AppDbContext>)Context,false})!;
+        var window=Host(form);Until(()=>Field<TextBox>(form,"TxtFullName").IsEnabled);
+        Call(form,"ApplyThemeVisuals",dark);
+        Assert(Field<TextBox>(form,"TxtAge").Text=="" && Field<ComboBox>(form,"CmbGender").SelectedIndex==-1,"Demographics are not prefilled with invented values");
+        Assert(Field<ComboBox>(form,"CmbPregnancyMonth").SelectedIndex==-1,"Pregnancy month starts unknown");
+        ValidationAssist.Show(Field<TextBox>(form,"TxtFullName"),"اسم المريض مطلوب.");Pump();
+        var errorLabel=Find<TextBlock>(AdornerLayer.GetAdornerLayer(Field<TextBox>(form,"TxtFullName"))!).FirstOrDefault(t=>t.Text=="اسم المريض مطلوب.");
+        Assert(errorLabel!=null&&errorLabel.FlowDirection==FlowDirection.RightToLeft,"Arabic validation uses native RTL text rather than a mirrored drawing");
+        Pump();
+        var firstCharacter=errorLabel!.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        var firstPosition=errorLabel.TranslatePoint(new Point(firstCharacter.X,firstCharacter.Y),form);
+        var inputPosition=Field<TextBox>(form,"TxtFullName").TranslatePoint(new Point(),form);
+        Assert(firstPosition.X>inputPosition.X+Field<TextBox>(form,"TxtFullName").ActualWidth/2,
+            $"Arabic validation starts on the right of its input: {firstPosition.X:0} versus {inputPosition.X:0}, label width {errorLabel.ActualWidth:0}");
+        Capture(window,(type.Namespace!.Contains("Original")?"original":"modern")+(dark?"-dark":"-light")+"-validation");
+        Field<TextBox>(form,"TxtFullName").Text="مريض تجريبي";Field<TextBox>(form,"TxtPhoneNumber").Text="٠٩١٢٣٤٥٦٧٨";
+        Field<TextBox>(form,"TxtBirthYear").Text=(AppClock.Today.Year-30).ToString(CultureInfo.InvariantCulture);
+        Assert(Field<TextBox>(form,"TxtAge").Text=="30" && Field<TextBox>(form,"TxtAge").IsReadOnly,"Year-only input calculates approximate age without asking for a month or day");
+        Assert(form.FindName("BirthDate")==null && form.FindName("BtnSavePatient")==null,"Full-date picker and patient-only action are removed");
+        var mainHeader=(ToggleButton)Field<AnimatedSection>(form,"PatientSection").Template.FindName("PART_SectionHeader",Field<AnimatedSection>(form,"PatientSection"));
+        var secondaryHeader=(ToggleButton)Field<AnimatedSection>(form,"PreviousVisitsSection").Template.FindName("PART_SectionHeader",Field<AnimatedSection>(form,"PreviousVisitsSection"));
+        Assert(mainHeader.Background.ToString()!=secondaryHeader.Background.ToString(),"Main and secondary section headers have distinct highlight palettes");
+        Field<ComboBox>(form,"CmbChronicDiseaseStatus").SelectedIndex=2;
+        Assert(Field<TextBox>(form,"TxtChronicDiseases").Visibility==Visibility.Visible,"Chronic disease details appear only for the specified state");
+        Field<TextBox>(form,"TxtChronicDiseases").Text="مرض تجريبي";
+        Assert(Field<TextBlock>(form,"TxtIdentityAlert").Text.Contains("مرض تجريبي"),"Chronic disease details reach the persistent alert");
+        Field<ComboBox>(form,"CmbChronicDiseaseStatus").SelectedIndex=1;
+        Assert(Field<TextBox>(form,"TxtChronicDiseases").Visibility==Visibility.Collapsed,"None-known state hides obsolete chronic disease details");
+        Field<ComboBox>(form,"CmbAllergyStatus").SelectedIndex=2;Field<TextBox>(form,"TxtAllergies").Text="حساسية تجريبية";
+        Assert(Field<TextBlock>(form,"TxtIdentityAlert").Text.Contains("حساسية تجريبية"),"Persistent identity strip shows documented allergy");
+        Field<ComboBox>(form,"CmbAllergyStatus").SelectedIndex=1;
+        Assert(Field<TextBox>(form,"TxtAllergies").Visibility==Visibility.Collapsed,"None-reported allergy hides obsolete details");
+        using(var db=Context())Assert(db.Patients.Count()==0 && db.Visits.Count()==0,"Editing the form does not save a patient before finishing the visit");
+        var selected=(System.Collections.ObjectModel.ObservableCollection<TreatmentSelectionItem>)type.GetField("_treatmentSelectionItems",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(form)!;
+        Field<TextBox>(form,"TxtTreatmentSearch").Text="تنظيف";Pump();
+        Assert(Field<ItemsControl>(form,"TreatmentItemsControl").Items.Count==1,"Treatment search filters the visible list");
+        Field<TextBox>(form,"TxtTreatmentSearch").Clear();selected[0].IsSelected=true;selected[0].Quantity=1;selected[0].ToothDetails[0].ToothId="11";
+        Field<TextBox>(form,"TxtCurrentCost").Text="١٠٠";Field<TextBox>(form,"TxtTodayPaid").Text="١٥٠";
+        Call(form,"BtnSaveVisit_Click",Field<Button>(form,"BtnSaveVisit"),new RoutedEventArgs());Pump();
+        using(var db=Context())Assert(db.Visits.Count()==0,"Overpayment never creates a visit");
+        Assert(ValidationAssist.GetError(Field<TextBox>(form,"TxtTodayPaid")).Length>0,"Overpayment has an inline field error");
+        var adult=(UserControl)form.FindName("AdultChartControl");var child=(UserControl)form.FindName("ChildChartControl");
+        adult.GetType().GetMethod("SelectTooth")!.Invoke(adult,new object[]{"11"});child.GetType().GetMethod("SelectTooth")!.Invoke(child,new object[]{"55"});
+        Assert(((List<string>)Call(form,"GetSelectedToothIds")!).Count==2,"Mixed dentition persists across chart switches");
+        var draft=(PatientFormDraft)Call(form,"CaptureDraft")!;
+        string draftPath=System.IO.Path.GetFullPath("obj/ClinicFormSmoke/synthetic.draft");draft.SavedAt=AppClock.Now;PatientDraftStore.SaveAt(draftPath,draft);
+        Assert(!System.IO.File.ReadAllText(draftPath).Contains("مريض تجريبي"),"Draft is protected rather than stored as plaintext");
+        var restored=PatientDraftStore.LoadAt(draftPath)!;
+        Assert(restored.Text["TxtFullName"]=="مريض تجريبي" && restored.Treatments.Count==1 && restored.AdultTeeth.Contains("11") && restored.ChildTeeth.Contains("55"),"Encrypted draft round-trip includes clinical state");
+        Field<TextBox>(form,"TxtTodayPaid").Text="٥٠";
+        Call(form,"BtnSaveVisit_Click",Field<Button>(form,"BtnSaveVisit"),new RoutedEventArgs());Until(()=>form.IsEnabled);Pump(150);
+        using(var db=Context())
+        {
+            Assert(db.Patients.Count()==1 && db.Visits.Count()==1 && db.Appointments.Count()==1,"Finishing a visit saves the patient and appointment together");
+            var patient=db.Patients.Single();
+            Assert(patient.PhoneNumber=="0912345678" && patient.BirthYear==AppClock.Today.Year-30 && patient.DateOfBirth==null,"Birth year persists without inventing a month/day");
+            Assert(patient.ChronicDiseases=="لا توجد أمراض معروفة" && patient.Allergies=="لا توجد حساسية معروفة","None-known medical states persist explicitly");
+            var visit=db.Visits.Include(v=>v.ToothRecords).Single();Assert(visit.CurrentCost==100 && visit.TodayPaid==50 && visit.RemainingAmount==50,"Payment math is exact after localized input");
+            Assert(visit.ToothRecords.Any(t=>t.ToothId=="11") && visit.ToothRecords.Any(t=>t.ToothId=="55"),"Both dentitions reach saved tooth records");
+        }
+        Patient historyPatient;
+        using(var db=Context())
+        {
+            historyPatient=db.Patients.Single();
+            for(int i=0;i<7;i++)db.Visits.Add(new Visit{PatientId=historyPatient.Id,VisitDate=AppClock.Now.AddDays(-i-1),Symptoms="زيارة تجريبية",CurrentCost=10});
+            db.SaveChanges();
+        }
+        var snapshot=type.GetMethod("Snapshot",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,new object[]{historyPatient})!;
+        Call(form,"ApplyPatientSuggestion",snapshot);Pump(120);
+        var historySection=Field<AnimatedSection>(form,"PreviousVisitsSection");historySection.IsExpanded=true;Pump();
+        var formScroll=Field<ScrollViewer>(form,"FormScroll");var history=Field<ListBox>(form,"ItemsPreviousVisits");
+        Field<Button>(form,"NavPatient").Focus();
+        formScroll.ScrollToVerticalOffset(history.TranslatePoint(new Point(),Field<StackPanel>(form,"FormSections")).Y);Pump();
+        var historyEntry=Find<Button>(history).First();double previousOffset=formScroll.VerticalOffset;
+        historyEntry.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,-120){RoutedEvent=Mouse.PreviewMouseWheelEvent});Pump();
+        Assert(formScroll.VerticalOffset>previousOffset,"Wheel scrolls down while the pointer is over a previous-visit entry");
+        previousOffset=formScroll.VerticalOffset;
+        historyEntry.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,120){RoutedEvent=Mouse.PreviewMouseWheelEvent});Pump();
+        Assert(formScroll.VerticalOffset<previousOffset,"Wheel scrolls up while the pointer is over a previous-visit entry");
+        historySection.IsExpanded=false;
+        // Recover an edited form with its selected patient; never access the user's clinic database.
+        type.GetField("_suspendDraft",BindingFlags.NonPublic|BindingFlags.Instance)!.SetValue(form,true);
+        Call(form,"RestoreDraft",restored);
+        type.GetField("_suspendDraft",BindingFlags.NonPublic|BindingFlags.Instance)!.SetValue(form,false);
+        Assert(Field<TextBox>(form,"TxtTodayPaid").Text=="١٥٠" && selected.Any(t=>t.IsSelected),"Draft restore retains unfinished payment and treatment inputs");
+        Call(form,"JumpToSection","PatientSection");Capture(window,(type.Namespace!.Contains("Original")?"original":"modern")+(dark?"-dark":"-light")+"-patient");
+        Assert(Field<ScrollViewer>(form,"FormScroll").VerticalOffset<1,"Section navigation lands at the section start even after an input had focus");
+        Call(form,"JumpToSection","ClinicalSection");Capture(window,(type.Namespace!.Contains("Original")?"original":"modern")+(dark?"-dark":"-light")+"-clinical");
+        window.Width=780;window.Height=850;Pump();Call(form,"JumpToSection","PatientSection");Capture(window,(type.Namespace!.Contains("Original")?"original":"modern")+(dark?"-dark":"-light")+"-compact");
+        Assert(Field<ScrollViewer>(form,"FormScroll").ExtentWidth<=Field<ScrollViewer>(form,"FormScroll").ViewportWidth+1,"Compact form does not require horizontal scrolling");
+        window.Close();
+    }
+    [STAThread] static int Main()
+    {
+        var prior=MotionPreferences.Current;
+        try
+        {
+            System.IO.Directory.CreateDirectory(output);var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};
+            System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary{Source=new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml")});
+            MotionPreferences.Set(MotionLevel.Off,false);Theme(false);
+            Assert(ClinicInput.NormalizeDigits("۱۲٣٫٤٥")=="123.45","Arabic and Persian digits normalize");
+            Assert(ClinicInput.AgeOn(new DateTime(2000,2,29),new DateTime(2026,2,28))==26,"Leap-day birthday age is correct");
+            Dentistry();UpgradeAndRecovery();
+            foreach(var type in new[]{typeof(AddPatientView),typeof(MyClinic.OriginalTheme.AddPatientView)})foreach(bool dark in new[]{false,true})Form(type,dark);
+            MotionPreferences.Set(prior,false);app.Shutdown();Console.WriteLine($"PASS: {checks} clinic form and dental chart checks. Previews: {output}");return 0;
+        }
+        catch(Exception e){Console.Error.WriteLine(e);MotionPreferences.Set(prior,false);return 1;}
+    }
+}

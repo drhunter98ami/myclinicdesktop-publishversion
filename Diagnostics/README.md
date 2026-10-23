@@ -62,3 +62,51 @@ comparison dates, blank future periods, daily averages, peak days, numeric versu
 currency labels, chart resizing, gradient areas, comparison toggles, keyboard/tooltips,
 expense drill-down callbacks, exact animated totals, and motion-off behavior. Both
 the modern and original statistics views use the same dashboard and breakdown controls.
+
+## Patient records and image viewer checks
+
+Run `./Diagnostics/RunPatientRecordsChecks.ps1` for patient-register and image-viewer
+checks. The harness detaches database-loading lifecycle handlers and uses only
+synthetic patients, visits, and images under `obj/PatientRecordsSmoke/`.
+It verifies Arabic/Persian digit and diacritic matching, phone-format highlighting,
+combined filters and ordering, visit date ranges, both interface palettes, compact
+layouts, tabbed visit details, anatomical FDI tooth ordering and treatment lookup,
+attachment notifications, image rotation/zoom, export selection, byte-preserving
+copies, duplicate filename handling, existing-file protection, same-file protection,
+and partial export failures. Rendered previews are saved in `previews/` there.
+
+The register now shares its workflow across both interface themes. Image export
+copies the original file; preview zoom and rotation do not alter exported bytes.
+Export the current image with a Save dialog, or check several images and choose
+an output folder using **تصدير المحدد**. Batch exports suffix duplicate names and
+report failed files. Current patient health data is labelled explicitly rather
+than presented as a historical snapshot. Visit summaries can be printed with
+the standard Windows print dialog.
+
+## Patient form and dental chart checks
+
+Run `./Diagnostics/RunClinicFormChecks.ps1` to verify the reorganized patient/visit
+form in both interface themes and palettes. Tests use isolated SQLite databases,
+synthetic patients, and encrypted draft files inside `obj/ClinicFormSmoke/`; they do
+not open the clinic database, medicines history, or the user's actual draft. Wide
+and compact form previews and both dental charts are rendered into that folder's
+`previews/` directory.
+
+Coverage includes saving the patient and visit together, Arabic/Persian numeric input,
+payment validation, birth-year persistence and the additive legacy-table upgrade,
+allergy/chronic-disease states, native RTL validation labels, separate main/secondary
+section highlights, wheel scrolling over previous visits, treatment search,
+section navigation after field focus, draft recovery
+across form instances, obsolete draft cleanup, and adult/primary tooth selections
+including a collapsed alternate chart. Tooth silhouettes use FDI identities and
+schematic crown/root morphology; shapes do not determine patient-specific anatomy
+or change existing canal calculation rules.
+
+The form automatically preserves unfinished work in a Windows-user-protected draft
+under `%LOCALAPPDATA%\MyClinicApp\Drafts`, scoped to the clinic login. A recovered
+draft is visibly labelled and is not a completed visit. Completing a visit saves
+the patient and retains the app's
+existing automatic appointment behavior. The dashboard retains one patient/visit
+entry button. `Patients.BirthYear` stores year-only input without inventing a month
+or day. Existing exact dates remain intact when their year is unchanged, and older
+date-based drafts recover into the year field. Age derived from a year is approximate.

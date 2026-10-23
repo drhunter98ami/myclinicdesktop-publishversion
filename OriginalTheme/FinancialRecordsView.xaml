@@ -285,7 +285,7 @@
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Center">
                             <TextBlock Text="الإدارة المالية"
-                                       FontFamily="Traditional Arabic"
+                                       FontFamily="Segoe UI"
                                        FontSize="28"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource AppTextPrimary}"
@@ -510,7 +510,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="سجل الدخل" FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold" Foreground="#10B981" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="0" Text="سجل الدخل" FontFamily="Segoe UI" FontSize="24" FontWeight="Bold" Foreground="#10B981" HorizontalAlignment="Right"/>
                                     <TextBlock Grid.Column="1" Text="&#xE8FB;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#10B981" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
@@ -607,7 +607,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="المصاريف" FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold" Foreground="#EF4444" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="0" Text="المصاريف" FontFamily="Segoe UI" FontSize="24" FontWeight="Bold" Foreground="#EF4444" HorizontalAlignment="Right"/>
                                     <TextBlock Grid.Column="1" Text="&#xE7C1;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#EF4444" VerticalAlignment="Center"/>
                                 </Grid>
                             </Border>
@@ -716,7 +716,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="دفعات قادمة (مستحقات)" FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold" Foreground="#F59E0B" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="0" Text="دفعات قادمة (مستحقات)" FontFamily="Segoe UI" FontSize="24" FontWeight="Bold" Foreground="#F59E0B" HorizontalAlignment="Right"/>
                                 <TextBlock Grid.Column="1" Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#F59E0B" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
@@ -843,7 +843,7 @@
                                 BorderThickness="0" Cursor="Hand" Click="BtnCloseIncomeTreatmentsOverlay_Click"/>
                         <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                             <TextBlock x:Name="TxtIncomeTreatmentsPatient" Text="العلاجات المحددة"
-                                       FontFamily="Traditional Arabic" FontSize="24" FontWeight="Bold"
+                                       FontFamily="Segoe UI" FontSize="24" FontWeight="Bold"
                                        Foreground="{DynamicResource AppTextPrimary}"/>
                             <TextBlock x:Name="TxtIncomeTreatmentsDate" FontSize="13"
                                        Foreground="{DynamicResource AppTextSecondary}" Margin="0,-4,0,0"/>

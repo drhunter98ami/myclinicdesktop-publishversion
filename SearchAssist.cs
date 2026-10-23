@@ -34,14 +34,14 @@ public static class SearchAssist
         int offset = 0;
         while (query.Length > 0 && offset < text.Length)
         {
-            int match = text.IndexOf(query, offset, StringComparison.CurrentCultureIgnoreCase);
+            var (match, length) = PatientRecordSearch.FindMatch(text, query, offset);
             if (match < 0) break;
             if (match > offset) block.Inlines.Add(new Run(text[offset..match]));
-            var highlight = new Run(text.Substring(match, query.Length))
+            var highlight = new Run(text.Substring(match, length))
             {
                 Background = new SolidColorBrush(Color.FromArgb(110, 245, 158, 11)), FontWeight = FontWeights.Bold
             };
-            block.Inlines.Add(highlight); offset = match + query.Length;
+            block.Inlines.Add(highlight); offset = match + length;
         }
         if (offset < text.Length) block.Inlines.Add(new Run(text[offset..]));
         System.Windows.Automation.AutomationProperties.SetName(block, text);

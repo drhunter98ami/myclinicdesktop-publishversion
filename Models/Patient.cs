@@ -20,6 +20,9 @@ namespace MyClinic.Models
 
         public int? Age { get; set; }
 
+        public System.DateTime? DateOfBirth { get; set; }
+        public int? BirthYear { get; set; }
+
         /// <summary>"ذكر" or "أنثى"</summary>
         public string? Gender { get; set; }
 

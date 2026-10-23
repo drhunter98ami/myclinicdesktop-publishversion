@@ -4,21 +4,26 @@
     <Style x:Key="AnimatedSectionStyle" TargetType="ux:AnimatedSection">
         <Setter Property="IsExpanded" Value="True"/>
         <Setter Property="Margin" Value="0,0,0,12"/>
+        <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ux:AnimatedSection">
                     <StackPanel>
                         <ToggleButton x:Name="PART_SectionHeader" Cursor="Hand" Padding="14,10" HorizontalContentAlignment="Stretch"
+                                      Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Foreground="{TemplateBinding Foreground}"
+                                      FontWeight="{TemplateBinding FontWeight}" FontSize="{TemplateBinding FontSize}"
                                       IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
-                                    <Border CornerRadius="10" Padding="{TemplateBinding Padding}" Background="{DynamicResource AppInputBg}"
-                                            BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">
+                                    <Border CornerRadius="10" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <ContentPresenter Content="{Binding Header, RelativeSource={RelativeSource AncestorType={x:Type ux:AnimatedSection}}}"
-                                                              TextElement.Foreground="{DynamicResource AppTextPrimary}" TextElement.FontWeight="SemiBold"/>
-                                            <TextBlock x:Name="Arrow" Grid.Column="1" Text="⌄" Foreground="{DynamicResource AppTextSecondary}" Margin="12,0,0,0"/>
+                                                              TextElement.Foreground="{TemplateBinding Foreground}" TextElement.FontWeight="{TemplateBinding FontWeight}"/>
+                                            <TextBlock x:Name="Arrow" Grid.Column="1" Text="⌄" Foreground="{TemplateBinding Foreground}" Margin="12,0,0,0"/>
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>

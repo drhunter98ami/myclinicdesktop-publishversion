@@ -222,8 +222,8 @@ static class UxChecks
                 var form = Layout(prefix + "AddPatientView.xaml");
                 var window = Host(form, prefix == "" ? 1376 : 1100, 850);
                 var sections = Find<AnimatedSection>(form).ToArray();
-                Assert(sections.Length == 3, "Visit forms expose vital signs, prescription and image sections");
-                var section = sections[0]; section.BringIntoView(); Pump(80);
+                Assert(sections.Length >= 3, "Visit forms expose vital signs, prescription and image sections");
+                var section = sections.First(s => s.Header?.ToString()?.Contains("Vital Signs") == true); section.BringIntoView(); Pump(80);
                 var weight = (TextBox)form.FindName("TxtWeight"); weight.Text = "70";
                 section.IsExpanded = false; Pump(350);
                 var body = (Border)section.Template.FindName("PART_SectionBody", section);

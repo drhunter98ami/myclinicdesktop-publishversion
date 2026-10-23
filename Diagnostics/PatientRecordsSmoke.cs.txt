@@ -1,0 +1,214 @@
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using MyClinic;
+using MyClinic.Models;
+
+static class RecordsChecks
+{
+    static int checks;
+    static readonly string output = Path.GetFullPath("obj/PatientRecordsSmoke/previews");
+    static readonly string files = Path.GetFullPath("obj/PatientRecordsSmoke/files");
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); checks++; }
+    static void Pump(int ms = 70)
+    {
+        var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static void Until(Func<bool> condition) { for(int i=0;i<150 && !condition();i++) Pump(40); Assert(condition(), "Async operation completed"); }
+    static object? Call(object target, string method, params object?[] args) => target.GetType().GetMethod(method, BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(target,args);
+    static T Private<T>(object target,string name) => (T)target.GetType().GetField(name,BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(target)!;
+    static T Named<T>(FrameworkElement element,string name) => (T)element.FindName(name);
+    static IEnumerable<T> Visuals<T>(DependencyObject root) where T:DependencyObject
+    {
+        if(root is T found)yield return found;
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++)foreach(var child in Visuals<T>(VisualTreeHelper.GetChild(root,i)))yield return child;
+    }
+    static double Contrast(Brush foreground,Brush background)
+    {
+        static double L(Color color)
+        {
+            static double Channel(byte channel){double v=channel/255.0;return v<=.04045?v/12.92:Math.Pow((v+.055)/1.055,2.4);}
+            return .2126*Channel(color.R)+.7152*Channel(color.G)+.0722*Channel(color.B);
+        }
+        double f=L(((SolidColorBrush)foreground).Color),b=L(((SolidColorBrush)background).Color);
+        return (Math.Max(f,b)+.05)/(Math.Min(f,b)+.05);
+    }
+    static void Theme(bool dark)
+    {
+        string code=File.ReadAllText("MainWindow.xaml.cs"); int start=code.IndexOf("private void SetTheme(bool isDark)");
+        int first=code.IndexOf("res[\"AppWindowBg\"]",start),second=code.IndexOf("res[\"AppWindowBg\"]",first+1);
+        string section=dark?code[first..second]:code[second..];
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\"")) Application.Current.Resources[m.Groups[1].Value]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value));
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateGradient\\(\"([^\"]+)\",\\s*\"([^\"]+)\"")) Application.Current.Resources[m.Groups[1].Value]=new LinearGradientBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value),(Color)ColorConverter.ConvertFromString(m.Groups[3].Value),45);
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*([0-9.]+);")) Application.Current.Resources[m.Groups[1].Value]=double.Parse(m.Groups[2].Value,System.Globalization.CultureInfo.InvariantCulture);
+        if(dark) { Application.Current.Resources["VisitBannerBg"]=new LinearGradientBrush(Color.FromRgb(13,108,107),Color.FromRgb(33,99,130),45); Application.Current.Resources["SettingsBannerBg"]=new LinearGradientBrush(Color.FromRgb(13,45,54),Color.FromRgb(15,74,75),0); }
+    }
+    static Window Host(FrameworkElement element,double width=1240,double height=900)
+    {
+        var root=new Grid {Background=(Brush)Application.Current.FindResource("AppWindowBg")};root.Children.Add(new AdornerDecorator{Child=element,Margin=new Thickness(18)});
+        var window=new Window{Content=root,Width=width,Height=height,Left=-12000,Top=-12000,ShowActivated=false,ShowInTaskbar=false};
+        window.Show();Pump();return window;
+    }
+    static void Capture(Window window,string name)
+    {
+        var element=(FrameworkElement)window.Content; var bitmap=new RenderTargetBitmap((int)element.ActualWidth,(int)element.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(element);
+        var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var stream=File.Create(Path.Combine(output,name+".png"));png.Save(stream);
+    }
+    static void DetachDataLifecycle(PatientRecordsView view)
+    {
+        // The live controls are exercised with synthetic data only. Never open the user's database.
+        var type=typeof(PatientRecordsView);
+        view.Loaded-=(RoutedEventHandler)Delegate.CreateDelegate(typeof(RoutedEventHandler),view,type.GetMethod("PatientRecordsView_Loaded",BindingFlags.NonPublic|BindingFlags.Instance)!);
+        view.IsVisibleChanged-=(DependencyPropertyChangedEventHandler)Delegate.CreateDelegate(typeof(DependencyPropertyChangedEventHandler),view,type.GetMethod("PatientRecordsView_IsVisibleChanged",BindingFlags.NonPublic|BindingFlags.Instance)!);
+        Call(view,"SetLoadingState",false);
+    }
+    static List<PatientCardModel> Patients() => new()
+    {
+        new(){Id=1,DisplayName="أَحْمَد محمود",PhoneNumber="+20 (١٠١) ٢٣٤-٥٦٧٨",AgeWithUnit="٣٢ سنة",GenderLabel="ذكر",VisitCount=2,LatestVisitDate=new DateTime(2026,10,23),Allergies="البنسلين",ChronicDiseases="غير مسجلة"},
+        new(){Id=2,DisplayName="ليلى عبد الرحمن",PhoneNumber="01098765432",AgeWithUnit="٢٨ سنة",GenderLabel="أنثى",VisitCount=1,LatestVisitDate=new DateTime(2026,7,1)},
+        new(){Id=3,DisplayName="مريض جديد باسم طويل لاختبار المساحة والمحاذاة",PhoneNumber="01123456789",AgeWithUnit="العمر غير محدد",GenderLabel="غير محدد",VisitCount=0}
+    };
+    static void SearchAndExport()
+    {
+        var patients=Patients();var today=new DateTime(2026,10,23);
+        Assert(PatientRecordSearch.Filter(patients,"احمد",0,0,0,today).Single().Id==1,"Diacritics and alef variants match");
+        Assert(PatientRecordSearch.Filter(patients,"۱۰۱۲۳۴۵۶۷۸",0,0,0,today).Single().Id==1,"Phone punctuation and Arabic/Persian digits match");
+        Assert(PatientRecordSearch.Filter(patients,"۳",0,0,0,today).Any(p=>p.Id==3),"File number accepts Persian digits");
+        Assert(PatientRecordSearch.Filter(patients,"",2,0,0,today).Single().Id==3,"No-visit filter");
+        Assert(PatientRecordSearch.Filter(patients,"",0,1,0,today).Single().Id==1,"Recent visit filter");
+        Assert(PatientRecordSearch.Filter(patients,"",2,1,0,today).Count==0,"Filters combine");
+        Assert(PatientRecordSearch.Filter(patients,"",0,0,2,today).First().Id==3,"Newest registration uses descending IDs");
+        var match=PatientRecordSearch.FindMatch(patients[0].PhoneNumber,"101234",0);
+        Assert(match.Start>=0 && PatientRecordSearch.Normalize(patients[0].PhoneNumber.Substring(match.Start,match.Length))=="101234","Highlight preserves source span across phone formatting");
+        var vm=new VisitDetailsViewModel{Teeth=new[]{"11","26"},DentalChartCategoryText="بالغين (Adult)"};
+        Assert(vm.UpperTeeth.Select(t=>t.Id).SequenceEqual(new[]{"18","17","16","15","14","13","12","11","21","22","23","24","25","26","27","28"}),"FDI upper arch is anatomically ordered");
+        Assert(vm.LowerTeeth.First().Id=="48" && vm.LowerTeeth.Last().Id=="38","FDI lower arch orientation");
+        Assert(new VisitDetailsViewModel{DentalChartCategoryText="أطفال (Child)"}.UpperTeeth.Count()==10,"Primary arch has ten teeth");
+        int changed=0;vm.PropertyChanged+=(_,e)=>{if(e.PropertyName=="AttachmentCountText")changed++;};
+        vm.AttachmentItems.Add(new(){FilePath="missing.png",FileName="missing.png"});
+        Assert(vm.HasAttachments && changed>0 && vm.AttachmentStatusText.Contains("تعذر"),"Failed previews remain visible/exportable and notify bindings");
+        string source=Path.Combine(files,"a","image.png");Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        var drawing=new DrawingVisual();using(var dc=drawing.RenderOpen()) { dc.DrawRectangle(Brushes.LightSeaGreen,null,new Rect(0,0,640,420));dc.DrawEllipse(Brushes.White,null,new Point(320,210),100,140); }
+        var bitmap=new RenderTargetBitmap(640,420,96,96,PixelFormats.Pbgra32);bitmap.Render(drawing);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var stream=File.Create(source))png.Save(stream);
+        string export=Path.Combine(files,"exports",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(export);File.WriteAllText(Path.Combine(export,"image.png"),"existing");
+        var reserved=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string first=ImageExportFiles.UniqueDestination(export,"image.png",reserved),second=ImageExportFiles.UniqueDestination(export,"image.png",reserved);
+        Assert(first!=second && first.EndsWith("image (2).png") && second.EndsWith("image (3).png"),"Batch export resolves existing and duplicate filenames");
+        var report=ImageExportFiles.Copy(new[]{(source,first),(source,second),(Path.Combine(files,"missing.png"),Path.Combine(export,"missing.png"))},false);
+        Assert(report.Copied==2 && report.Failures.Count==1,"Partial export reports successes and failures");
+        Assert(File.ReadAllText(Path.Combine(export,"image.png"))=="existing","Batch export preserves existing destination");
+        Assert(File.ReadAllBytes(source).SequenceEqual(File.ReadAllBytes(first)),"Export preserves original bytes");
+        Assert(ImageExportFiles.Copy(new[]{(source,source)},true).Failures.Count==1 && File.Exists(source),"Same-file export cannot destroy source");
+        Assert(ImageExportFiles.Copy(new[]{(source,first)},false).Failures.Count==1,"No silent overwrite when destination appears");
+    }
+    static void Records(bool original,bool dark)
+    {
+        Theme(dark);FrameworkElement host;PatientRecordsView view;
+        if(original){var wrapper=new MyClinic.OriginalTheme.PatientRecordsView();host=wrapper;view=Named<PatientRecordsView>(wrapper,"Records");}else{view=new();host=view;}
+        DetachDataLifecycle(view);
+        Private<List<PatientCardModel>>(view,"_allPatients").AddRange(Patients());Call(view,"ApplyFilters");
+        var window=Host(host);if(original)Call(host,"ApplyPalette",dark);Pump();
+        string prefix=(original?"original":"modern")+(dark?"-dark":"-light");
+        var list=Named<ListBox>(view,"PatientsListBox");Assert(list.Items.Count==3,"Records shows seeded patient rows");Capture(window,prefix+"-patients");
+        Visuals<Expander>(view).First().IsExpanded=true;Pump();
+        Call(view,"ShowRecordsStatus","تم نسخ رقم الهاتف ✓");Pump();
+        var summary=Named<WrapPanel>(view,"ResultSummary");var status=Named<TextBlock>(view,"RecordsStatus");
+        var summaryBounds=summary.TransformToAncestor(view).TransformBounds(new Rect(summary.RenderSize));
+        var statusBounds=status.TransformToAncestor(view).TransformBounds(new Rect(status.RenderSize));
+        Assert(status.Visibility==Visibility.Visible && !summaryBounds.IntersectsWith(statusBounds),"Phone-copy feedback has a separate row from the patient count");
+        foreach(string name in new[]{"SortBox","VisitFilterBox","RecentFilterBox"})
+        {
+            var combo=Named<ComboBox>(view,name);combo.ApplyTemplate();
+            var toggle=(ToggleButton)combo.Template.FindName("FilterToggle",combo);toggle.ApplyTemplate();
+            var surface=(Border)toggle.Template.FindName("FilterComboSurface",toggle);
+            Assert(Contrast(combo.Foreground,surface.Background)>=4.5,"Selected filter text contrasts with its actual themed surface");
+            combo.IsDropDownOpen=true;Pump();
+            var popupSurface=(Border)combo.Template.FindName("FilterPopupSurface",combo);
+            var item=(ComboBoxItem)combo.ItemContainerGenerator.ContainerFromIndex(0);item.ApplyTemplate();
+            var option=(Border)item.Template.FindName("OptionSurface",item);
+            Assert(Contrast(item.Foreground,option.Background)>=4.5 && Contrast(item.Foreground,popupSurface.Background)>=4.5,"Dropdown choices stay readable in the active palette");
+            combo.IsDropDownOpen=false;
+        }
+        Pump();Capture(window,prefix+"-filters-copy-feedback");
+        Visuals<Expander>(view).First().IsExpanded=false;
+        Named<TextBox>(view,"TxtNameSearch").Text="احمد";Call(view,"ApplyFilters");Assert(list.Items.Count==1,"Live unified search uses normalized matching");
+        Named<TextBox>(view,"TxtNameSearch").Clear();Call(view,"ApplyFilters");
+        Named<CheckBox>(view,"CompactToggle").IsChecked=true;window.Width=800;window.Height=780;Pump();Capture(window,prefix+"-compact");
+        Assert(Named<Border>(view,"RecordsHeader").ActualWidth<=view.ActualWidth+1,"Header fits compact viewport");
+        var patient=Patients()[0];view.GetType().GetField("_selectedPatient",BindingFlags.NonPublic|BindingFlags.Instance)!.SetValue(view,patient);
+        Named<Grid>(view,"DrawerPatientInfoCard").DataContext=patient;
+        var visits=Private<List<VisitHistoryItem>>(view,"_allPatientVisits");
+        visits.AddRange(new[]{new VisitHistoryItem{VisitId=11,VisitDate=new(2026,10,23),VisitDateTimeText="23/10/2026 10:30",Title="متابعة علاج السن 11",Details="فحص وحشو",DiagnosisText="تسوس",ToothIds=new[]{"11","26"},SelectedTreatments=new[]{new SelectedTreatment{TreatmentName="حشو",ToothId="11",Quantity=1,Cost=250,Currency="SYP"}}},new VisitHistoryItem{VisitId=12,VisitDate=new(2026,9,4),Title="فحص دوري",DiagnosisText="فحص"}});
+        Call(view,"ApplyVisitFilters");Assert(Named<ListBox>(view,"VisitsListBox").Items.Count==2,"Visit timeline is populated");
+        Named<TextBox>(view,"VisitSearchBox").Text="تسوس";Assert(Named<ListBox>(view,"VisitsListBox").Items.Count==1,"Search covers diagnosis beyond truncated timeline text");
+        Named<TextBox>(view,"VisitSearchBox").Clear();Named<DatePicker>(view,"VisitFromDate").SelectedDate=new(2026,10,1);Assert(Named<ListBox>(view,"VisitsListBox").Items.Count==1,"Date filter works");
+        Named<DatePicker>(view,"VisitToDate").SelectedDate=new(2026,9,1);Assert(Named<TextBlock>(view,"EmptyVisitsText").Text.Contains("البداية"),"Inverted date range explains error");
+        Named<DatePicker>(view,"VisitFromDate").SelectedDate=Named<DatePicker>(view,"VisitToDate").SelectedDate=null;
+        Call(view,"ShowMedicalRecordDrawer");Pump();Capture(window,prefix+"-timeline");
+        Assert(!Named<Border>(view,"RecordsHeader").IsEnabled,"Drawer prevents focus moving to background controls");
+        var patientSurface=(Border)list.Template.FindName("RecordListSurface",list);
+        Assert(patientSurface.Background is SolidColorBrush patientBrush && patientBrush.Color.A==0,"Disabled patient list preserves a transparent background behind profiles");
+        Call(view,"OpenVisitDetails_Click",new Button{Tag=visits[0]},new RoutedEventArgs());Pump();
+        var tabs=Named<TabControl>(view,"VisitTabs");Assert(tabs.Items.Count==4,"All visit sections are organized in four tabs");
+        Assert(!Visuals<TextBlock>(Named<Border>(view,"VisitDetailsModal")).Any(t=>t.Text.Contains("المستخدم الحالي")),"Visit header does not display the signed-in username");
+        var timeline=Named<ListBox>(view,"VisitsListBox");
+        var timelineSurface=(Border)timeline.Template.FindName("RecordListSurface",timeline);
+        Assert(timelineSurface.Background is SolidColorBrush timelineBrush && timelineBrush.Color.A==0,"Disabled timeline keeps its themed background behind the details modal");
+        Capture(window,prefix+"-visit");tabs.SelectedIndex=1;Pump();Capture(window,prefix+"-dental");
+        Call(view,"RecordedTooth_Click",new Button{Tag="11"},new RoutedEventArgs());Assert(Named<TextBlock>(view,"ToothTreatmentHint").Text.Contains("حشو"),"Tooth selection finds associated treatment");
+        Call(view,"HideVisitDetailsOverlay",false);Pump();Assert(Named<Border>(view,"MedicalRecordDrawer").IsEnabled,"Closing details restores drawer interaction");
+        Call(view,"HideMedicalRecordDrawer");Pump();Assert(Named<Border>(view,"RecordsHeader").IsEnabled,"Closing drawer restores patient controls");window.Close();
+    }
+    static void Viewer()
+    {
+        Theme(true);string source=Path.Combine(files,"a","image.png");
+        var thumb=new BitmapImage(new Uri(source));thumb.Freeze();
+        var viewer=new PatientImageViewer(new[]{new VisitAttachmentItem{FilePath=source,FileName="image.png",Thumbnail=thumb},new VisitAttachmentItem{FilePath=Path.Combine(files,"missing.png"),FileName="missing.png"}},source,"مريض تجريبي") {Left=-12000,Top=-12000,ShowActivated=false,ShowInTaskbar=false};
+        viewer.Show();Until(()=>Named<Border>(viewer,"ImageState").Visibility==Visibility.Collapsed);
+        Assert(Named<Image>(viewer,"FullImage").Source is not null,"Viewer loads full preview");
+        Call(viewer,"SelectAll_Click",viewer,new RoutedEventArgs());Assert(Named<Button>(viewer,"ExportSelectedButton").IsEnabled && Named<Button>(viewer,"ExportSelectedButton").Content.ToString()!.Contains("2"),"Batch selection enables export count");
+        Call(viewer,"Rotate_Click",viewer,new RoutedEventArgs());Assert(((BitmapSource)Named<Image>(viewer,"FullImage").Source).PixelWidth==420,"Rotation uses decoded image");
+        Call(viewer,"ZoomIn_Click",viewer,new RoutedEventArgs());Assert(Named<TextBlock>(viewer,"ZoomLabel").Text.Length>0,"Zoom has visible feedback");Pump();
+        Assert(Named<Button>(viewer,"ExportSelectedButton").Content.ToString()!.Contains("2"),"Batch selection count remains correct after rendering and zoom");Capture(viewer,"image-viewer");
+        Named<ListBox>(viewer,"ImageStrip").SelectedIndex=1;Until(()=>Named<Button>(viewer,"RetryImageButton").Visibility==Visibility.Visible);
+        Assert(Named<TextBlock>(viewer,"ImageStateText").Text.Contains("غير موجود"),"Missing image has explicit error state");
+        Assert(Named<Button>(viewer,"ExportCurrentButton").IsEnabled,"Missing preview remains eligible for original export with failure reporting");viewer.Close();
+    }
+    static void Motion()
+    {
+        Theme(false);var view=new PatientRecordsView();DetachDataLifecycle(view);var window=Host(view,900,780);
+        foreach(var level in new[]{MotionLevel.Subtle,MotionLevel.Full})
+        {
+            MotionPreferences.Set(level,false);Call(view,"ShowMedicalRecordDrawer");Pump(260);
+            Assert(Math.Abs(Named<Border>(view,"MedicalRecordDrawer").Opacity-1)<.01,"Drawer fade settles at full opacity");
+            Call(view,"HideMedicalRecordDrawer");Pump(230);
+            Assert(Named<Grid>(view,"MedicalRecordOverlay").Visibility==Visibility.Collapsed && Named<Border>(view,"RecordsHeader").IsEnabled,"Animated dismissal restores controls");
+        }
+        MotionPreferences.Set(MotionLevel.Off,false);window.Close();
+    }
+    [STAThread] static int Main()
+    {
+        var prior=MotionPreferences.Current;
+        try
+        {
+            Directory.CreateDirectory(output);Directory.CreateDirectory(files);
+            var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary{Source=new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml")});
+            MotionPreferences.Set(MotionLevel.Off,false);SearchAndExport();
+            foreach(bool original in new[]{false,true})foreach(bool dark in new[]{false,true})Records(original,dark);
+            Viewer();Motion();MotionPreferences.Set(prior,false);app.Shutdown();Console.WriteLine($"PASS: {checks} patient records and image-export checks. Previews: {output}");return 0;
+        }
+        catch(Exception ex){Console.Error.WriteLine(ex);MotionPreferences.Set(prior,false);return 1;}
+    }
+}

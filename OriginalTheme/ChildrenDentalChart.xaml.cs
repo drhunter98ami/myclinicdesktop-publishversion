@@ -58,19 +58,11 @@ namespace MyClinic.OriginalTheme
 
         private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
         {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            // Logical children exist even when the alternate dentition is collapsed or not rendered yet.
+            foreach (DependencyObject child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
             {
-                DependencyObject child = VisualTreeHelper.GetChild(parent, i);
-
-                if (child is T typedChild)
-                {
-                    yield return typedChild;
-                }
-
-                foreach (T nestedChild in FindVisualChildren<T>(child))
-                {
-                    yield return nestedChild;
-                }
+                if (child is T typedChild) yield return typedChild;
+                foreach (T nestedChild in FindVisualChildren<T>(child)) yield return nestedChild;
             }
         }
     }

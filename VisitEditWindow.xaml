@@ -223,7 +223,7 @@
                                FontSize="32"
                                FontWeight="Bold"
                                Foreground="{DynamicResource VisitBannerTitleFg}"/>
-                    <TextBlock Text="سيُحفظ كل تغيير مع وقته الدقيق وقيمته قبل التعديل وبعده. تاريخ الزيارة والبيانات المالية والعلاجات والأسنان والوصفة والصور لا تتغير."
+                        <TextBlock Text="يُحفظ كل تعديل مع وقته والقيم السابقة والجديدة. يمكنك تعديل الملاحظات والقياسات وإضافة صور؛ تبقى الصور الموجودة وتاريخ الزيارة والبيانات المالية والعلاجات والأسنان والوصفة محفوظة."
                                Foreground="{DynamicResource VisitBannerSubFg}"
                                FontWeight="SemiBold"
                                TextWrapping="Wrap"

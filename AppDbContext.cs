@@ -7,6 +7,8 @@ namespace MyClinic
 {
     public class AppDbContext : DbContext
     {
+        public AppDbContext() { }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         public DbSet<User> Users { get; set; }
         public DbSet<AppointmentEntry> Appointments { get; set; }
         public DbSet<Patient> Patients { get; set; }
@@ -25,6 +27,7 @@ namespace MyClinic
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
+            if (optionsBuilder.IsConfigured) return;
             string dbPath;
 
             // Check if running in development mode (dotnet run)

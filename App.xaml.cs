@@ -40,6 +40,8 @@ public partial class App : Application
             @"DROP INDEX IF EXISTS IX_Patients_PhoneNumber;
               CREATE INDEX IF NOT EXISTS IX_Patients_PhoneNumber
               ON Patients (PhoneNumber);");
+        EnsureColumnExists(context, "Patients", "DateOfBirth", "TEXT NULL");
+        EnsureColumnExists(context, "Patients", "BirthYear", "INTEGER NULL");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Appointments (

@@ -206,7 +206,13 @@ namespace MyClinic
                     Foreground = (Brush)FindResource("AppTextSecondary"),
                     Margin = new Thickness(0, 3, 0, 12)
                 });
-                content.Children.Add(changeList);
+                content.Children.Add(new Expander
+                {
+                    Header = $"عرض التغييرات ({changes.Count})",
+                    IsExpanded = ReferenceEquals(entry, entries[0]),
+                    Foreground = (Brush)FindResource("AppTextPrimary"),
+                    Content = changeList
+                });
                 shell.Child = content;
                 card.Children.Add(shell);
                 HistoryItems.Children.Add(card);
@@ -232,7 +238,7 @@ namespace MyClinic
                 Foreground = CreateBrush(textHex),
                 Opacity = 0.85
             });
-            content.Children.Add(new TextBlock
+            var valueText = new TextBlock
             {
                 Text = string.IsNullOrWhiteSpace(value) ? "غير محدد" : value,
                 TextWrapping = TextWrapping.Wrap,
@@ -240,7 +246,10 @@ namespace MyClinic
                 FontWeight = FontWeights.SemiBold,
                 Foreground = CreateBrush(textHex),
                 Margin = new Thickness(0, 4, 0, 0)
-            });
+            };
+            if (value?.Length > 240)
+                content.Children.Add(new Expander { Header = "عرض النص الكامل", Foreground = CreateBrush(textHex), Content = valueText });
+            else content.Children.Add(valueText);
             card.Child = content;
             return card;
         }

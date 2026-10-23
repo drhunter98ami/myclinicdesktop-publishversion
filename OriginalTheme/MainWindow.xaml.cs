@@ -239,6 +239,16 @@ namespace MyClinic.OriginalTheme
             ApplyInternetStatus(isConnected);
         }
 
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (MainContent.Content is IRecoverableClinicForm form && !form.PreserveDraft())
+            {
+                e.Cancel = true;
+                UiFeedback.Notify(this, "تعذر حفظ المسودة. احفظ البيانات أو تجاهل المسودة قبل إغلاق البرنامج.");
+            }
+            base.OnClosing(e);
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             _clockTimer?.Stop();
@@ -513,7 +523,7 @@ namespace MyClinic.OriginalTheme
         {
             _dashboardView ??= new DashboardView();
             _dashboardView.RefreshWelcomeName();
-            NavigationTransition.Show(MainContent, _dashboardView);
+            if (!NavigationTransition.Show(MainContent, _dashboardView)) return;
             _dashboardView.RequestRefresh();
             _ = _dashboardView.RefreshNowAsync();
             SetActiveNavigation(BtnDashboard);
@@ -532,14 +542,14 @@ namespace MyClinic.OriginalTheme
 
         public void ShowAddPatient()
         {
-            NavigationTransition.Show(MainContent, new AddPatientView());
+            if (!NavigationTransition.Show(MainContent, new AddPatientView())) return;
             SetActiveNavigation(BtnDashboard);
         }
 
         public void ShowPatientRecords()
         {
             _patientRecordsView ??= new PatientRecordsView();
-            NavigationTransition.Show(MainContent, _patientRecordsView);
+            if (!NavigationTransition.Show(MainContent, _patientRecordsView)) return;
             _patientRecordsView.RequestRefresh();
             _ = _patientRecordsView.EnsureDataCurrentAsync();
             SetActiveNavigation(BtnPatients);
@@ -548,7 +558,7 @@ namespace MyClinic.OriginalTheme
         public void ShowFinancialRecords()
         {
             _financialRecordsView ??= new FinancialRecordsView();
-            NavigationTransition.Show(MainContent, _financialRecordsView);
+            if (!NavigationTransition.Show(MainContent, _financialRecordsView)) return;
             _financialRecordsView.RequestRefresh();
             _ = _financialRecordsView.EnsureDataCurrentAsync();
             SetActiveNavigation(BtnFinancials);
@@ -558,7 +568,7 @@ namespace MyClinic.OriginalTheme
         public void ShowShortages()
         {
             _shortagesView ??= new ShortagesView();
-            NavigationTransition.Show(MainContent, _shortagesView);
+            if (!NavigationTransition.Show(MainContent, _shortagesView)) return;
             SetActiveNavigation(BtnShortages);
         }
 
@@ -566,7 +576,7 @@ namespace MyClinic.OriginalTheme
         public void ShowLab()
         {
             _labView ??= new LabView();
-            NavigationTransition.Show(MainContent, _labView);
+            if (!NavigationTransition.Show(MainContent, _labView)) return;
             SetActiveNavigation(BtnLab);
         }
 
@@ -574,7 +584,7 @@ namespace MyClinic.OriginalTheme
         public void ShowSettings()
         {
             _settingsView ??= new SettingsView();
-            NavigationTransition.Show(MainContent, _settingsView);
+            if (!NavigationTransition.Show(MainContent, _settingsView)) return;
             SetActiveNavigation(BtnSettings);
         }
 
@@ -582,7 +592,7 @@ namespace MyClinic.OriginalTheme
         public void ShowStatistics()
         {
             _statisticsView ??= new StatisticsView();
-            NavigationTransition.Show(MainContent, _statisticsView);
+            if (!NavigationTransition.Show(MainContent, _statisticsView)) return;
             SetActiveNavigation(BtnStatistics);
         }
 

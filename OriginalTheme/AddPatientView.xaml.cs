@@ -32,40 +32,261 @@ namespace MyClinic.OriginalTheme
         private readonly ObservableCollection<PatientLookupSuggestion> _patientSuggestions = new();
         private readonly ObservableCollection<VisitHistoryItem> _previousVisits = new();
         private readonly ObservableCollection<TreatmentSelectionItem> _treatmentSelectionItems = new();
-        
+
         // Dynamic Medicine Autofill Collections
         private readonly ObservableCollection<string> _recentMedicines = new();
         private List<string> _allMedicines = new();
         private static readonly string MedicinesFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
-            "MyClinicApp", 
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MyClinicApp",
             "Medicines.json");
 
         private readonly Dictionary<int, IReadOnlyList<VisitAttachmentItem>> _attachmentCache = new();
-        
+
         private PatientLookupSnapshot? _selectedPatientLookup;
         private bool _isApplyingPatientLookup;
 
-        public AddPatientView()
+        public AddPatientView() : this(() => new AppDbContext(), true) { }
+
+        public AddPatientView(Func<AppDbContext> contextFactory, bool enableLocalPersistence) : this(contextFactory, enableLocalPersistence, null) { }
+
+        public AddPatientView(Func<AppDbContext> contextFactory, bool enableLocalPersistence, string? draftPath)
         {
+            _createContext = contextFactory;
+            _draftPathOverride = draftPath;
+            _medicinePersistenceEnabled = enableLocalPersistence;
+            _draftsEnabled = enableLocalPersistence || draftPath != null;
             InitializeComponent();
             ItemsPatientSuggestions.ItemsSource = _patientSuggestions;
             ItemsPreviousVisits.ItemsSource = _previousVisits;
-            ItemsRecentMedicines.ItemsSource = _recentMedicines; // Bind Recent drugs
+            ItemsRecentMedicines.ItemsSource = _recentMedicines;
             TreatmentItemsControl.ItemsSource = _treatmentSelectionItems;
 
-            LoadMedicines(); // Loads local JSON record of previously entered medicines
-            LoadTreatments(); // Load treatments from database
+            ApplyThemeVisuals(IsDarkThemeActive());
+
+            if (_medicinePersistenceEnabled) LoadMedicines();
+            _treatmentsTask = LoadTreatments();
 
             UpdateRemainingVisitAmount();
             UpdateFemaleDetailsVisibility();
             UpdatePregnancyMonthVisibility();
             RefreshPrescriptionList();
             RefreshSelectedImagesList();
+
+            InitializeWorkflow();
+            Loaded += AddPatientView_Loaded;
+            Unloaded += AddPatientView_Unloaded;
+        }
+
+        private async void AddPatientView_Loaded(object sender, RoutedEventArgs e)
+        {
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+            GlobalEvents.OnThemeChanged += HandleThemeChanged;
+            ApplyThemeVisuals(IsDarkThemeActive());
+            if (!_workflowReady) await StartWorkflowAsync();
+        }
+
+        private void AddPatientView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _draftTimer.Stop();
+            PreserveDraft();
+            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
+        }
+
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
+        private static LinearGradientBrush CreateGradient(string startHex, string endHex, Point startPoint, Point endPoint)
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = startPoint,
+                EndPoint = endPoint
+            };
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(startHex), 0.0));
+            brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(endHex), 1.0));
+            return brush;
+        }
+
+        private void HandleThemeChanged(bool isDark)
+        {
+            ApplyThemeVisuals(isDark);
+        }
+
+        private void ApplyThemeVisuals(bool isDark)
+        {
+            if (isDark)
+            {
+                // تدرج الترويسة العلوية وترويسة بطاقة الزيارة (الوضع الداكن)
+                var bannerGradient = new LinearGradientBrush { StartPoint = new Point(1, 0), EndPoint = new Point(0, 1) };
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0D6C6B"), 0.0));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0B8674"), 0.48));
+                bannerGradient.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#216382"), 1.0));
+
+                Resources["VisitBannerBg"] = bannerGradient;
+                Resources["VisitBannerBorder"] = CreateBrush("#662DD4BF");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#FFFFFF");
+                Resources["VisitBannerSubFg"] = CreateBrush("#E2F2F0");
+                Resources["VisitBannerToothBrush"] = CreateBrush("#1EFFFFFF");
+
+                // البطاقات والحقول (الوضع الداكن)
+                Resources["VisitCardBg"] = CreateBrush("#121621");
+                Resources["VisitCardBorder"] = CreateBrush("#232E42");
+                Resources["VisitSubCardBg"] = CreateBrush("#0B101B");
+                Resources["VisitSubCardBorder"] = CreateBrush("#1E283A");
+
+                // البطاقات المميزة والمربعات المضيئة (الوضع الداكن)
+                Resources["VisitAccentCardBg"] = CreateBrush("#102930");
+                Resources["VisitAccentCardBorder"] = CreateBrush("#452DD4BF");
+                Resources["VisitGlowBoxBg"] = CreateBrush("#0F353D");
+                Resources["VisitGlowBoxBorder"] = CreateBrush("#2DD4BF");
+                Resources["VisitGlowBoxFg"] = CreateBrush("#5EEAD4");
+                Resources["VisitGlowOpacity"] = 0.52d;
+
+                // الأزرار الأساسية والثانوية (الوضع الداكن)
+                Resources["VisitPrimaryBtnBg"] = CreateGradient("#14B8A6", "#0D9488", new Point(0, 0), new Point(1, 0));
+                Resources["VisitPrimaryBtnBorder"] = CreateBrush("#5EEAD4");
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#47535E");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#64748B");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#FFFFFF");
+
+                // بطاقات الزيارات السابقة ونافذة تفاصيل الزيارة (الوضع الداكن)
+                Resources["VisitHistoryHeaderBg"] = CreateGradient("#14464B", "#102B33", new Point(0, 0), new Point(1, 1));
+                Resources["VisitHistoryHeaderFg"] = CreateBrush("#F8FAFC");
+                Resources["VisitEntryCardBg"] = CreateBrush("#0A0E19");
+                Resources["VisitEntryCardBorder"] = CreateBrush("#1E2638");
+                Resources["VisitEntryPillIndicator"] = CreateBrush("#14B8A6");
+
+                Resources["VisitModalOuterBg"] = CreateBrush("#0B131D");
+                Resources["VisitModalOuterBorder"] = CreateBrush("#552DD4BF");
+                Resources["VisitModalChipBg"] = CreateBrush("#12363B");
+                Resources["VisitModalChipBorder"] = CreateBrush("#452DD4BF");
+
+                // شارات العلاجات والكميات والأسنان والتحذيرات (مطابقة لألوان التقويم في الوضع الداكن)
+                Resources["VisitTreatmentPillBg"] = CreateBrush("#0D514F");
+                Resources["VisitTreatmentPillBorder"] = CreateBrush("#14857E");
+                Resources["VisitTreatmentPillFg"] = CreateBrush("#E6FFFA");
+
+                Resources["VisitQtyPillBg"] = CreateBrush("#15203E");
+                Resources["VisitQtyPillBorder"] = CreateBrush("#25386B");
+                Resources["VisitQtyPillFg"] = CreateBrush("#E2E8F0");
+
+                Resources["VisitCostPillBg"] = CreateBrush("#0F353D");
+                Resources["VisitCostPillBorder"] = CreateBrush("#2DD4BF");
+                Resources["VisitCostPillFg"] = CreateBrush("#5EEAD4");
+
+                Resources["VisitToothBadgeBg"] = CreateBrush("#103339");
+                Resources["VisitToothBadgeBorder"] = CreateBrush("#14B8A6");
+                Resources["VisitToothBadgeFg"] = CreateBrush("#2DD4BF");
+
+                Resources["VisitWarningCardBg"] = CreateBrush("#2A161D");
+                Resources["VisitWarningCardBorder"] = CreateBrush("#BA6571");
+                Resources["VisitWarningFg"] = CreateBrush("#FDA4AF");
+            }
+            else
+            {
+                // الترويسة العلوية وترويسة بطاقة الزيارة (الوضع الفاتح)
+                Resources["VisitBannerBg"] = CreateBrush("#E3EFED");
+                Resources["VisitBannerBorder"] = CreateBrush("#D5E6E3");
+                Resources["VisitBannerTitleFg"] = CreateBrush("#13284A");
+                Resources["VisitBannerSubFg"] = CreateBrush("#2C3E50");
+                Resources["VisitBannerToothBrush"] = CreateBrush("#CFE3DF");
+
+                // البطاقات والحقول (الوضع الفاتح)
+                Resources["VisitCardBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitCardBorder"] = CreateBrush("#E4ECEA");
+                Resources["VisitSubCardBg"] = CreateBrush("#F8FAFC");
+                Resources["VisitSubCardBorder"] = CreateBrush("#DCE5E7");
+
+                // البطاقات المميزة والمربعات (الوضع الفاتح)
+                Resources["VisitAccentCardBg"] = CreateBrush("#E3EFED");
+                Resources["VisitAccentCardBorder"] = CreateBrush("#B4D0CB");
+                Resources["VisitGlowBoxBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitGlowBoxBorder"] = CreateBrush("#B4D0CB");
+                Resources["VisitGlowBoxFg"] = CreateBrush("#13284A");
+                Resources["VisitGlowOpacity"] = 0.0d;
+
+                // الأزرار الأساسية والثانوية (الوضع الفاتح)
+                Resources["VisitPrimaryBtnBg"] = CreateBrush("#3348BD");
+                Resources["VisitPrimaryBtnBorder"] = Brushes.Transparent;
+                Resources["VisitSecondaryBtnBg"] = CreateBrush("#C3DCD8");
+                Resources["VisitSecondaryBtnBorder"] = CreateBrush("#8EB4AE");
+                Resources["VisitSecondaryBtnFg"] = CreateBrush("#264642");
+
+                // بطاقات الزيارات السابقة ونافذة تفاصيل الزيارة (الوضع الفاتح)
+                Resources["VisitHistoryHeaderBg"] = CreateBrush("#C3DCD8");
+                Resources["VisitHistoryHeaderFg"] = CreateBrush("#13284A");
+                Resources["VisitEntryCardBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitEntryCardBorder"] = CreateBrush("#CBD5E1");
+                Resources["VisitEntryPillIndicator"] = CreateBrush("#3348BD");
+
+                Resources["VisitModalOuterBg"] = CreateBrush("#F6F5F1");
+                Resources["VisitModalOuterBorder"] = CreateBrush("#D5E6E3");
+                Resources["VisitModalChipBg"] = CreateBrush("#FFFFFF");
+                Resources["VisitModalChipBorder"] = CreateBrush("#C3DCD8");
+
+                // شارات العلاجات والكميات والأسنان والتحذيرات (مطابقة لألوان التقويم في الوضع الفاتح)
+                Resources["VisitTreatmentPillBg"] = CreateBrush("#B2DCCC");
+                Resources["VisitTreatmentPillBorder"] = CreateBrush("#96CEB8");
+                Resources["VisitTreatmentPillFg"] = CreateBrush("#0F291E");
+
+                Resources["VisitQtyPillBg"] = CreateBrush("#CAD4F0");
+                Resources["VisitQtyPillBorder"] = CreateBrush("#B2C0E8");
+                Resources["VisitQtyPillFg"] = CreateBrush("#1E293B");
+
+                Resources["VisitCostPillBg"] = CreateBrush("#E3EFED");
+                Resources["VisitCostPillBorder"] = CreateBrush("#96CEB8");
+                Resources["VisitCostPillFg"] = CreateBrush("#15803D");
+
+                Resources["VisitToothBadgeBg"] = CreateBrush("#E3EFED");
+                Resources["VisitToothBadgeBorder"] = CreateBrush("#7FA6A0");
+                Resources["VisitToothBadgeFg"] = CreateBrush("#25635A");
+
+                Resources["VisitWarningCardBg"] = CreateBrush("#FFF2F0");
+                Resources["VisitWarningCardBorder"] = CreateBrush("#FB7A6D");
+                Resources["VisitWarningFg"] = CreateBrush("#B91C1C");
+            }
+
+            Resources["VisitMainSectionBg"] = CreateBrush(isDark ? "#18345A" : "#DFE8FF");
+            Resources["VisitMainSectionBorder"] = CreateBrush(isDark ? "#345B89" : "#9BB6F0");
+            Resources["VisitMainSectionFg"] = CreateBrush(isDark ? "#DDEAFF" : "#183C79");
+            Resources["VisitSecondarySectionBg"] = CreateBrush(isDark ? "#123333" : "#E3F2F0");
+            Resources["VisitSecondarySectionBorder"] = CreateBrush(isDark ? "#2C6860" : "#A4D3C9");
+            Resources["VisitSecondarySectionFg"] = CreateBrush(isDark ? "#BCF2DF" : "#155B53");
+            Resources["VisitPrimaryBtnFg"] = Brushes.White;
+            UpdateChartModeButtons();
+            if (_workflowReady) SetActiveSection(_currentSection);
+        }
+
+        private void UpdateChartModeButtons()
+        {
+            if (BtnAdult is null || BtnChild is null)
+                return;
+
+            bool isAdultActive = AdultChartControl?.Visibility == Visibility.Visible;
+            Brush activeBg = (Brush)Resources["VisitPrimaryBtnBg"];
+            Brush activeFg = Brushes.White;
+            Brush inactiveBg = Brushes.Transparent;
+            Brush inactiveFg = TryFindResource("AppTextSecondary") as Brush ?? CreateBrush("#64748B");
+
+            BtnAdult.Background = isAdultActive ? activeBg : inactiveBg;
+            BtnAdult.Foreground = isAdultActive ? activeFg : inactiveFg;
+
+            BtnChild.Background = !isAdultActive ? activeBg : inactiveBg;
+            BtnChild.Foreground = !isAdultActive ? activeFg : inactiveFg;
         }
 
         #region Medicine Persistence & Autofill Logic
-        
+
         private void LoadMedicines()
         {
             try
@@ -81,16 +302,17 @@ namespace MyClinic.OriginalTheme
                     }
                 }
             }
-            catch { /* Keep going if error */ }
+            catch { }
         }
 
         private void SaveMedicines()
         {
+            if (!_medicinePersistenceEnabled) return;
             try
             {
                 File.WriteAllText(MedicinesFilePath, JsonSerializer.Serialize(_allMedicines));
             }
-            catch { /* Keep going if error */ }
+            catch { }
         }
 
         private void AddToMedicines(string medicine)
@@ -98,7 +320,6 @@ namespace MyClinic.OriginalTheme
             if (string.IsNullOrWhiteSpace(medicine)) return;
             medicine = medicine.Trim();
 
-            // Move this medicine to the top (Most recent)
             _allMedicines.RemoveAll(m => string.Equals(m, medicine, StringComparison.CurrentCultureIgnoreCase));
             _allMedicines.Insert(0, medicine);
 
@@ -140,7 +361,6 @@ namespace MyClinic.OriginalTheme
                 .Take(10)
                 .ToList();
 
-            // Only show suggestions popup if there are results AND we didn't just auto-fill exactly the result.
             if (matches.Any() && !matches.Any(m => string.Equals(m, query, StringComparison.CurrentCultureIgnoreCase)))
             {
                 LstMedicineSuggestions.ItemsSource = matches;
@@ -167,11 +387,11 @@ namespace MyClinic.OriginalTheme
 
         #region Treatment Selection Logic
 
-        private async void LoadTreatments()
+        private async Task LoadTreatments()
         {
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
                 var treatments = await db.TreatmentCosts
                     .OrderBy(t => t.TreatmentName)
                     .ToListAsync();
@@ -179,7 +399,7 @@ namespace MyClinic.OriginalTheme
                 _treatmentSelectionItems.Clear();
                 foreach (var treatment in treatments)
                 {
-                    _treatmentSelectionItems.Add(new TreatmentSelectionItem
+                    var item = new TreatmentSelectionItem
                     {
                         TreatmentId = treatment.Id,
                         TreatmentName = treatment.TreatmentName,
@@ -187,23 +407,42 @@ namespace MyClinic.OriginalTheme
                         Currency = treatment.Currency,
                         IsSelected = false,
                         Quantity = 1
-                    });
+                    };
+                    _treatmentSelectionItems.Add(item);
+                    SubscribeTreatment(item);
                 }
+                var recentJson = await db.Visits.AsNoTracking().OrderByDescending(v => v.VisitDate)
+                    .Select(v => v.SelectedTreatmentsJson).Take(200).ToListAsync();
+                foreach (var json in recentJson)
+                    foreach (var t in ParseSelectedTreatments(json))
+                        _treatmentFrequency[t.TreatmentId] = _treatmentFrequency.GetValueOrDefault(t.TreatmentId) + 1;
+                foreach (var id in _treatmentSelectionItems.OrderByDescending(t => _treatmentFrequency.GetValueOrDefault(t.TreatmentId)).ThenBy(t => t.TreatmentName).Take(6).Select(t => t.TreatmentId))
+                    _frequentTreatmentIds.Add(id);
             }
             catch (Exception)
             {
-                // If treatments fail to load, continue without them
+                UiFeedback.Notify(this, "تعذر تحميل قائمة العلاجات. أعد فتح النموذج للمحاولة مجدداً.");
             }
         }
 
         private void TreatmentCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            if (sender is CheckBox { DataContext: TreatmentSelectionItem selected } checkbox)
+                selected.IsSelected = checkbox.IsChecked == true;
+            if (!_suspendDraft && sender is CheckBox { DataContext: TreatmentSelectionItem chosen } && chosen.IsSelected && _activeTooth != null)
+            {
+                var empty = chosen.ToothDetails.FirstOrDefault(d => string.IsNullOrWhiteSpace(d.ToothId));
+                if (empty != null) empty.ToothId = _activeTooth;
+            }
             if (sender is CheckBox { DataContext: TreatmentSelectionItem item } && item.IsSelected && item.IsRootCanal)
             {
                 foreach (var detail in item.ToothDetails.Where(d => !string.IsNullOrWhiteSpace(d.ToothId)))
                     ConfigureCanalsForTooth(detail);
             }
             CalculateTotalCost();
+            UpdateSelectedTreatmentSummary();
+            ScheduleDraft();
+            if (sender is FrameworkElement element) FormMotion.Reveal(element);
         }
 
         private void TreatmentTooth_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -258,21 +497,25 @@ namespace MyClinic.OriginalTheme
                 if (!ChildChartControl.SelectTooth(tooth))
                     return;
 
-                BtnChild_Click(this, new RoutedEventArgs());
+                AdultChartControl.Visibility = Visibility.Collapsed;
+                ChildChartControl.Visibility = Visibility.Visible;
             }
             else
             {
                 if (!AdultChartControl.SelectTooth(tooth))
                     return;
 
-                BtnAdult_Click(this, new RoutedEventArgs());
+                AdultChartControl.Visibility = Visibility.Visible;
+                ChildChartControl.Visibility = Visibility.Collapsed;
             }
+
+            UpdateChartModeButtons();
         }
 
         private void CanalCount_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (sender is TextBox { DataContext: TreatmentToothDetail detail }
-                && int.TryParse(sender is TextBox box ? box.Text : null, out int count))
+                && int.TryParse(ClinicInput.NormalizeDigits(sender is TextBox box ? box.Text : null), out int count))
             {
                 detail.CanalCount = Math.Max(0, count);
                 ResizeCanals(detail);
@@ -332,6 +575,7 @@ namespace MyClinic.OriginalTheme
 
         private void CalculateTotalCost()
         {
+            if (_suspendDraft) return;
             decimal total = 0;
             foreach (var item in _treatmentSelectionItems)
             {
@@ -339,13 +583,12 @@ namespace MyClinic.OriginalTheme
                 {
                     int quantity = item.Quantity > 0 ? item.Quantity : 1;
                     decimal cost = item.Cost;
-                    
-                    // Convert USD to SYP if needed
+
                     if (item.Currency == "USD")
                     {
                         try
                         {
-                            using var db = new AppDbContext();
+                            using var db = _createContext();
                             var settings = db.AppSettings.FirstOrDefault();
                             if (settings != null)
                             {
@@ -354,10 +597,9 @@ namespace MyClinic.OriginalTheme
                         }
                         catch (Exception)
                         {
-                            // If conversion fails, use original cost
                         }
                     }
-                    
+
                     total += cost * quantity;
                 }
             }
@@ -423,9 +665,6 @@ namespace MyClinic.OriginalTheme
                 return cost * Math.Max(1, t.Quantity);
             });
 
-            // A higher manual value is the actual negotiated cost for this visit.
-            // Store the difference evenly in the selected treatment prices so the
-            // finance details and payment allocation use that real cost.
             if (manualCost <= automaticCost)
                 return;
 
@@ -491,35 +730,30 @@ namespace MyClinic.OriginalTheme
         {
             AdultChartControl.Visibility = Visibility.Visible;
             ChildChartControl.Visibility = Visibility.Collapsed;
-
-            BtnAdult.Background = Brushes.White;
-            BtnAdult.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"));
-
-            BtnChild.Background = Brushes.Transparent;
-            BtnChild.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64748B"));
+            UpdateChartModeButtons();
+            FormMotion.Reveal(AdultChartControl); ScheduleDraft();
         }
 
         private void BtnChild_Click(object sender, RoutedEventArgs e)
         {
             AdultChartControl.Visibility = Visibility.Collapsed;
             ChildChartControl.Visibility = Visibility.Visible;
-
-            BtnChild.Background = Brushes.White;
-            BtnChild.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"));
-
-            BtnAdult.Background = Brushes.Transparent;
-            BtnAdult.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#64748B"));
+            UpdateChartModeButtons();
+            FormMotion.Reveal(ChildChartControl); ScheduleDraft();
         }
 
         private void PatientLookup_TextChanged(object sender, TextChangedEventArgs e)
         {
-            RefreshPatientSuggestions();
+            if (!_suspendDraft && !_isApplyingPatientLookup && _selectedPatientLookup == null) RefreshPatientSuggestions();
         }
 
         private void BtnApplyPatientSuggestion_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement { Tag: PatientLookupSuggestion suggestion })
             {
+                if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id &&
+                    MessageBox.Show("اختيار مريض مختلف يمسح بيانات الزيارة الحالية. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id) ResetWorkflowForm();
                 ApplyPatientSuggestion(suggestion.Snapshot);
             }
         }
@@ -575,6 +809,7 @@ namespace MyClinic.OriginalTheme
 
             VisitDetailsModal.DataContext = viewModel;
             VisitDetailsOverlay.Visibility = Visibility.Visible;
+            if (sender is FrameworkElement source) FormMotion.OpenDetails(source, VisitDetailsModal);
 
             if (!alreadyCached && visit.AttachmentPaths.Count > 0)
             {
@@ -681,7 +916,7 @@ namespace MyClinic.OriginalTheme
                 return;
             }
 
-            string phoneQuery = TxtPhoneNumber.Text.Trim();
+            string phoneQuery = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
             string nameQuery = TxtFullName.Text.Trim();
 
             if (phoneQuery.Length == 0 && nameQuery.Length < 2)
@@ -697,7 +932,7 @@ namespace MyClinic.OriginalTheme
                 return;
             }
 
-            using var db = new AppDbContext();
+            using var db = _createContext();
             List<PatientLookupSnapshot> candidates = db.Patients
                 .AsNoTracking()
                 .Select(patient => new PatientLookupSnapshot
@@ -706,6 +941,8 @@ namespace MyClinic.OriginalTheme
                     PhoneNumber = patient.PhoneNumber,
                     FullName = patient.FullName,
                     Age = patient.Age,
+                    DateOfBirth = patient.DateOfBirth,
+                    BirthYear = patient.BirthYear,
                     Gender = patient.Gender,
                     BloodType = patient.BloodType,
                     IsSmoker = patient.IsSmoker,
@@ -740,11 +977,7 @@ namespace MyClinic.OriginalTheme
                 ? "اختر المريض المناسب لتعبئة البيانات تلقائياً."
                 : "لا توجد نتائج مطابقة حالياً.";
 
-            if (!hasSuggestions && !MatchesSelectedPatient(phoneQuery, nameQuery))
-            {
-                _selectedPatientLookup = null;
-                ClearPreviousVisits();
-            }
+
         }
 
         private void ApplyPatientSuggestion(PatientLookupSnapshot snapshot)
@@ -757,7 +990,9 @@ namespace MyClinic.OriginalTheme
                 TxtPhoneNumber.Text = snapshot.PhoneNumber;
                 TxtFullName.Text = snapshot.FullName ?? string.Empty;
                 TxtAge.Text = snapshot.Age?.ToString(CultureInfo.CurrentCulture) ?? string.Empty;
-
+                _legacyBirthDate = snapshot.DateOfBirth;
+                TxtBirthYear.Text = (snapshot.BirthYear ?? snapshot.DateOfBirth?.Year)?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+                CmbGender.SelectedIndex = -1;
                 TrySelectComboBoxItemByText(CmbGender, snapshot.Gender);
                 if (string.IsNullOrWhiteSpace(snapshot.BloodType))
                 {
@@ -768,8 +1003,10 @@ namespace MyClinic.OriginalTheme
                     TrySelectComboBoxItemByText(CmbBloodType, snapshot.BloodType);
                 }
 
-                TxtAllergies.Text = snapshot.Allergies ?? string.Empty;
-                TxtChronicDiseases.Text = snapshot.ChronicDiseases ?? string.Empty;
+                CmbAllergyStatus.SelectedIndex = ClinicInput.AllergyState(snapshot.Allergies);
+                TxtAllergies.Text = CmbAllergyStatus.SelectedIndex == 2 ? snapshot.Allergies ?? string.Empty : string.Empty;
+                CmbChronicDiseaseStatus.SelectedIndex = ClinicInput.ChronicDiseaseState(snapshot.ChronicDiseases);
+                TxtChronicDiseases.Text = CmbChronicDiseaseStatus.SelectedIndex == 2 ? snapshot.ChronicDiseases ?? string.Empty : string.Empty;
 
                 ChkSmoker.IsChecked = snapshot.IsSmoker;
                 TxtSmokingType.Text = snapshot.SmokingType ?? string.Empty;
@@ -777,6 +1014,9 @@ namespace MyClinic.OriginalTheme
 
                 LoadPreviousVisits(snapshot);
                 ClearPatientSuggestions();
+                UpdateIdentity();
+                foreach (var field in new Control[] { TxtFullName, TxtPhoneNumber, TxtAge, CmbGender, CmbBloodType }) FormMotion.Highlight(field);
+                ScheduleDraft();
             }
             finally
             {
@@ -788,7 +1028,7 @@ namespace MyClinic.OriginalTheme
         {
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
 
                 var rawVisits = db.Visits
                     .AsNoTracking()
@@ -807,7 +1047,7 @@ namespace MyClinic.OriginalTheme
                 if (TxtTotalPatientRemaining != null) TxtTotalPatientRemaining.Text = totalRemaining.ToString("0.##", CultureInfo.CurrentCulture);
                 if (PatientFinancialHistoryPanel != null) PatientFinancialHistoryPanel.Visibility = Visibility.Visible;
 
-                List<VisitHistoryItem> visits = rawVisits.Select(MapVisit).ToList();
+                List<VisitHistoryItem> visits = rawVisits.Take(10).Select(MapVisit).ToList();
 
                 _previousVisits.Clear();
                 foreach (VisitHistoryItem visit in visits)
@@ -823,7 +1063,7 @@ namespace MyClinic.OriginalTheme
                 if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = visits.Count.ToString(CultureInfo.CurrentCulture);
                 if (TxtPreviousVisitsHint != null)
                 {
-                    TxtPreviousVisitsHint.Text = visits.Count == 1
+                    TxtPreviousVisitsHint.Text = rawVisits.Count > 10 ? "آخر 10 زيارات · السجل الكامل في سجل المرضى." : visits.Count == 1
                         ? "تم العثور على زيارة سابقة واحدة. اضغط عليها لعرض التفاصيل."
                         : $"تم العثور على {visits.Count} زيارات سابقة. اضغط على أي زيارة لعرض التفاصيل.";
                 }
@@ -875,20 +1115,19 @@ namespace MyClinic.OriginalTheme
             if (PreviousVisitsPanel != null) PreviousVisitsPanel.Visibility = Visibility.Collapsed;
             if (TxtPreviousVisitsCount != null) TxtPreviousVisitsCount.Text = "0";
             if (TxtPreviousVisitsHint != null) TxtPreviousVisitsHint.Text = "اضغط على أي زيارة لعرض تفاصيلها.";
-            
-            // إخفاء شريط السجل المالي عند عدم وجود مريض
+
             if (PatientFinancialHistoryPanel != null)
             {
                 PatientFinancialHistoryPanel.Visibility = Visibility.Collapsed;
             }
-            
+
             HideVisitDetailsOverlay();
         }
 
         private void HideVisitDetailsOverlay()
         {
             VisitDetailsOverlay.Visibility = Visibility.Collapsed;
-            
+
             if (VisitDetailsModal.DataContext is VisitDetailsViewModel vm)
             {
                 vm.AttachmentItems.Clear();
@@ -904,7 +1143,6 @@ namespace MyClinic.OriginalTheme
                 return false;
             }
 
-            // لضمان أنه عند تغيير الاسم أو الرقم بعد التحديد، يتم فك الارتباط لإنشاء فرد جديد من العائلة
             bool matchesPhone = string.IsNullOrWhiteSpace(phoneQuery) ||
                 _selectedPatientLookup.PhoneNumber.Contains(phoneQuery, StringComparison.CurrentCultureIgnoreCase) ||
                 phoneQuery.Contains(_selectedPatientLookup.PhoneNumber, StringComparison.CurrentCultureIgnoreCase);
@@ -913,7 +1151,6 @@ namespace MyClinic.OriginalTheme
                 _selectedPatientLookup.DisplayName.Contains(nameQuery, StringComparison.CurrentCultureIgnoreCase) ||
                 nameQuery.Contains(_selectedPatientLookup.DisplayName, StringComparison.CurrentCultureIgnoreCase);
 
-            // يجب أن يتطابق الاثنان معاً لكي يتم اعتبارهما نفس المريض المحدد
             return matchesPhone && matchesName;
         }
 
@@ -995,17 +1232,22 @@ namespace MyClinic.OriginalTheme
 
         private async void BtnSaveVisit_Click(object sender, RoutedEventArgs e)
         {
-            string phoneNumber = TxtPhoneNumber.Text.Trim();
-            bool valid = ValidationAssist.Check(TxtPhoneNumber, !string.IsNullOrWhiteSpace(phoneNumber), "رقم الهاتف مطلوب لحفظ بيانات المريض.");
-            bool ageValid = TryParseNullableInt(TxtAge.Text, out int? age);
-            valid &= ValidationAssist.Check(TxtAge, ageValid, "يرجى إدخال عمر صحيح أو ترك الحقل فارغاً.");
+            if (_visitCommitted) { UiFeedback.Notify(this, "تم حفظ هذه الزيارة بالفعل. احذف المسودة المتبقية قبل بدء زيارة أخرى."); return; }
+            bool valid = ValidatePatientFields();
+            string phoneNumber = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
             bool costValid = TryParseMoney(TxtCurrentCost.Text, out decimal currentCost) && currentCost >= 0;
             valid &= ValidationAssist.Check(TxtCurrentCost, costValid, "يرجى إدخال تكلفة صحيحة للزيارة.");
-            bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && todayPaid >= 0;
-            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "يرجى إدخال دفعة صحيحة لليوم.");
+            bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && ClinicInput.ValidPayment(currentCost, todayPaid);
+            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "الدفعة يجب أن تكون بين صفر وتكلفة الزيارة. سجّل دفعات الديون السابقة من الشؤون المالية.");
+            valid &= ValidationAssist.Check(CmbPregnancyMonth, ChkPregnant.IsChecked != true || CmbPregnancyMonth.SelectedIndex >= 0, "اختر شهر الحمل.");
             if (!valid)
             {
-                ValidationAssist.FocusFirst(TxtPhoneNumber, TxtAge, TxtCurrentCost, TxtTodayPaid);
+                ValidationAssist.FocusFirst(TxtFullName, TxtPhoneNumber, TxtAge, TxtBirthYear, TxtAllergies, TxtChronicDiseases, TxtCurrentCost, TxtTodayPaid, CmbPregnancyMonth);
+                return;
+            }
+            if (_selectedImagePaths.Any(path => !File.Exists(path)))
+            {
+                UiFeedback.Notify(this, "إحدى الصور المحددة لم تعد موجودة. أعد اختيار الصور قبل حفظ الزيارة.");
                 return;
             }
 
@@ -1013,26 +1255,26 @@ namespace MyClinic.OriginalTheme
 
             bool isFemale = CmbGender.SelectedIndex == 1;
             bool isPregnant = isFemale && ChkPregnant.IsChecked == true;
-            using var saveFeedback = SaveFeedback.Begin(this, sender, BtnSaveVisit);
+            using var saveFeedback = SaveFeedback.Begin(this, sender, BtnSaveVisit, BtnSaveVisitTop);
             if (!saveFeedback.CanStart) return;
             await saveFeedback.ShowBusyAsync();
 
 
             try
             {
-                using var db = new AppDbContext();
+                using var db = _createContext();
+                using var transaction = await db.Database.BeginTransactionAsync();
 
                 Patient? patient = null;
 
-                // تحديث المريض الحالي فقط إذا قام المستخدم باختياره بشكل صريح من قائمة المقترحات
                 if (_selectedPatientLookup != null)
                 {
                     patient = db.Patients.FirstOrDefault(existingPatient => existingPatient.Id == _selectedPatientLookup.Id);
+                    if (patient == null) { UiFeedback.Notify(this, "لم يعد ملف المريض موجوداً. اختر المريض مجدداً."); return; }
                 }
 
                 bool isExistingPatient = patient is not null;
 
-                // إنشاء مريض جديد إذا لم يتم اختيار أحد (يسمح بإضافة أفراد العائلة بنفس رقم الهاتف)
                 if (patient is null)
                 {
                     patient = new Patient
@@ -1044,22 +1286,11 @@ namespace MyClinic.OriginalTheme
                 }
                 else
                 {
-                    // تحديث رقم الهاتف في حال قام المستخدم بتصحيح خطأ إملائي بسيط بعد الاختيار
                     patient.PhoneNumber = phoneNumber;
                 }
 
-                patient.FullName = NullIfWhiteSpace(TxtFullName.Text);
-                patient.Age = age;
-                patient.Gender = GetSelectedComboBoxText(CmbGender);
-                patient.BloodType = NormalizeBloodType(GetSelectedComboBoxText(CmbBloodType));
-                patient.IsSmoker = ChkSmoker.IsChecked == true;
-                patient.SmokingType = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingType.Text) : null;
-                patient.SmokingFrequency = patient.IsSmoker ? NullIfWhiteSpace(TxtSmokingFrequency.Text) : null;
-                patient.Allergies = NullIfWhiteSpace(TxtAllergies.Text);
-                patient.ChronicDiseases = NullIfWhiteSpace(TxtChronicDiseases.Text);
+                WritePatientFields(patient);
 
-                // Snapshot the current USD→SYP rate so historic payment details
-                // are never retroactively affected by future rate changes.
                 double usdToSypRateSnapshot = 15000;
                 var appSettings = db.AppSettings.FirstOrDefault();
                 if (appSettings != null)
@@ -1078,7 +1309,7 @@ namespace MyClinic.OriginalTheme
                 }
 
                 int completedCanals = selectedTreatments
-                .Where(t => IsRootCanalTreatment(t.TreatmentName))
+                    .Where(t => IsRootCanalTreatment(t.TreatmentName))
                     .Sum(t => t.ToothDetails.Count > 0
                         ? t.ToothDetails.Where(d => int.TryParse(d.ToothId, out _)).Sum(d => d.CanalCount > 0 ? d.CanalCount : GetDefaultCanalNames(int.Parse(d.ToothId!)).Count)
                         : (!string.IsNullOrWhiteSpace(t.ToothId) ? Math.Max(1, t.CanalCount) : 0));
@@ -1130,48 +1361,49 @@ namespace MyClinic.OriginalTheme
                     PatientId = patient.Id > 0 ? patient.Id : null,
                     IsAutomaticallyGenerated = true
                 });
-                await db.SaveChangesAsync(); // أو db.SaveChanges();
-                
+                await db.SaveChangesAsync();
 
                 if (_selectedImagePaths.Count > 0)
                 {
                     string safePatientName = string.IsNullOrWhiteSpace(patient.FullName) ? "بدون_اسم" : patient.FullName;
                     visit.AttachedImagePathsJson = SaveVisitImages(safePatientName, visit.Id, _selectedImagePaths);
                     await db.SaveChangesAsync();
-                    
                 }
 
-                // Update the global runtime cache so the Dashboard stays accurate
+                await transaction.CommitAsync();
+                _visitCommitted = true;
                 AppRuntimeCache.AddOrUpdateVisit(visit);
 
-                // IMMEDIATELY notify the MainWindow that Financials need a refresh
                 if (Window.GetWindow(this) is MainWindow mainWindow)
                 {
                     mainWindow.InvalidateFinancialRecords();
                 }
 
-                // إضافة هذا السطر فوراً بعد نجاح عملية الحفظ لإشعار الواجهة المالية بوجود تحديث
                 GlobalEvents.NotifyFinancialRecordAdded();
-
-                // --- الكود الجديد: إرسال تنبيه لتحديث سجل المرضى ---
-                GlobalEvents.NotifyPatientRecordAdded(); 
+                GlobalEvents.NotifyPatientRecordAdded();
                 GlobalEvents.NotifyFileKitCanalCountChanged();
 
-                // ... باقي كود تفريغ الحقول وإظهار رسالة النجاح ...
                 saveFeedback.Success("تم حفظ المريض والزيارة بنجاح.");
-                ResetForm();
+                if (DeleteDraft()) ResetWorkflowForm();
+                else { _baseline = Fingerprint(CaptureDraft()); _lastSavedDraft = _baseline; }
                 NavigateToDashboard(visit, patient, isExistingPatient, savedVisitDateTime);
             }
             catch (Exception ex)
             {
-                // ... معالجة الأخطاء ...
                 MessageBox.Show($"حدث خطأ أثناء حفظ البيانات:\n{ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
-            ResetForm();
+            if (HasUnsavedChanges())
+            {
+                var answer = MessageBox.Show("هل تريد حفظ التغييرات كمسودة قبل الإغلاق؟\nنعم: حفظ مسودة · لا: تجاهل التغييرات · إلغاء: متابعة التحرير",
+                    "تغييرات غير محفوظة", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (answer == MessageBoxResult.Cancel) return;
+                if (answer == MessageBoxResult.Yes) { if (!PreserveDraft()) return; }
+                else { if (!DeleteDraft()) return; ResetWorkflowForm(); }
+            }
             NavigateToDashboard();
         }
 
@@ -1184,6 +1416,12 @@ namespace MyClinic.OriginalTheme
             if (TxtRemainingAmount != null)
             {
                 TxtRemainingAmount.Text = remainingAmount.ToString("0.##", CultureInfo.CurrentCulture);
+            }
+            if (TxtPaymentHint != null)
+            {
+                TxtPaymentHint.Text = todayPaid > currentCost ? "الدفعة تتجاوز تكلفة الزيارة. سجّل دفعات الديون السابقة في الشؤون المالية." :
+                    "المبالغ المحاسبية بالليرة السورية (SYP). رصيد الزيارات السابقة معروض بشكل منفصل.";
+                TxtPaymentHint.SetResourceReference(TextBlock.ForegroundProperty, todayPaid > currentCost ? "VisitWarningFg" : "AppTextSecondary");
             }
         }
 
@@ -1223,9 +1461,7 @@ namespace MyClinic.OriginalTheme
 
         private List<string> GetSelectedToothIds()
         {
-            IEnumerable<string> selectedTeeth = AdultChartControl.Visibility == Visibility.Visible
-                ? AdultChartControl.GetSelectedTeeth()
-                : ChildChartControl.GetSelectedTeeth();
+            IEnumerable<string> selectedTeeth = AdultChartControl.GetSelectedTeeth().Concat(ChildChartControl.GetSelectedTeeth());
 
             return selectedTeeth
                 .Distinct(StringComparer.Ordinal)
@@ -1277,7 +1513,7 @@ namespace MyClinic.OriginalTheme
                 return true;
             }
 
-            if (int.TryParse(value.Trim(), out int parsedValue))
+            if (int.TryParse(ClinicInput.NormalizeDigits(value), out int parsedValue))
             {
                 result = parsedValue;
                 return true;
@@ -1295,7 +1531,7 @@ namespace MyClinic.OriginalTheme
                 return true;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
                    decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
@@ -1308,7 +1544,7 @@ namespace MyClinic.OriginalTheme
                 return 0;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal currentCultureValue)
                 ? currentCultureValue
@@ -1327,7 +1563,6 @@ namespace MyClinic.OriginalTheme
                 return;
             }
 
-            // Storing the drug to dictionary for AutoFill logic
             AddToMedicines(medicineName);
 
             _prescriptionItems.Add(new PrescriptionItem
@@ -1412,6 +1647,7 @@ namespace MyClinic.OriginalTheme
 
             LstPrescriptionEntries.ItemsSource = null;
             LstPrescriptionEntries.ItemsSource = _prescriptionItems.Select(FormatPrescriptionItem).ToList();
+            FormMotion.Reveal(LstPrescriptionEntries); ScheduleDraft();
         }
 
         private void RefreshSelectedImagesList()
@@ -1429,6 +1665,7 @@ namespace MyClinic.OriginalTheme
             TxtImageSelectionHint.Text = _selectedImagePaths.Count == 0
                 ? "لا توجد صور محددة بعد"
                 : $"تم اختيار {_selectedImagePaths.Count} من {MaxVisitImages} صور";
+            ScheduleDraft();
         }
 
         private static string FormatPrescriptionItem(PrescriptionItem item)
@@ -1474,8 +1711,7 @@ namespace MyClinic.OriginalTheme
             }
 
             string storageRoot = ResolveVisitImagesRoot();
-            
-            // استخدام اسم المريض بدلاً من رقم الهاتف لاسم المجلد
+
             string sanitizedName = SanitizePathSegment(patientName);
             string visitFolderName = $"{sanitizedName}_visit_{visitId}_{AppClock.Now:yyyyMMdd_HHmmss}";
             string visitFolderPath = Path.Combine(storageRoot, visitFolderName);
@@ -1487,8 +1723,7 @@ namespace MyClinic.OriginalTheme
             foreach (string sourcePath in existingFiles)
             {
                 string extension = Path.GetExtension(sourcePath);
-                
-                // استخدام التاريخ/الوقت مع أجزاء الثانية (_fff) ورقم تسلسلي لضمان عدم وجود أسماء مكررة أبداً
+
                 string timestamp = AppClock.Now.ToString("yyyyMMdd_HHmmss_fff");
                 string destinationFileName = $"{timestamp}_{sequence:00}{extension}";
                 string destinationPath = Path.Combine(visitFolderPath, destinationFileName);
@@ -1505,12 +1740,10 @@ namespace MyClinic.OriginalTheme
 
         private static string ResolveVisitImagesRoot()
         {
-            // توجيه مجلد الصور ليكون داخل المجلد الآمن الخاص بالعيادة
             string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string clinicFolder = Path.Combine(appDataFolder, "MyClinicApp");
             string imagesFolder = Path.Combine(clinicFolder, "PatientVisitImages");
 
-            // التأكد من أن مجلد الصور موجود، وإلا سيقوم بإنشائه
             if (!Directory.Exists(imagesFolder))
             {
                 Directory.CreateDirectory(imagesFolder);
@@ -1551,8 +1784,8 @@ namespace MyClinic.OriginalTheme
             string details = Truncate(
                 FirstNonEmpty(
                     ToLabelValue("خطة العلاج", visit.TreatmentPlanNotes),
-                    toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الز الزيارة." : null,
-                            ToLabelValue("شكوى المريض", visit.Symptoms),
+                    toothCount > 0 ? $"تم تسجيل {toothCount} أسنان في مخطط الزيارة." : null,
+                    ToLabelValue("شكوى المريض", visit.Symptoms),
                     ToLabelValue("الضغط", visit.BloodPressure),
                     "لا توجد ملاحظات إضافية."),
                 120);
@@ -1626,8 +1859,8 @@ namespace MyClinic.OriginalTheme
                 BitmapImage image = new();
                 image.BeginInit();
                 image.CacheOption = BitmapCacheOption.OnLoad;
-                image.DecodePixelWidth = 320; 
-                image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile; 
+                image.DecodePixelWidth = 320;
+                image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
                 image.UriSource = new Uri(filePath, UriKind.Absolute);
                 image.EndInit();
                 image.Freeze();
@@ -1732,7 +1965,7 @@ namespace MyClinic.OriginalTheme
                 return false;
             }
 
-            string trimmedValue = value.Trim();
+            string trimmedValue = ClinicInput.NormalizeDigits(value);
 
             return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
                    decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
@@ -1877,8 +2110,8 @@ namespace MyClinic.OriginalTheme
         {
             TxtPhoneNumber.Clear();
             TxtFullName.Clear();
-            TxtAge.Text = "0";
-            CmbGender.SelectedIndex = 0;
+            TxtAge.Clear();
+            CmbGender.SelectedIndex = -1;
             CmbBloodType.SelectedIndex = 0;
 
             TxtCurrentCost.Text = "0";
@@ -1891,7 +2124,7 @@ namespace MyClinic.OriginalTheme
 
             ChkPregnant.IsChecked = false;
             ChkNursing.IsChecked = false;
-            CmbPregnancyMonth.SelectedIndex = 0;
+            CmbPregnancyMonth.SelectedIndex = -1;
 
             TxtAllergies.Clear();
             TxtChronicDiseases.Clear();
@@ -1947,6 +2180,8 @@ namespace MyClinic.OriginalTheme
             public string PhoneNumber { get; init; } = string.Empty;
             public string? FullName { get; init; }
             public int? Age { get; init; }
+            public DateTime? DateOfBirth { get; init; }
+            public int? BirthYear { get; init; }
             public string? Gender { get; init; }
             public string? BloodType { get; init; }
             public bool IsSmoker { get; init; }
@@ -1978,9 +2213,6 @@ namespace MyClinic.OriginalTheme
 
         private void NavigateToDashboard(Visit? savedVisit = null, Patient? savedPatient = null, bool isExistingPatient = false, DateTime savedVisitDateTime = default)
         {
-            // Let the save context finish disposing before the dashboard opens a
-            // second context to reload the calendar. This avoids a transient
-            // SQLite read/lock race immediately after saving a visit.
             Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Background,
                 new Action(() =>
