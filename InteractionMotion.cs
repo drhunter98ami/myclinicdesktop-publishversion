@@ -93,16 +93,16 @@ public static class InteractionMotion
         {
             bool hover = _element.IsMouseOver && _element.IsEnabled;
             bool focus = _element.IsKeyboardFocusWithin && _element.IsEnabled;
-            if (_moves && _element.IsLoaded && (SystemParameters.ClientAreaAnimation || _group != null))
+            if (_moves && _element.IsLoaded && (MotionPreferences.Enabled || _group != null))
             {
                 EnsureTransform();
-                bool press = SystemParameters.ClientAreaAnimation && _element is ButtonBase && pressed && (hover || focus);
-                double size = press ? 0.98 : 1;
+                bool press = MotionPreferences.Enabled && _element is ButtonBase && pressed && (hover || focus);
+                double size = press ? (MotionPreferences.Current == MotionLevel.Subtle ? 0.99 : 0.98) : 1;
                 _scale!.CenterX = _element.ActualWidth / 2;
                 _scale.CenterY = _element.ActualHeight / 2;
                 Animate(_scale, ScaleTransform.ScaleXProperty, size);
                 Animate(_scale, ScaleTransform.ScaleYProperty, size);
-                Animate(_offset!, TranslateTransform.YProperty, SystemParameters.ClientAreaAnimation && hover && !press ? -2 : 0);
+                Animate(_offset!, TranslateTransform.YProperty, MotionPreferences.Enabled && hover && !press ? -MotionPreferences.Distance(2) : 0);
             }
             if ((hover || focus) && _highlight == null && _element.IsLoaded)
             {

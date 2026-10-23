@@ -118,16 +118,20 @@ namespace MyClinic.OriginalTheme
             if (!int.TryParse(PregnancyMonthText.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out int pregnancyMonth) &&
                 !string.IsNullOrWhiteSpace(PregnancyMonthText.Text))
             {
-                MessageBox.Show("يرجى إدخال شهر حمل صحيح من 1 إلى 9 أو تركه فارغاً.", "قيمة غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(PregnancyMonthText, "يرجى إدخال شهر حمل صحيح من 1 إلى 9 أو تركه فارغاً.");
                 PregnancyMonthText.Focus();
                 return;
             }
             if (!string.IsNullOrWhiteSpace(PregnancyMonthText.Text) && pregnancyMonth is < 1 or > 9)
             {
-                MessageBox.Show("يجب أن يكون شهر الحمل بين 1 و9.", "قيمة غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(PregnancyMonthText, "يجب أن يكون شهر الحمل بين 1 و9.");
                 PregnancyMonthText.Focus();
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -209,6 +213,7 @@ namespace MyClinic.OriginalTheme
                 await db.SaveChangesAsync();
                 AppRuntimeCache.AddOrUpdateVisit(visit);
 
+                saveFeedback.Success("تم حفظ تعديلات الزيارة.");
                 DialogResult = true;
             }
             catch (Exception ex)

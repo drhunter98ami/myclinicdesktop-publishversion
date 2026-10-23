@@ -232,6 +232,12 @@
                         </ComboBox>
                         <TextBlock Text="الوضع الداكن" Style="{StaticResource HintStyle}" Margin="0,0,0,8"/>
                         <ToggleButton x:Name="ThemeToggle" Style="{StaticResource SettingsToggleSwitchStyle}" Checked="ThemeToggle_Checked" Unchecked="ThemeToggle_Unchecked" HorizontalAlignment="Left"/>
+                        <TextBlock  Text="الحركة والتأثيرات" Foreground="{DynamicResource AppTextSecondary}" Margin="0,12,0,6"/>
+                        <ComboBox  x:Name="MotionLevelComboBox" Style="{StaticResource ComboBoxStyle}" ToolTip="يتبع أيضاً إعدادات الحركة في Windows." SelectionChanged="MotionLevelComboBox_SelectionChanged" MinWidth="120" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="بدون حركة"/>
+                            <ComboBoxItem Content="حركة خفيفة"/>
+                            <ComboBoxItem Content="حركة كاملة"/>
+                        </ComboBox>
                     </StackPanel>
                 </Border>
                 <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" Padding="24">

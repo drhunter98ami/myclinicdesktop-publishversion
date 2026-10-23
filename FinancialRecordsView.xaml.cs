@@ -108,6 +108,12 @@ namespace MyClinic
 
         private void Financial_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                Financial_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive() || FinancialSpotlightCanvas is null || FinancialSpotlightTransform is null)
                 return;
 
@@ -195,10 +201,6 @@ namespace MyClinic
 
             try
             {
-                _incomeRows.Clear();
-                _expenseRows.Clear();
-                _allVisits.Clear(); 
-                _allExpenses.Clear();
 
                 var data = await Task.Run(async () =>
                 {
@@ -263,6 +265,9 @@ namespace MyClinic
                     
                     return (visits, expenses, upcomingModels);
                 });
+                if (_refreshRequested) return;
+                _allVisits.Clear();
+                _allExpenses.Clear();
                 _allVisits.AddRange(data.visits);
                 _allExpenses.AddRange(data.expenses);
                 ReplaceCollection(_upcomingPayments, data.upcomingModels);
@@ -340,7 +345,7 @@ namespace MyClinic
         {
             if (CmbExpenseCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
             {
-                MessageBox.Show("يرجى اختيار فئة المصروف.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(CmbExpenseCategory, "يرجى اختيار فئة المصروف.");
                 CmbExpenseCategory.Focus();
                 return;
             }
@@ -349,13 +354,17 @@ namespace MyClinic
 
             if (!TryParseMoney(TxtExpenseAmount.Text, out decimal amount) || amount <= 0)
             {
-                MessageBox.Show("يرجى إدخال قيمة صحيحة للمصروف.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtExpenseAmount, "يرجى إدخال قيمة صحيحة للمصروف.");
                 TxtExpenseAmount.Focus();
                 TxtExpenseAmount.SelectAll();
                 return;
             }
 
             DateTime expenseDate = GetSyrianTime();
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -387,6 +396,8 @@ namespace MyClinic
                 CmbExpenseCategory.SelectedIndex = 0;
 
                 ApplyFilters();
+                if (_refreshTask != null) RequestRefresh();
+                saveFeedback.Success("تم الحفظ بنجاح.");
             }
             catch (Exception)
             {
@@ -400,7 +411,7 @@ namespace MyClinic
         {
             if (CmbUpcomingCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
             {
-                MessageBox.Show("يرجى اختيار فئة الدفعة.", "دفعات قادمة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(CmbUpcomingCategory, "يرجى اختيار فئة الدفعة.");
                 CmbUpcomingCategory.Focus();
                 return;
             }
@@ -408,20 +419,24 @@ namespace MyClinic
             string desc = TxtUpcomingDescription.Text.Trim();
             if (string.IsNullOrWhiteSpace(desc))
             {
-                MessageBox.Show("يرجى إدخال تفاصيل الدفعة.", "دفعات قادمة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtUpcomingDescription, "يرجى إدخال تفاصيل الدفعة.");
                 TxtUpcomingDescription.Focus();
                 return;
             }
 
             if (!TryParseMoney(TxtUpcomingAmount.Text, out decimal amt) || amt <= 0)
             {
-                MessageBox.Show("يرجى إدخال قيمة صحيحة للدفعة.", "دفعات قادمة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtUpcomingAmount, "يرجى إدخال قيمة صحيحة للدفعة.");
                 TxtUpcomingAmount.Focus();
                 TxtUpcomingAmount.SelectAll();
                 return;
             }
             
             string description = ExpenseCategories.FormatDescription(category, desc);
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -447,6 +462,8 @@ namespace MyClinic
                 TxtUpcomingAmount.Clear();
                 CmbUpcomingCategory.SelectedIndex = 0;
                 EmptyUpcomingText.Visibility = Visibility.Collapsed;
+                if (_refreshTask != null) RequestRefresh();
+                saveFeedback.Success("تم الحفظ بنجاح.");
             }
             catch (Exception)
             {
@@ -527,6 +544,9 @@ namespace MyClinic
         private void ApplyFilters()
         {
             DateTime selectedDate = (DpFilterDate.SelectedDate ?? GetSyrianTime().Date).Date;
+            string scrollKey = $"{_rangeMode}|{selectedDate:yyyy-MM-dd}";
+            using var incomeScroll = ScrollState.Updating(IncomeItemsControl, scrollKey);
+            using var expenseScroll = ScrollState.Updating(ExpenseItemsControl, scrollKey);
             
             List<VisitFinanceSnapshot> filteredVisits = _allVisits
                 .Where(visit => MatchesRange(visit.VisitDate.Date, selectedDate))
@@ -703,8 +723,8 @@ namespace MyClinic
             double totalExpenses = expenseRows.Sum(item => item.RawAmount);
             double netAmount = totalIncome - totalExpenses;
 
-            TxtTotalIncome.Text = FormatMoney(totalIncome);
-            TxtTotalExpenses.Text = FormatMoney(totalExpenses);
+            AnimatedNumber.Show(TxtTotalIncome, totalIncome, "{0:0.##} ل.س");
+            AnimatedNumber.Show(TxtTotalExpenses, totalExpenses, "{0:0.##} ل.س");
             TxtNetAmount.Text = FormatMoney(netAmount);
             bool isDark = IsDarkThemeActive();
             TxtNetAmount.Foreground = netAmount < 0
@@ -712,8 +732,8 @@ namespace MyClinic
                 : new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#2DD4BF" : "#2250DF"));
 
             TxtVisitCount.Text = filteredVisits.Count.ToString(CultureInfo.CurrentCulture);
-            TxtIncomeFooterTotal.Text = FormatMoney(totalIncome);
-            TxtExpenseFooterTotal.Text = FormatMoney(totalExpenses);
+            AnimatedNumber.Show(TxtIncomeFooterTotal, totalIncome, "{0:0.##} ل.س");
+            AnimatedNumber.Show(TxtExpenseFooterTotal, totalExpenses, "{0:0.##} ل.س");
 
             EmptyIncomeText.Visibility = _incomeRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             EmptyExpenseText.Visibility = _expenseRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -798,7 +818,7 @@ namespace MyClinic
 
         private void SetLoadingState(bool isLoading)
         {
-            LoadingOverlay.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+            LoadingFeedback.Set(this, LoadingOverlay, isLoading, _hasLoadedData);
         }
 
         // --- Unpaid Accounts Overlay Logic ---
@@ -902,6 +922,7 @@ namespace MyClinic
                         unpaidList = unpaidList.OrderBy(u => u.FirstDebtDate).ToList();
                 }
 
+                using var unpaidScroll = ScrollState.Updating(UnpaidItemsControl, CmbUnpaidSort?.SelectedIndex.ToString() ?? "");
                 ReplaceCollection(_unpaidAccounts, unpaidList);
                 EmptyUnpaidText.Visibility = _unpaidAccounts.Any() ? Visibility.Collapsed : Visibility.Visible;
                 TxtUnpaidTotal.Text = $"الإجمالي: {_unpaidAccounts.Sum(u => u.RemainingAmount).ToString("N0", CultureInfo.CurrentCulture)} ل.س";
@@ -947,6 +968,7 @@ namespace MyClinic
 
         private async void TxtPatientSearchInput_TextChanged(object sender, TextChangedEventArgs e)
         {
+            SearchAssist.SetNameQuery(this, TxtPatientSearchInput?.Text.Trim() ?? "");
             string query = TxtPatientSearchInput.Text.Trim();
             
             if (string.IsNullOrWhiteSpace(query))
@@ -1074,17 +1096,21 @@ namespace MyClinic
 
             if (!isPaymentEntered && !isForgivenessEntered)
             {
-                MessageBox.Show("يرجى إدخال قيمة للدفعة أو للمسامحة.", "إضافة دفعة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtAddPaymentAmount, "يرجى إدخال قيمة للدفعة أو للمسامحة.");
                 return;
             }
 
             if ((isPaymentEntered && paymentAmount < 0) || (isForgivenessEntered && forgivenessAmount < 0))
             {
-                MessageBox.Show("لا يمكن إدخال قيم سالبة.", "إضافة دفعة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(paymentAmount < 0 ? TxtAddPaymentAmount : TxtAddForgivenessAmount, "لا يمكن إدخال قيم سالبة.");
                 return;
             }
 
             DateTime paymentDateTime = GetSyrianTime();
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -1111,6 +1137,8 @@ namespace MyClinic
 
                 RequestRefresh();
                 await EnsureDataCurrentAsync();
+                if (_refreshTask != null) RequestRefresh();
+                saveFeedback.Success("تم الحفظ بنجاح.");
             }
             catch (Exception)
             {

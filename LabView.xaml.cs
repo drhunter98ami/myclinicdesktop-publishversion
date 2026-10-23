@@ -71,6 +71,12 @@ namespace MyClinic
 
         private void Lab_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                Lab_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive() || LabSpotlightCanvas is null || LabSpotlightTransform is null)
                 return;
 
@@ -217,14 +223,18 @@ namespace MyClinic
             AddLabNameDialogOverlay.Visibility = Visibility.Collapsed;
         }
 
-        private void BtnConfirmAddLabName_Click(object sender, RoutedEventArgs e)
+        private async void BtnConfirmAddLabName_Click(object sender, RoutedEventArgs e)
         {
             string newLabName = TxtNewLabName.Text?.Trim();
             if (string.IsNullOrWhiteSpace(newLabName))
             {
-                MessageBox.Show("يرجى إدخال اسم المخبر", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtNewLabName, "يرجى إدخال اسم المخبر");
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -232,7 +242,7 @@ namespace MyClinic
                 // Check if name already exists
                 if (context.LabNames.Any(l => l.Name == newLabName))
                 {
-                    MessageBox.Show("هذا الاسم موجود بالفعل", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ValidationAssist.Show(TxtNewLabName, "هذا الاسم موجود بالفعل");
                     return;
                 }
                 var labName = new LabName { Name = newLabName };
@@ -241,7 +251,7 @@ namespace MyClinic
                 LoadLabNames();
                 CmbLabName.SelectedItem = labName;
                 AddLabNameDialogOverlay.Visibility = Visibility.Collapsed;
-                MessageBox.Show("تم إضافة المخبر بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم إضافة المخبر بنجاح");
             }
             catch (Exception ex)
             {
@@ -249,19 +259,23 @@ namespace MyClinic
             }
         }
 
-        private void BtnAddWork_Click(object sender, RoutedEventArgs e)
+        private async void BtnAddWork_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(TxtPatientName.Text))
             {
-                MessageBox.Show("يرجى إدخال اسم المريض", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtPatientName, "يرجى إدخال اسم المريض");
                 return;
             }
 
             if (!decimal.TryParse(TxtCost.Text, out decimal cost) || cost <= 0)
             {
-                MessageBox.Show("يرجى إدخال تكلفة صحيحة", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtCost, "يرجى إدخال تكلفة صحيحة");
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -290,7 +304,7 @@ namespace MyClinic
                 LoadLabWorks();
                 ApplyFilters();
 
-                MessageBox.Show("تم إضافة العمل بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم إضافة العمل بنجاح");
             }
             catch (Exception ex)
             {

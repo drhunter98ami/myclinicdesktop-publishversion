@@ -326,7 +326,7 @@
 
         <!-- ═══ Patient list ═════════════════════════════════════════════════════ -->
         <Grid motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="2" Grid.Row="1" Panel.ZIndex="2">
-            <ListBox motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="PatientsListBox"
+            <ListBox motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="PatientsListBox" motion:ScrollState.Enabled="True"
                      Background="Transparent"
                      BorderThickness="0"
                      HorizontalContentAlignment="Stretch"
@@ -383,7 +383,7 @@
                                 <StackPanel Grid.Column="1"
                                             Margin="14,0,14,0"
                                             VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding DisplayName}"
+                                    <TextBlock motion:SearchAssist.Text="{Binding DisplayName}" motion:SearchAssist.Kind="Name"
                                                FontFamily="Traditional Arabic"
                                                FontSize="24"
                                                FontWeight="Bold"
@@ -399,7 +399,7 @@
                                                    Foreground="{DynamicResource DashCalendarTodayNumFg}"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,6,0"/>
-                                        <TextBlock Text="{Binding PhoneNumber}"
+                                        <TextBlock motion:SearchAssist.Text="{Binding PhoneNumber}" motion:SearchAssist.Kind="Phone"
                                                    FontSize="14"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource AppTextSecondary}"/>
@@ -705,7 +705,7 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer Grid.Row="2"
+                    <ScrollViewer motion:ScrollState.Enabled="True" Grid.Row="2"
                                   VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="24,0,24,24">
                             <Border Margin="0,0,0,16"
@@ -1113,7 +1113,7 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1"
+                    <ScrollViewer motion:ScrollState.Enabled="True" Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"
                                   Padding="24,20,24,8">
                         <StackPanel>

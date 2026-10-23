@@ -244,7 +244,7 @@
     </UserControl.Resources>
 
     <Grid>
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <ScrollViewer motion:ScrollState.Enabled="True" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <Grid Margin="0,0,0,24">
                 <Grid.RowDefinitions>
@@ -698,7 +698,7 @@
                         </Grid>
                     </Border>
                 </Grid>
-                
+
                 <!-- Upcoming Payments Section (دفعات قادمة) -->
                 <Border motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="5" Grid.Row="4" Grid.ColumnSpan="3" Style="{StaticResource PanelCardStyle}" Margin="0,0,0,18" ClipToBounds="True">
                     <Grid>
@@ -782,7 +782,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Grid.Column="2" Text="{Binding Description}" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                     <TextBlock Grid.Column="1" Text="{Binding AmountText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#F59E0B" FontWeight="Bold" FontSize="16"/>
-                                                    
+
                                                     <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
                                                         <Button Content="&#xE73E;" FontFamily="Segoe MDL2 Assets" Foreground="White" Background="#10B981" Width="40" Height="40" Margin="0,0,8,0" ToolTip="تم الدفع (تحويل للمصاريف)" Cursor="Hand" Click="BtnPayUpcoming_Click">
                                                             <Button.Template>
@@ -817,7 +817,7 @@
         </ScrollViewer>
 
         <!-- Income Treatments Overlay -->
-        <Border x:Name="IncomeTreatmentsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="50"
+        <Border motion:OverlayMotion.Enabled="True" x:Name="IncomeTreatmentsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="50"
                 MouseLeftButtonDown="IncomeTreatmentsDimmer_MouseLeftButtonDown">
             <Border Width="620" MaxHeight="540" Background="{DynamicResource AppCardBg}" CornerRadius="22"
                     BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Padding="0"
@@ -912,7 +912,7 @@
         </Border>
 
         <!-- Unpaid Accounts Overlay -->
-        <Border x:Name="UnpaidAccountsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
+        <Border motion:OverlayMotion.Enabled="True" x:Name="UnpaidAccountsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
             <Border Width="850" MaxHeight="650" Background="{DynamicResource AppCardBg}" CornerRadius="22" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -984,7 +984,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </Grid>
-                            
+
                             <TextBlock x:Name="EmptyUnpaidText" Grid.Row="1" Text="لا توجد حسابات غير مسددة." Margin="0,40" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                         </Grid>
                     </Border>
@@ -993,7 +993,7 @@
         </Border>
 
         <!-- Patient Search History Overlay -->
-        <Border x:Name="PatientSearchOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
+        <Border motion:OverlayMotion.Enabled="True" x:Name="PatientSearchOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
             <Border Width="1050" MaxHeight="650" Background="{DynamicResource AppCardBg}" CornerRadius="22" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -1012,7 +1012,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
+
                         <TextBox x:Name="TxtPatientSearchInput" Grid.Row="0" Style="{StaticResource InputBoxStyle}" Tag="أدخل اسم المريض أو رقم الهاتف..." TextChanged="TxtPatientSearchInput_TextChanged" Height="46" FontSize="15"/>
 
                         <Border x:Name="SuggestionsPopupBorder" Grid.Row="1" Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="8" Margin="0,4,0,0" MaxHeight="180" Visibility="Collapsed">
@@ -1036,7 +1036,7 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            
+
                             <Border Grid.Row="0" Background="{DynamicResource AppInputBg}" Padding="16,12" BorderBrush="{DynamicResource AppBorder}" BorderThickness="0,0,0,1">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

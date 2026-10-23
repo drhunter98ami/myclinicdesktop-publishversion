@@ -439,7 +439,7 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="حفظ وإنهاء الزيارة"
+                        <Button x:Name="BtnSaveVisitTop" Content="حفظ وإنهاء الزيارة"
                                 Style="{StaticResource PrimaryActionButton}"
                                 Height="42"
                                 Margin="0,0,10,0"
@@ -830,9 +830,10 @@
                     </Grid>
 
                     <!-- العلامات الحيوية -->
-                    <Border Style="{StaticResource Card}">
+                    <motion:AnimatedSection Header="العلامات الحيوية (Vital Signs)" Style="{StaticResource AnimatedSectionStyle}" >
+<Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="العلامات الحيوية (Vital Signs)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,18"/>
+
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -887,6 +888,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+</motion:AnimatedSection>
 
                     <!-- شكوى المريض والتشخيص -->
                     <Grid Margin="0,0,0,4">
@@ -1304,7 +1306,8 @@
 
                         <!-- الوصفة الطبية -->
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <Border Style="{StaticResource Card}" Margin="0">
+                            <motion:AnimatedSection Header="الوصفة الطبية" Style="{StaticResource AnimatedSectionStyle}" Margin="0">
+<Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,15">
                                         <Border Width="40"
@@ -1317,7 +1320,7 @@
                                             <TextBlock Text="🧾" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="الوصفة الطبية" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+
                                             <TextBlock Text="أضف الأدوية والتعليمات الخاصة بالزيارة الحالية" Foreground="{DynamicResource AppTextSecondary}"/>
                                         </StackPanel>
                                     </DockPanel>
@@ -1436,13 +1439,15 @@
                                              Padding="6"/>
                                 </StackPanel>
                             </Border>
+</motion:AnimatedSection>
                         </StackPanel>
 
                         <!-- المرفقات والملاحظات -->
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <Border Style="{StaticResource Card}">
+                            <motion:AnimatedSection Header="صور الزيارة" Style="{StaticResource AnimatedSectionStyle}" >
+<Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="صور الزيارة" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+
                                     <TextBlock Text="يمكنك إرفاق حتى 5 صور للملفات أو الأشعة أو المرفقات السريرية" Foreground="{DynamicResource AppTextSecondary}" Margin="0,6,0,15"/>
 
                                     <Border Background="{DynamicResource VisitAccentCardBg}"
@@ -1477,6 +1482,7 @@
                                              Padding="6"/>
                                 </StackPanel>
                             </Border>
+</motion:AnimatedSection>
 
                             <Border Style="{StaticResource Card}" Margin="0">
                                 <StackPanel>
@@ -1551,7 +1557,7 @@
         </Canvas>
 
         <!-- بطاقة تفاصيل الزيارة الطبية (Visit Card Modal) المنسقة بالكامل مع الثيم الفاتح والداكن -->
-        <Grid x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
+        <Grid motion:OverlayMotion.Enabled="True" x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
             <Border x:Name="VisitDetailsDimmer" Background="#B006121A" MouseLeftButtonDown="VisitDetailsDimmer_MouseLeftButtonDown"/>
 
             <Border x:Name="VisitDetailsModal"

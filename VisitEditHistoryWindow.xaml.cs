@@ -77,6 +77,12 @@ namespace MyClinic
 
         private void Window_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                Window_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive() || HistorySpotlightCanvas is null || HistorySpotlightTransform is null)
                 return;
 

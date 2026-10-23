@@ -12,8 +12,9 @@ internal static class ChartMotion
     {
         var scale = new ScaleTransform(1, 1, centerX, centerY);
         slice.RenderTransform = scale;
-        Run(scale, ScaleTransform.ScaleXProperty, 0.82, 1, index * 28, 520);
-        Run(scale, ScaleTransform.ScaleYProperty, 0.82, 1, index * 28, 520);
+        double start = MotionPreferences.Current == MotionLevel.Subtle ? 0.94 : 0.82;
+        Run(scale, ScaleTransform.ScaleXProperty, start, 1, index * 28, 520);
+        Run(scale, ScaleTransform.ScaleYProperty, start, 1, index * 28, 520);
         FadeIn(slice, index * 28);
     }
 
@@ -29,8 +30,8 @@ internal static class ChartMotion
     {
         var clip = new RectangleGeometry(new Rect(0, 0, width, height));
         line.Clip = clip;
-        if (!SystemParameters.ClientAreaAnimation) return;
-        var animation = new RectAnimation(new Rect(0, 0, 0, height), new Rect(0, 0, width, height), TimeSpan.FromMilliseconds(850))
+        if (!MotionPreferences.Enabled) return;
+        var animation = new RectAnimation(new Rect(0, 0, 0, height), new Rect(0, 0, width, height), MotionPreferences.Duration(850))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
                 FillBehavior = FillBehavior.Stop
@@ -68,6 +69,7 @@ internal static class ChartMotion
     }
 
     public static void FadeIn(UIElement element, int delay = 0) => Run(element, UIElement.OpacityProperty, 0, 1, delay, 350);
+    public static void Emphasize(UIElement element) => Run(element, UIElement.OpacityProperty, 0.65, 1, 0, 350);
 
     public static void To(DependencyObject target, DependencyProperty property, double value)
     {
@@ -85,15 +87,15 @@ internal static class ChartMotion
     private static void Run(DependencyObject target, DependencyProperty property, double from, double to, int delay, int duration)
     {
         DoubleAnimationUsingKeyFrames? animation = null;
-        if (SystemParameters.ClientAreaAnimation)
+        if (MotionPreferences.Enabled)
         {
             delay = Math.Min(delay, 420);
             animation = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
             animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
             if (delay > 0)
-                animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay))));
+                animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(MotionPreferences.Duration(delay))));
             animation.KeyFrames.Add(new SplineDoubleKeyFrame(to,
-                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay + duration)), new KeySpline(0.16, 1, 0.3, 1)));
+                KeyTime.FromTimeSpan(MotionPreferences.Duration(delay + duration)), new KeySpline(0.16, 1, 0.3, 1)));
             animation.Completed += (_, _) =>
             {
                 if (target is UIElement element) element.BeginAnimation(property, null);
@@ -124,7 +126,7 @@ internal sealed class ChartLegendInteraction
     {
         _slices[label] = slice;
         _descriptions[label] = description;
-        _directions[label] = new Point(Math.Cos(angle * Math.PI / 180) * 5, Math.Sin(angle * Math.PI / 180) * 5);
+        _directions[label] = new Point(Math.Cos(angle * Math.PI / 180), Math.Sin(angle * Math.PI / 180));
         var offset = new TranslateTransform();
         _offsets[label] = offset;
         slice.RenderTransform = new TransformGroup { Children = { slice.RenderTransform, offset } };
@@ -159,13 +161,14 @@ internal sealed class ChartLegendInteraction
 
     private void Select(string? label)
     {
+        AnimatedNumber.Cancel(_summary);
         label ??= _rows.FirstOrDefault(entry => entry.Value.IsKeyboardFocusWithin).Key;
         foreach (var (name, slice) in _slices)
         {
             bool selected = name == label;
             ChartMotion.To(slice, UIElement.OpacityProperty, label == null || selected ? 1 : 0.45);
-            ChartMotion.To(_offsets[name], TranslateTransform.XProperty, selected ? _directions[name].X : 0);
-            ChartMotion.To(_offsets[name], TranslateTransform.YProperty, selected ? _directions[name].Y : 0);
+            ChartMotion.To(_offsets[name], TranslateTransform.XProperty, selected ? _directions[name].X * MotionPreferences.Distance(5) : 0);
+            ChartMotion.To(_offsets[name], TranslateTransform.YProperty, selected ? _directions[name].Y * MotionPreferences.Distance(5) : 0);
         }
         foreach (var (name, row) in _rows)
         {

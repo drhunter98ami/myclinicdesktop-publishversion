@@ -61,7 +61,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
         <Style TargetType="ComboBox" x:Key="ModernComboBox">
             <Setter Property="Height" Value="40"/>
             <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
@@ -73,12 +73,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton Name="ToggleButton" 
-                                          BorderBrush="{TemplateBinding BorderBrush}" 
-                                          Background="{TemplateBinding Background}" 
-                                          BorderThickness="{TemplateBinding BorderThickness}" 
-                                          Focusable="false" 
-                                          IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" 
+                            <ToggleButton Name="ToggleButton"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="false"
+                                          IsChecked="{Binding Path=IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}"
                                           ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
@@ -267,22 +267,22 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- ROW 0: Top Section (Side-by-Side Layout) -->
-                
+
                 <!-- Left Column (Clinical Data Top) -->
                 <StackPanel motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="1" Grid.Row="0" Grid.Column="0" Margin="0,0,20,0" VerticalAlignment="Top">
-                    
+
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="اختيار العلاجات" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
-                            
+
                              <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
                                 <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="TreatmentItemsControl">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="{DynamicResource AppInputBg}" 
-                                                    BorderBrush="{DynamicResource AppBorder}" 
-                                                    BorderThickness="1" 
-                                                    CornerRadius="6" 
+                                            <Border Background="{DynamicResource AppInputBg}"
+                                                    BorderBrush="{DynamicResource AppBorder}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
                                                     Padding="12,8"
                                                     Margin="0,0,0,8">
                                                  <Grid>
@@ -413,7 +413,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <TextBlock Text="البيانات المالية" Foreground="{DynamicResource AppTextPrimary}" FontSize="18" FontWeight="Bold"/>
                                     <TextBlock Text="تفاصيل الدفع والتكلفة" Foreground="{DynamicResource AppTextSecondary}" FontSize="14"/>
@@ -422,13 +422,13 @@
                                 <StackPanel Grid.Column="1" Margin="10,0">
                                     <TextBlock Text="التكلفة الحالية" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtCurrentCost" Text="0" TextAlignment="Center" Style="{StaticResource ModernTextBox}" TextChanged="FinancialInput_TextChanged"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="0" Margin="10,0">
                                     <TextBlock Text="دفعة اليوم" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtTodayPaid" Text="0" TextAlignment="Center" Style="{StaticResource ModernTextBox}" TextChanged="FinancialInput_TextChanged"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
                             </Grid>
@@ -448,13 +448,13 @@
                                 <Grid>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Text="السجل المالي التراكمي للمريض:" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                                        
+
                                         <TextBlock Text="إجمالي التكلفة:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TxtTotalPatientCost" Text="0" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center" FontSize="15"/>
-                                        
+
                                         <TextBlock Text="إجمالي الدفعات:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TxtTotalPatientPaid" Text="0" FontWeight="Bold" Foreground="#16A34A" VerticalAlignment="Center" FontSize="15"/>
-                                        
+
                                         <TextBlock Text="إجمالي المتبقي:" Foreground="{DynamicResource AppTextSecondary}" Margin="20,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TxtTotalPatientRemaining" Text="0" FontWeight="Bold" Foreground="#DC2626" VerticalAlignment="Center" FontSize="15"/>
                                     </StackPanel>
@@ -467,7 +467,7 @@
                         <StackPanel>
                             <TextBlock Text="عادات التدخين" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
                             <CheckBox x:Name="ChkSmoker" Content="المريض مدخن" Margin="0,10,0,0" FlowDirection="RightToLeft" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" Checked="ChkSmoker_CheckedChanged" Unchecked="ChkSmoker_CheckedChanged"/>
-                            
+
                             <StackPanel x:Name="PanelSmokerDetails" Visibility="Collapsed" Margin="0,15,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -494,7 +494,7 @@
                                 <CheckBox x:Name="ChkPregnant" Content="حامل" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,0" Checked="ChkPregnant_CheckedChanged" Unchecked="ChkPregnant_CheckedChanged"/>
                                 <CheckBox x:Name="ChkNursing" Content="مرضع" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="20,0,0,0"/>
                             </StackPanel>
-                            
+
                             <StackPanel x:Name="PanelPregnancyMonth" Visibility="Collapsed" Margin="0,15,0,0">
                                 <TextBlock Text="شهر الحمل" Style="{StaticResource FormLabel}"/>
                                 <ComboBox x:Name="CmbPregnancyMonth" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
@@ -533,10 +533,11 @@
                         </Border>
                     </Grid>
 
-                    <Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
+                    <motion:AnimatedSection Header="العلامات الحيوية (Vital Signs)" Style="{StaticResource AnimatedSectionStyle}" >
+<Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
                         <StackPanel>
-                            <TextBlock Text="العلامات الحيوية (Vital Signs)" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-                            
+
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -544,12 +545,12 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <StackPanel Grid.Column="0" Margin="10,0">
                                     <TextBlock Text="ضغط الدم (BP)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtBloodPressure" Tag="120/80" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
                                 </StackPanel>
-                                
+
                                 <StackPanel Grid.Column="1" Margin="10,0">
                                     <TextBlock Text="النبض (HR)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtHeartRate" Tag="72" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
@@ -572,7 +573,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <StackPanel Grid.Column="0" Margin="10,0">
                                     <TextBlock Text="الوزن (Weight)" Style="{StaticResource FormLabel}" HorizontalAlignment="Center"/>
                                     <TextBox x:Name="TxtWeight" Tag="70" Style="{StaticResource ModernTextBox}" TextAlignment="Center"/>
@@ -590,13 +591,14 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+</motion:AnimatedSection>
 
                     <Grid Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        
+
                         <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
                             <StackPanel>
                                 <TextBlock Text="شكوى المريض" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left"/>
@@ -672,7 +674,7 @@
                                 <StackPanel Grid.Column="0" Margin="0,0,5,0">
                                     <TextBlock Text="العمر" Style="{StaticResource FormLabel}"/>
                                     <TextBox x:Name="TxtAge" Text="0" Style="{StaticResource ModernTextBox}"
-                                             GotKeyboardFocus="TextBox_GotKeyboardFocus" 
+                                             GotKeyboardFocus="TextBox_GotKeyboardFocus"
                                              PreviewMouseLeftButtonDown="TextBox_PreviewMouseLeftButtonDown"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
@@ -705,7 +707,7 @@
                                     CornerRadius="18"
                                     BorderThickness="0"
                                     Visibility="Collapsed">
-                                
+
                                 <StackPanel>
                                     <Border CornerRadius="18,18,0,0" Padding="16,14,16,10" Background="{DynamicResource AppSidebarBg}">
                                         <Grid>
@@ -892,7 +894,7 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
-                                
+
                                 <Button x:Name="BtnChild" Content="أطفال" Width="100" Height="40" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextSecondary}" FontWeight="Bold" Click="BtnChild_Click">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
@@ -904,7 +906,7 @@
                                 </Button>
                             </StackPanel>
                         </Border>
-                        
+
                         <Border Style="{StaticResource Card}" Margin="0" MinHeight="450" HorizontalAlignment="Stretch">
                             <Grid>
                                 <local:AdultDentalChart x:Name="AdultChartControl" Visibility="Visible"/>
@@ -921,14 +923,15 @@
 
                         <!-- Prescriptions Full Space Left -->
                         <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                            <Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}" Margin="0">
+                            <motion:AnimatedSection Header="الوصفة الطبية" Style="{StaticResource AnimatedSectionStyle}" Margin="0">
+<Border Style="{StaticResource Card}" Background="{DynamicResource AppInputBg}">
                                 <StackPanel>
                                     <DockPanel Margin="0,0,0,15">
                                         <Border Width="38" Height="38" CornerRadius="10" Background="#2563EB" DockPanel.Dock="Right">
                                             <TextBlock Text="🧾" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <StackPanel Margin="0,0,12,0">
-                                            <TextBlock Text="الوصفة الطبية" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+
                                             <TextBlock Text="أضف الأدوية والتعليمات الخاصة بالزيارة الحالية" Foreground="{DynamicResource AppTextSecondary}"/>
                                         </StackPanel>
                                     </DockPanel>
@@ -1045,13 +1048,15 @@
                                              Padding="6"/>
                                 </StackPanel>
                             </Border>
+</motion:AnimatedSection>
                         </StackPanel>
 
                         <!-- Attachments & Notes Full Space Right -->
                         <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                            <Border Style="{StaticResource Card}">
+                            <motion:AnimatedSection Header="صور الزيارة" Style="{StaticResource AnimatedSectionStyle}" >
+<Border Style="{StaticResource Card}">
                                 <StackPanel>
-                                    <TextBlock Text="صور الزيارة" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
+
                                     <TextBlock Text="يمكنك إرفاق حتى 5 صور للملفات أو الأشعة أو المرفقات السريرية" Foreground="{DynamicResource AppTextSecondary}" Margin="0,6,0,15"/>
 
                                     <Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="18">
@@ -1082,6 +1087,7 @@
                                              Padding="6"/>
                                 </StackPanel>
                             </Border>
+</motion:AnimatedSection>
 
                             <Border Style="{StaticResource Card}" Margin="0">
                                 <StackPanel>
@@ -1115,13 +1121,13 @@
                         </ControlTemplate>
                     </Button.Template>
                 </Button>
-                
+
                 <Button Content="إلغاء" Width="100" Height="45" Style="{StaticResource SecondaryActionButton}" FontSize="16" Click="BtnCancel_Click"/>
             </StackPanel>
         </Border>
 
         <!-- Fully Rebuilt Visit Details Modal matched to PatientRecordsView style -->
-        <Grid x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
+        <Grid motion:OverlayMotion.Enabled="True" x:Name="VisitDetailsOverlay" Grid.RowSpan="3" Visibility="Collapsed" Panel.ZIndex="25">
             <Border x:Name="VisitDetailsDimmer" Background="#A3000000" MouseLeftButtonDown="VisitDetailsDimmer_MouseLeftButtonDown"/>
 
             <Border x:Name="VisitDetailsModal" Width="760" MaxHeight="900" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource AppWindowBg}" CornerRadius="28" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">
@@ -1188,7 +1194,7 @@
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="28,20,28,6">
                         <StackPanel>
-                            
+
                             <!-- Patient Information Section -->
                             <Border Style="{StaticResource DetailSectionStyle}">
                                 <StackPanel>
@@ -1436,9 +1442,9 @@
                                         <TextBlock Text="&#xEFA9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#9333EA" Margin="0,0,10,0"/>
                                         <TextBlock Text="المخطط السني" FontFamily="Traditional Arabic" FontSize="25" FontWeight="Bold" Foreground="#9333EA"/>
                                     </StackPanel>
-                                    
+
                                     <TextBlock Text="{Binding DentalChartCategoryText}" Margin="0,0,0,16" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold"/>
-                                    
+
                                     <TextBlock Text="الأسنان المسجلة" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                                     <ItemsControl ItemsSource="{Binding Teeth}" Margin="0,10,0,0">
                                         <ItemsControl.ItemsPanel>

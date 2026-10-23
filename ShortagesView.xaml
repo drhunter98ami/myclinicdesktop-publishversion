@@ -637,7 +637,7 @@
         </Grid>
 
         <!-- Edit Price Dialog Overlay -->
-        <Grid x:Name="EditPriceDialogOverlay" Panel.ZIndex="20" Visibility="Collapsed" Grid.RowSpan="2">
+        <Grid motion:OverlayMotion.Enabled="True" x:Name="EditPriceDialogOverlay" Panel.ZIndex="20" Visibility="Collapsed" Grid.RowSpan="2">
             <Border Background="#A00F172A" MouseLeftButtonDown="EditPriceDialogBackdrop_MouseLeftButtonDown"/>
 
             <Border Width="420"

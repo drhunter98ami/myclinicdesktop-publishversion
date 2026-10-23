@@ -100,6 +100,12 @@ namespace MyClinic
 
         private void PatientRecords_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                PatientRecords_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive() || PatientRecordsSpotlightCanvas is null || PatientRecordsSpotlightTransform is null)
                 return;
 
@@ -445,6 +451,11 @@ namespace MyClinic
             try
             {
                 List<PatientCardModel> loaded = await Task.Run(LoadPatientsAsync);
+                if (_refreshGeneration != requestGeneration)
+                {
+                    refreshSucceeded = true;
+                    return;
+                }
 
                 _allPatients.Clear();
                 _allPatients.AddRange(loaded);
@@ -489,6 +500,9 @@ namespace MyClinic
         {
             string nameFilter  = TxtNameSearch.Text.Trim();
             string phoneFilter = TxtPhoneSearch.Text.Trim();
+            using var scrollState = ScrollState.Updating(PatientsListBox, nameFilter + "\0" + phoneFilter);
+            SearchAssist.SetNameQuery(this, nameFilter);
+            SearchAssist.SetPhoneQuery(this, phoneFilter);
 
             // Build the result list first, then do a single batched UI update
             List<PatientCardModel> result = _allPatients
@@ -499,6 +513,7 @@ namespace MyClinic
 
             // Keep the exact filtered order, with one UI notification and linear work.
             _filteredPatients.ReplaceAll(result);
+            SearchAssist.Summary(PatientsListBox, result.Count, ("الاسم", TxtNameSearch), ("الهاتف", TxtPhoneSearch));
 
             EmptyStateTitle.Text       = "لا توجد نتائج مطابقة";
             EmptyStateDescription.Text = "جرّب البحث باسم مختلف أو رقم هاتف آخر.";
@@ -613,11 +628,11 @@ namespace MyClinic
             DrawerTranslate.X        = -48;
 
             OverlayDimmer.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170)));
+                new DoubleAnimation(0, 1, MotionPreferences.Duration(170)));
 
             DrawerTranslate.BeginAnimation(
                 System.Windows.Media.TranslateTransform.XProperty,
-                new DoubleAnimation(-48, 0, TimeSpan.FromMilliseconds(210))
+                new DoubleAnimation(-48, 0, MotionPreferences.Duration(210))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
@@ -630,10 +645,10 @@ namespace MyClinic
             if (MedicalRecordOverlay.Visibility != Visibility.Visible)
                 return;
 
-            var fade = new DoubleAnimation(OverlayDimmer.Opacity, 0, TimeSpan.FromMilliseconds(140));
+            var fade = new DoubleAnimation(OverlayDimmer.Opacity, 0, MotionPreferences.Duration(140));
             OverlayDimmer.BeginAnimation(OpacityProperty, fade);
 
-            var slide = new DoubleAnimation(DrawerTranslate.X, -48, TimeSpan.FromMilliseconds(160))
+            var slide = new DoubleAnimation(DrawerTranslate.X, -48, MotionPreferences.Duration(160))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
@@ -648,11 +663,11 @@ namespace MyClinic
             VisitDetailsTranslate.Y        = 24;
 
             VisitDetailsDimmer.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170)));
+                new DoubleAnimation(0, 1, MotionPreferences.Duration(170)));
 
             VisitDetailsTranslate.BeginAnimation(
                 System.Windows.Media.TranslateTransform.YProperty,
-                new DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(210))
+                new DoubleAnimation(24, 0, MotionPreferences.Duration(210))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
@@ -680,10 +695,10 @@ namespace MyClinic
                 return;
             }
 
-            var fade = new DoubleAnimation(VisitDetailsDimmer.Opacity, 0, TimeSpan.FromMilliseconds(140));
+            var fade = new DoubleAnimation(VisitDetailsDimmer.Opacity, 0, MotionPreferences.Duration(140));
             VisitDetailsDimmer.BeginAnimation(OpacityProperty, fade);
 
-            var slide = new DoubleAnimation(VisitDetailsTranslate.Y, 24, TimeSpan.FromMilliseconds(160))
+            var slide = new DoubleAnimation(VisitDetailsTranslate.Y, 24, MotionPreferences.Duration(160))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
             };
@@ -722,16 +737,12 @@ namespace MyClinic
 
         private void SetLoadingState(bool isLoading)
         {
-            LoadingOverlay.Visibility  = isLoading ? Visibility.Visible : Visibility.Collapsed;
-            PatientsListBox.Visibility = isLoading
-                ? Visibility.Collapsed
-                : (_filteredPatients.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
-            EmptyStateCard.Visibility  = isLoading
-                ? Visibility.Collapsed
-                : (_filteredPatients.Count == 0 ? Visibility.Visible : Visibility.Collapsed);
-
-            TxtNameSearch.IsEnabled  = !isLoading;
-            TxtPhoneSearch.IsEnabled = !isLoading;
+            LoadingFeedback.Set(this, LoadingOverlay, isLoading, _hasLoadedData);
+            bool firstLoad = isLoading && !_hasLoadedData;
+            PatientsListBox.Visibility = !firstLoad && _filteredPatients.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyStateCard.Visibility = !firstLoad && _filteredPatients.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            TxtNameSearch.IsEnabled = !firstLoad;
+            TxtPhoneSearch.IsEnabled = !firstLoad;
         }
 
         // ── Static mapping helpers ────────────────────────────────────────────────

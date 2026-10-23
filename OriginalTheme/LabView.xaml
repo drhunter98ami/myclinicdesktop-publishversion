@@ -453,7 +453,7 @@
                         <TextBlock Grid.Column="1" Grid.Row="0" Text="اسم المخبر" Style="{StaticResource FormLabel}"/>
                         <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Margin="10,0,0,15">
                             <ComboBox x:Name="CmbLabName" Width="200" Style="{StaticResource DarkComboBox}"/>
-                            <Button x:Name="BtnAddLabName" Content="+" Width="35" Margin="5,0,0,0" 
+                            <Button x:Name="BtnAddLabName" Content="+" Width="35" Margin="5,0,0,0"
                                     Style="{StaticResource PrimaryButton}" Click="BtnAddLabName_Click" Padding="0"/>
                         </StackPanel>
 
@@ -657,7 +657,7 @@
     </ScrollViewer>
 
     <!-- Add Lab Name Dialog Overlay -->
-    <Grid x:Name="AddLabNameDialogOverlay" Panel.ZIndex="20" Visibility="Collapsed">
+    <Grid motion:OverlayMotion.Enabled="True" x:Name="AddLabNameDialogOverlay" Panel.ZIndex="20" Visibility="Collapsed">
         <Border Background="#A00F172A" MouseLeftButtonDown="AddLabNameDialogBackdrop_MouseLeftButtonDown"/>
 
         <Border Width="400" Padding="32" Background="{DynamicResource AppCardBg}" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center">

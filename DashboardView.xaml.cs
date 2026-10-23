@@ -170,6 +170,12 @@ namespace MyClinic
 
         private void Dashboard_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                Dashboard_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive())
                 return;
 
@@ -439,6 +445,7 @@ namespace MyClinic
                     var patients = await db.Patients.AsNoTracking().ToListAsync();
                     return (appointments, visits, patients);
                 });
+                if (_refreshRequested) return;
                 var (appointments, visits, patients) = data;
 
                 var appointmentKeys = appointments
@@ -755,21 +762,21 @@ namespace MyClinic
 
             if (string.IsNullOrWhiteSpace(patientName))
             {
-                MessageBox.Show("يرجى إدخال اسم المريض.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(CmbAppointmentPatientName, "يرجى إدخال اسم المريض.");
                 CmbAppointmentPatientName.Focus();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(phoneNumber))
             {
-                MessageBox.Show("يرجى إدخال رقم الهاتف.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(CmbAppointmentPhoneNumber, "يرجى إدخال رقم الهاتف.");
                 CmbAppointmentPhoneNumber.Focus();
                 return;
             }
 
             if (DpAppointmentDate.SelectedDate is null)
             {
-                MessageBox.Show("يرجى اختيار تاريخ الموعد.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(DpAppointmentDate, "يرجى اختيار تاريخ الموعد.");
                 return;
             }
 
@@ -780,12 +787,16 @@ namespace MyClinic
 
             if (!DateTime.TryParse(timeText, out DateTime parsedTime))
             {
-                MessageBox.Show("يرجى التأكد من إدخال وقت صحيح.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(CmbHour, "يرجى التأكد من إدخال وقت صحيح.");
                 return;
             }
 
             TimeSpan selectedTime = parsedTime.TimeOfDay;
             DateTime appointmentDateTime = DpAppointmentDate.SelectedDate.Value.Date.Add(selectedTime);
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -811,6 +822,7 @@ namespace MyClinic
 
                 UpdateSearchSuggestions();
                 ApplyAppointmentsFilter();
+                saveFeedback.Success("تم الحفظ بنجاح.");
             }
             catch (Exception)
             {
@@ -1093,10 +1105,13 @@ namespace MyClinic
         private void ReplaceAppointments(IEnumerable<AppointmentCardModel> items)
         {
             _appointments.ReplaceAll(items);
+            SearchAssist.Summary(AppointmentsItemsControl, _appointments.Count, ("البحث", TxtAppointmentsSearch));
         }
 
         private void ApplyAppointmentsFilter()
         {
+            SearchAssist.SetNameQuery(this, TxtAppointmentsSearch.Text?.Trim() ?? "");
+            SearchAssist.SetPhoneQuery(this, TxtAppointmentsSearch.Text?.Trim() ?? "");
             DateTime syrianNow = GetSyrianTime();
             DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? syrianNow.Date).Date;
 
@@ -1584,7 +1599,7 @@ namespace MyClinic
 
         private void SetLoadingState(bool isLoading)
         {
-            LoadingOverlay.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+            LoadingFeedback.Set(this, LoadingOverlay, isLoading, _hasLoadedData);
         }
     }
 

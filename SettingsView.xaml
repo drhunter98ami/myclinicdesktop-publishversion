@@ -673,7 +673,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Text="المظهر" Style="{StaticResource SectionTitleStyle}"/>
                         <TextBlock Grid.Row="1" Text="اختر تصميم واجهة التطبيق." Style="{StaticResource HintStyle}" Margin="0,4,0,8"/>
                         <ComboBox Grid.Row="2"
@@ -690,6 +690,12 @@
                                       Checked="ThemeToggle_Checked"
                                       Unchecked="ThemeToggle_Unchecked"
                                       HorizontalAlignment="Left"/>
+                        <TextBlock Grid.Row="5" Text="الحركة والتأثيرات" Foreground="{DynamicResource AppTextSecondary}" Margin="0,12,0,6"/>
+                        <ComboBox Grid.Row="6" x:Name="MotionLevelComboBox" Style="{StaticResource ComboBoxStyle}" ToolTip="يتبع أيضاً إعدادات الحركة في Windows." SelectionChanged="MotionLevelComboBox_SelectionChanged" MinWidth="120" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="بدون حركة"/>
+                            <ComboBoxItem Content="حركة خفيفة"/>
+                            <ComboBoxItem Content="حركة كاملة"/>
+                        </ComboBox>
                     </Grid>
                 </Border>
 

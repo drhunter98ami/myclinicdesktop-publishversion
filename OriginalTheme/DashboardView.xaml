@@ -399,7 +399,7 @@
                                 <Border x:Name="AppointmentsSearchSuggestionsPanel" Grid.Row="1" Margin="0,5,0,0" MaxHeight="210"
                                         Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1"
                                         CornerRadius="9" Visibility="Collapsed">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer motion:ScrollState.Enabled="True" VerticalScrollBarVisibility="Auto">
                                         <ItemsControl x:Name="AppointmentsSearchSuggestions">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -449,7 +449,7 @@
 
                 <!-- شبكة البطاقات -->
                 <Grid motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="4" Grid.Row="1">
-                    <ScrollViewer x:Name="DailyAppointmentsPanel" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer motion:ScrollState.Enabled="True" x:Name="DailyAppointmentsPanel" VerticalScrollBarVisibility="Auto">
                         <Grid>
                             <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="AppointmentsItemsControl">
                                 <ItemsControl.ItemsPanel>
@@ -475,8 +475,8 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" HorizontalAlignment="Right">
-                                                        <TextBlock Text="{Binding PatientName}" FontFamily="Traditional Arabic" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="{Binding PhoneNumber}" Margin="0,-4,0,0" FontSize="12" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock motion:SearchAssist.Text="{Binding PatientName}" FontFamily="Traditional Arabic" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock motion:SearchAssist.Text="{Binding PhoneNumber}" motion:SearchAssist.Kind="Phone" Margin="0,-4,0,0" FontSize="12" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Right" TextTrimming="CharacterEllipsis"/>
                                                     </StackPanel>
                                                     <Border Grid.Column="1" Padding="8,5" CornerRadius="9" Background="{Binding ReasonBackground}" VerticalAlignment="Top">
                                                         <TextBlock Text="{Binding Reason}" Foreground="{Binding ReasonForeground}" FontWeight="Bold" FontSize="12"/>
@@ -648,7 +648,7 @@
                             <TextBlock Grid.Column="6" Text="السبت" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource AppTextSecondary}"/>
                         </Grid>
 
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer motion:ScrollState.Enabled="True" Grid.Row="2" VerticalScrollBarVisibility="Auto">
                             <Grid x:Name="CalendarDaysGrid" FlowDirection="LeftToRight"/>
                         </ScrollViewer>
                     </Grid>
@@ -692,7 +692,7 @@
 
                     <Border Grid.Row="1" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="14" Padding="10" MinHeight="180">
                         <Grid>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer motion:ScrollState.Enabled="True" VerticalScrollBarVisibility="Auto">
                                 <ItemsControl x:Name="DayDetailsItemsControl">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>

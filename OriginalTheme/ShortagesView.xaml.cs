@@ -93,11 +93,16 @@ namespace MyClinic.OriginalTheme
             TxtNonUrgentTotal.Text = $"{nonUrgentTotal.ToString("N0", CultureInfo.CurrentCulture)} ل.س";
         }
 
-        private void BtnAddUrgent_Click(object sender, RoutedEventArgs e)
+        private async void BtnAddUrgent_Click(object sender, RoutedEventArgs e)
         {
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
             if (TryAddShortage(TxtUrgentInput, TxtUrgentPrice, TxtUrgentQuantity, CmbUrgentCurrency, isUrgent: true, out ShortageRowModel? row))
             {
                 UrgentItems.Add(row);
+                saveFeedback.Success("تمت إضافة المادة.");
             }
         }
 
@@ -107,11 +112,16 @@ namespace MyClinic.OriginalTheme
                 BtnAddUrgent_Click(sender, e);
         }
 
-        private void BtnAddNonUrgent_Click(object sender, RoutedEventArgs e)
+        private async void BtnAddNonUrgent_Click(object sender, RoutedEventArgs e)
         {
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
             if (TryAddShortage(TxtNonUrgentInput, TxtNonUrgentPrice, TxtNonUrgentQuantity, CmbNonUrgentCurrency, isUrgent: false, out ShortageRowModel? row))
             {
                 NonUrgentItems.Add(row);
+                saveFeedback.Success("تمت إضافة المادة.");
             }
         }
 
@@ -128,21 +138,20 @@ namespace MyClinic.OriginalTheme
             string text = input.Text.Trim();
             if (string.IsNullOrEmpty(text))
             {
+                ValidationAssist.Show(input, "يرجى إدخال اسم المادة.");
                 return false;
             }
 
             if (!decimal.TryParse(priceInput.Text.Trim(), NumberStyles.Number, CultureInfo.CurrentCulture, out decimal price) || price < 0)
             {
-                MessageBox.Show("يرجى إدخال سعر صحيح.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
-                priceInput.Focus();
+                ValidationAssist.Show(priceInput, "يرجى إدخال سعر صحيح.");
                 return false;
             }
 
             int quantity = ParseQuantity(quantityInput.Text);
             if (quantity < 1)
             {
-                MessageBox.Show("يرجى إدخال عدد صحيح أكبر من صفر.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
-                quantityInput.Focus();
+                ValidationAssist.Show(quantityInput, "يرجى إدخال عدد صحيح أكبر من صفر.");
                 return false;
             }
 
@@ -237,25 +246,29 @@ namespace MyClinic.OriginalTheme
             EditPriceDialogOverlay.Visibility = Visibility.Collapsed;
         }
 
-        private void BtnConfirmEditPrice_Click(object sender, RoutedEventArgs e)
+        private async void BtnConfirmEditPrice_Click(object sender, RoutedEventArgs e)
         {
             if (_editingItem == null) return;
 
             if (!decimal.TryParse(TxtEditPrice.Text.Trim(), NumberStyles.Number, CultureInfo.CurrentCulture, out decimal newPrice) || newPrice < 0)
             {
-                MessageBox.Show("يرجى إدخال سعر صحيح.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtEditPrice, "يرجى إدخال سعر صحيح.");
                 return;
             }
 
             int newQuantity = ParseQuantity(TxtEditQuantity.Text);
             if (newQuantity < 1)
             {
-                MessageBox.Show("يرجى إدخال عدد صحيح أكبر من صفر.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtEditQuantity, "يرجى إدخال عدد صحيح أكبر من صفر.");
                 TxtEditQuantity.Focus();
                 return;
             }
 
             string newCurrency = (CmbEditCurrency.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "SYP";
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -284,7 +297,7 @@ namespace MyClinic.OriginalTheme
 
                     UpdateTotals();
                     EditPriceDialogOverlay.Visibility = Visibility.Collapsed;
-                    MessageBox.Show("تم تحديث السعر بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
+                    saveFeedback.Success("تم تحديث السعر بنجاح");
                 }
             }
             catch (Exception ex)

@@ -21,11 +21,29 @@ namespace MyClinic.OriginalTheme
         public SettingsView()
         {
             InitializeComponent();
+            MotionLevelComboBox.SelectedIndex = (int)MotionPreferences.Current;
             TreatmentItemsControl.ItemsSource = _treatmentCosts;
             Loaded += SettingsView_Loaded;
             
             // Set default currency selection
             CmbTreatmentCurrency.SelectedIndex = 0;
+        }
+
+        private void MotionLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (MotionLevelComboBox == null || MotionLevelComboBox.SelectedIndex < 0) return;
+            var selected = (MotionLevel)MotionLevelComboBox.SelectedIndex;
+            if (selected == MotionPreferences.Current) return;
+            try
+            {
+                MotionPreferences.Set(selected);
+                UiFeedback.Notify(this, "تم تحديث إعدادات الحركة.");
+            }
+            catch (Exception ex)
+            {
+                MotionLevelComboBox.SelectedIndex = (int)MotionPreferences.Current;
+                MessageBox.Show($"تعذر حفظ إعدادات الحركة: {ex.Message}", "الإعدادات", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void SettingsView_Loaded(object sender, RoutedEventArgs e)
@@ -54,9 +72,13 @@ namespace MyClinic.OriginalTheme
                 selectedTime < TimeSpan.Zero ||
                 selectedTime >= TimeSpan.FromDays(1))
             {
-                MessageBox.Show("يرجى إدخال تاريخ ووقت صحيحين بصيغة ساعة:دقيقة، مثل 14:30.", "وقت غير صالح", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtAppClockTime, "يرجى إدخال تاريخ ووقت صحيحين بصيغة ساعة:دقيقة، مثل 14:30.");
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -66,7 +88,7 @@ namespace MyClinic.OriginalTheme
                 SetAppClockFields(AppClock.Now);
                 if (Window.GetWindow(this) is MainWindow mainWindow)
                     await mainWindow.NotifyAppTimeChangedAsync(previousAppTime);
-                MessageBox.Show("تم حفظ وقت التطبيق وتطبيقه على أقسام البرنامج.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم حفظ وقت التطبيق وتطبيقه على أقسام البرنامج.");
             }
             catch (Exception ex)
             {
@@ -83,7 +105,7 @@ namespace MyClinic.OriginalTheme
                 SetAppClockFields(AppClock.Now);
                 if (Window.GetWindow(this) is MainWindow mainWindow)
                     await mainWindow.NotifyAppTimeChangedAsync(previousAppTime);
-                MessageBox.Show("تمت إعادة التطبيق إلى وقته الافتراضي.", "تمت إعادة الضبط", MessageBoxButton.OK, MessageBoxImage.Information);
+                UiFeedback.Notify(this, "تمت إعادة التطبيق إلى وقته الافتراضي.");
             }
             catch (Exception ex)
             {
@@ -91,14 +113,14 @@ namespace MyClinic.OriginalTheme
             }
         }
 
-        private void BtnSaveUsername_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveUsername_Click(object sender, RoutedEventArgs e)
         {
             string newUsername = TxtUsername.Text.Trim();
             string currentUsername = LoginSessionStore.CurrentUsername;
 
             if (string.IsNullOrWhiteSpace(newUsername))
             {
-                MessageBox.Show("يرجى إدخال اسم مستخدم صحيح.", "اسم غير صالح", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtUsername, "يرجى إدخال اسم مستخدم صحيح.");
                 TxtUsername.Focus();
                 return;
             }
@@ -108,6 +130,10 @@ namespace MyClinic.OriginalTheme
                 MessageBox.Show("تعذر تحديد المستخدم الحالي. يرجى تسجيل الدخول مجدداً.", "تعذر تغيير الاسم", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -121,7 +147,7 @@ namespace MyClinic.OriginalTheme
 
                 if (db.Users.Any(u => u.Id != user.Id && u.Username == newUsername))
                 {
-                    MessageBox.Show("اسم المستخدم مستخدم مسبقاً. يرجى اختيار اسم آخر.", "اسم مستخدم موجود", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ValidationAssist.Show(TxtUsername, "اسم المستخدم مستخدم مسبقاً. يرجى اختيار اسم آخر.");
                     TxtUsername.Focus();
                     TxtUsername.SelectAll();
                     return;
@@ -147,7 +173,7 @@ namespace MyClinic.OriginalTheme
                 if (Window.GetWindow(this) is MainWindow mainWindow)
                     mainWindow.RefreshWelcomeName();
 
-                MessageBox.Show("تم تغيير اسم المستخدم بنجاح.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم تغيير اسم المستخدم بنجاح.");
             }
             catch (Exception ex)
             {
@@ -250,15 +276,19 @@ namespace MyClinic.OriginalTheme
             }
         }
 
-        private void BtnSaveExchangeRate_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveExchangeRate_Click(object sender, RoutedEventArgs e)
         {
             if (!decimal.TryParse(TxtExchangeRate.Text, NumberStyles.Any, CultureInfo.CurrentCulture, out var rate) || rate <= 0)
             {
-                MessageBox.Show("يرجى إدخال سعر صرف صحيح.", "قيمة غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtExchangeRate, "يرجى إدخال سعر صرف صحيح.");
                 TxtExchangeRate.Focus();
                 TxtExchangeRate.SelectAll();
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -279,7 +309,7 @@ namespace MyClinic.OriginalTheme
                 TxtExchangeRate.Text = rate.ToString("N0", CultureInfo.CurrentCulture);
                 TxtCurrentExchangeRate.Text = $"{rate:N0} ل.س";
                 GlobalEvents.NotifyExchangeRateChanged();
-                MessageBox.Show("تم حفظ سعر الصرف وتحديث التبويبات المرتبطة.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم حفظ سعر الصرف وتحديث التبويبات المرتبطة.");
             }
             catch (Exception ex)
             {
@@ -316,18 +346,22 @@ namespace MyClinic.OriginalTheme
 
             if (string.IsNullOrWhiteSpace(treatmentName))
             {
-                MessageBox.Show("يرجى إدخال اسم العلاج.", "بيانات ناقصة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtTreatmentName, "يرجى إدخال اسم العلاج.");
                 TxtTreatmentName.Focus();
                 return;
             }
 
             if (!decimal.TryParse(costText, out decimal cost) || cost <= 0)
             {
-                MessageBox.Show("يرجى إدخال تكلفة صحيحة.", "قيمة غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtTreatmentCost, "يرجى إدخال تكلفة صحيحة.");
                 TxtTreatmentCost.Focus();
                 TxtTreatmentCost.SelectAll();
                 return;
             }
+            using var saveFeedback = SaveFeedback.Begin(this, sender);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -360,6 +394,7 @@ namespace MyClinic.OriginalTheme
                 TxtTreatmentName.Clear();
                 TxtTreatmentCost.Clear();
                 TxtTreatmentName.Focus();
+                saveFeedback.Success("تم الحفظ بنجاح.");
             }
             catch (Exception ex)
             {

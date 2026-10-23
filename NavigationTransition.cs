@@ -33,7 +33,7 @@ public static class NavigationTransition
             return;
 
         (host.GetValue(SessionProperty) as EntranceSession)?.Stop();
-        bool animate = host.IsLoaded && host.Content != null && SystemParameters.ClientAreaAnimation;
+        bool animate = host.IsLoaded && host.Content != null && MotionPreferences.Enabled;
         host.Content = content;
         if (!animate || content is not FrameworkElement page)
             return;
@@ -70,7 +70,7 @@ public static class NavigationTransition
                 return;
 
             _page.BeginAnimation(UIElement.OpacityProperty, null);
-            if (!SystemParameters.ClientAreaAnimation)
+            if (!MotionPreferences.Enabled)
             {
                 Stop();
                 return;
@@ -207,10 +207,10 @@ public static class NavigationTransition
             element.BeginAnimation(UIElement.OpacityProperty, Track(0, element.Opacity, delay, 300));
             if (motion == NavigationMotion.Toolbar)
                 translation.BeginAnimation(TranslateTransform.XProperty,
-                    Track(element.FlowDirection == FlowDirection.RightToLeft ? -14 : 14, 0, delay, duration));
+                    Track(MotionPreferences.Distance(element.FlowDirection == FlowDirection.RightToLeft ? -14 : 14), 0, delay, duration));
             else
                 translation.BeginAnimation(TranslateTransform.YProperty,
-                    Track(distance ?? (motion == NavigationMotion.Header ? 14 : 24), 0, delay, duration));
+                    Track(MotionPreferences.Distance(distance ?? (motion == NavigationMotion.Header ? 14 : 24)), 0, delay, duration));
             if (motion == NavigationMotion.Card)
             {
                 scale.BeginAnimation(ScaleTransform.ScaleXProperty, Track(0.985, 1, delay, duration));
@@ -223,9 +223,9 @@ public static class NavigationTransition
             var animation = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
             animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
             if (delay > 0)
-                animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay))));
+                animation.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(MotionPreferences.Duration(delay))));
             animation.KeyFrames.Add(new SplineDoubleKeyFrame(to,
-                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delay + duration)), new KeySpline(0.16, 1, 0.3, 1)));
+                KeyTime.FromTimeSpan(MotionPreferences.Duration(delay + duration)), new KeySpline(0.16, 1, 0.3, 1)));
             return animation;
         }
 

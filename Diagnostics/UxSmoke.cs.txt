@@ -1,0 +1,282 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Markup;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using System.Xml.Linq;
+using MyClinic;
+using MyClinic.Models;
+
+static class UxChecks
+{
+    static int checks;
+    static readonly string output = System.IO.Path.GetFullPath("obj/UxSmoke/previews");
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); checks++; }
+    static void Pump(int ms)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+        timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
+    {
+        if (root is T found) yield return found;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            foreach (var item in Find<T>(VisualTreeHelper.GetChild(root, i))) yield return item;
+    }
+    static Window Host(UIElement element, double width = 1000, double height = 700)
+    {
+        var root = new Grid { Background = Application.Current.TryFindResource("AppWindowBg") as Brush ?? Brushes.White };
+        root.Children.Add(new AdornerDecorator { Child = element, Margin = new Thickness(20) });
+        var window = new Window { Content = root, Width = width, Height = height, Left = -12000, Top = -12000, ShowActivated = false, ShowInTaskbar = false };
+        window.Show(); Pump(80); return window;
+    }
+    static void Capture(Window window, string name)
+    {
+        var root = (FrameworkElement)window.Content;
+        var bitmap = new RenderTargetBitmap((int)root.ActualWidth, (int)root.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(root);
+        var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = System.IO.File.Create(System.IO.Path.Combine(output, name + ".png")); png.Save(stream);
+    }
+    static void Theme(bool dark)
+    {
+        string code = System.IO.File.ReadAllText("MainWindow.xaml.cs");
+        int start = code.IndexOf("private void SetTheme(bool isDark)");
+        int first = code.IndexOf("res[\"AppWindowBg\"]", start);
+        int second = code.IndexOf("res[\"AppWindowBg\"]", first + 1);
+        string section = dark ? code[first..second] : code[second..];
+        var resources = Application.Current.Resources;
+        foreach (Match match in Regex.Matches(section, "res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\""))
+            resources[match.Groups[1].Value] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(match.Groups[2].Value));
+        foreach (Match match in Regex.Matches(section, "res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateGradient\\(\"([^\"]+)\",\\s*\"([^\"]+)\""))
+            resources[match.Groups[1].Value] = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(match.Groups[2].Value), (Color)ColorConverter.ConvertFromString(match.Groups[3].Value), 45);
+        foreach (Match match in Regex.Matches(section, "res\\[\"([^\"]+)\"\\]\\s*=\\s*([0-9.]+);"))
+            resources[match.Groups[1].Value] = double.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+        foreach (Match match in Regex.Matches(section, "res\\[\"([^\"]+)\"\\]\\s*=\\s*Brushes\\.(\\w+)"))
+            resources[match.Groups[1].Value] = typeof(Brushes).GetProperty(match.Groups[2].Value)!.GetValue(null)!;
+    }
+    // Load visual trees without code-behind handlers, so previews never open clinic data or save settings.
+    static UserControl Layout(string path)
+    {
+        var document = XDocument.Load(path);
+        var events = new HashSet<string>(new[] { typeof(FrameworkElement), typeof(UIElement), typeof(Control), typeof(Button), typeof(TextBox), typeof(ComboBox), typeof(DatePicker), typeof(ListBox), typeof(DataGrid), typeof(ScrollViewer), typeof(System.Windows.Controls.Primitives.ToggleButton), typeof(System.Windows.Controls.Primitives.Thumb) }
+            .SelectMany(type => type.GetEvents()).Select(e => e.Name));
+        foreach (var node in document.Root!.DescendantsAndSelf())
+        {
+            if (node.Name.NamespaceName.StartsWith("clr-namespace:") && !node.Name.NamespaceName.Contains("assembly="))
+                node.Name = XName.Get(node.Name.LocalName, node.Name.NamespaceName + ";assembly=MyClinic");
+            foreach (var attribute in node.Attributes().ToArray())
+            {
+                if (attribute.IsNamespaceDeclaration && attribute.Value.StartsWith("clr-namespace:") && !attribute.Value.Contains("assembly=")) attribute.Value += ";assembly=MyClinic";
+                else if (attribute.Name.LocalName == "Class" || events.Contains(attribute.Name.LocalName)) attribute.Remove();
+                else if (attribute.Name.NamespaceName.StartsWith("clr-namespace:") && !attribute.Name.NamespaceName.Contains("assembly="))
+                {
+                    node.SetAttributeValue(XName.Get(attribute.Name.LocalName, attribute.Name.NamespaceName + ";assembly=MyClinic"), attribute.Value);
+                    attribute.Remove();
+                }
+            }
+        }
+        foreach (var setter in document.Descendants().Where(e => e.Name.LocalName == "EventSetter").ToArray()) setter.Remove();
+        return (UserControl)XamlReader.Parse(document.ToString());
+    }
+    static void FeedbackAndValidation()
+    {
+        var input = new TextBox { Width = 280, Height = 36, Margin = new Thickness(0, 5, 0, 5) };
+        var button = new Button { Content = "حفظ", Width = 130, Height = 38 };
+        var owner = new UserControl { Content = new StackPanel { Children = { input, button } } };
+        var window = Host(owner);
+        ValidationAssist.Show(input, "يرجى إدخال قيمة صحيحة."); Pump(80);
+        Assert(ValidationAssist.GetError(input).Length > 0, "Validation exposes the field error");
+        Assert(input.Margin.Bottom > 5, "Inline error reserves layout space");
+        Assert(input.IsKeyboardFocused, "Invalid field receives keyboard focus");
+        input.Visibility = Visibility.Collapsed; Pump(40);
+        Assert(AdornerLayer.GetAdornerLayer(input)?.GetAdorners(input) == null, "Hidden inputs do not leave floating validation messages");
+        input.Visibility = Visibility.Visible; Pump(40);
+        Assert(AdornerLayer.GetAdornerLayer(input)?.GetAdorners(input)?.Length > 0, "Visible invalid inputs restore their inline messages");
+        input.Text = "corrected";
+        Assert(ValidationAssist.GetError(input) == "" && input.Margin.Bottom == 5, "Editing clears the inline error and restores layout");
+        using (var save = SaveFeedback.Begin(owner, button))
+        {
+            Assert(save.CanStart && !button.IsEnabled && (string)button.Content == "جارٍ الحفظ...", "Save feedback marks and disables the button");
+            Assert(!owner.IsEnabled, "Submitted fields remain stable while saving");
+            using var duplicate = SaveFeedback.Begin(owner, button);
+            Assert(!duplicate.CanStart, "Duplicate saves are blocked while one is active");
+            save.Success("تم حفظ الاختبار.");
+        }
+        Assert(button.IsEnabled && (string)button.Content == "✓ تم الحفظ", "Successful save shows a checkmark and restores input");
+        Assert(owner.IsEnabled, "The form becomes available again after saving");
+        Assert(Find<TextBlock>((DependencyObject)window.Content).Any(t => t.Text.Contains("تم حفظ الاختبار")), "Routine success appears as a nonblocking notification");
+        using (var next = SaveFeedback.Begin(owner, button)) Assert(next.CanStart, "A new save can start after completion");
+        Assert((string)button.Content == "حفظ", "Interrupted success label restores the original content");
+        button.Width = 40; Pump(40);
+        using (var compact = SaveFeedback.Begin(owner, button)) Assert((string)button.Content == "…", "Compact action buttons use a fitting busy indicator");
+        window.Close();
+    }
+    static void SearchAndScroll()
+    {
+        var name = new TextBox { Text = "ali" };
+        var phone = new TextBox();
+        var text = new TextBlock(); SearchAssist.SetText(text, "Ali Ahmad");
+        var list = new ListBox { Height = 260, ItemsSource = Enumerable.Range(0, 5000).Select(i => "Patient " + i).ToArray() };
+        ScrollState.SetEnabled(list, true);
+        var grid = new Grid(); grid.Children.Add(list);
+        var panel = new StackPanel { Children = { name, phone, text, grid } };
+        SearchAssist.SetNameQuery(panel, "ali");
+        var window = Host(panel);
+        Assert(text.Inlines.OfType<Run>().Any(run => run.FontWeight == FontWeights.Bold && run.Text == "Ali"), "Search highlights matching names without changing their text");
+        SearchAssist.Summary(list, 5000, ("الاسم", name), ("الهاتف", phone)); Pump(80);
+        var chip = Find<Button>(grid).First(b => b.Content?.ToString()?.Contains("ali") == true);
+        chip.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(name.Text == "", "A filter chip clears its corresponding input");
+        var scroll = Find<ScrollViewer>(list).First(); scroll.ScrollToVerticalOffset(1000); Pump(120);
+        double before = scroll.VerticalOffset;
+        using (ScrollState.Updating(list)) list.ItemsSource = Enumerable.Range(0, 5000).Select(i => "Updated " + i).ToArray();
+        Pump(180);
+        Assert(Math.Abs(scroll.VerticalOffset - before) < 1, $"Refresh preserves scroll position ({before} -> {scroll.VerticalOffset})");
+        using (ScrollState.Updating(list, "filtered")) list.ItemsSource = Enumerable.Range(0, 5000).ToArray();
+        Pump(180); Assert(scroll.VerticalOffset == 0, "A new search starts at its first result");
+        using (ScrollState.Updating(list)) list.ItemsSource = Enumerable.Range(0, 5000).ToArray();
+        Pump(180); Assert(Math.Abs(scroll.VerticalOffset - before) < 1, "Returning to a previous search restores its position");
+        grid.Children.Remove(list); Pump(80); grid.Children.Add(list); Pump(180);
+        Assert(Math.Abs(Find<ScrollViewer>(list).First().VerticalOffset - before) < 1, "Leaving and returning to a tab preserves scroll position");
+        window.Close();
+    }
+    static void PatientCards()
+    {
+        foreach (bool dark in new[] { false, true })
+        foreach (string prefix in new[] { "", "OriginalTheme/" })
+        {
+            Theme(dark);
+            var view = Layout(prefix + "PatientRecordsView.xaml");
+            var list = (ListBox)view.FindName("PatientsListBox");
+            var first = new PatientCardModel { DisplayName = "أحمد محمد", PhoneNumber = "07701234567", AgeText = "50", GenderLabel = "ذكر", VisitCount = 4 };
+            list.ItemsSource = new[] { first };
+            var window = Host(view, 1376, 850);
+            TextBlock Field(string kind) => Find<TextBlock>(list).Single(t =>
+                System.Windows.Data.BindingOperations.GetBindingExpression(t, SearchAssist.TextProperty) != null && SearchAssist.GetKind(t) == kind);
+            string VisibleText(string kind) => new TextRange(Field(kind).ContentStart, Field(kind).ContentEnd).Text;
+            void CheckText(string expectedName, string expectedPhone, string stage)
+            {
+                Assert(VisibleText("Name") == expectedName && VisibleText("Phone") == expectedPhone,
+                    $"{prefix} patient card displays name and phone {stage}: '{VisibleText("Name")}' / '{VisibleText("Phone")}'");
+            }
+            CheckText(first.DisplayName, first.PhoneNumber, "on initial load without a search");
+            SearchAssist.SetNameQuery(view, "أحمد"); SearchAssist.SetPhoneQuery(view, "123"); Pump(40);
+            CheckText(first.DisplayName, first.PhoneNumber, "during search");
+            Assert(Field("Name").Inlines.OfType<Run>().Any(r => r.Text == "أحمد" && r.Background != null) &&
+                   Field("Phone").Inlines.OfType<Run>().Any(r => r.Text == "123" && r.Background != null), "Both card fields highlight their matching query");
+            SearchAssist.SetNameQuery(view, ""); SearchAssist.SetPhoneQuery(view, ""); Pump(40);
+            CheckText(first.DisplayName, first.PhoneNumber, "after clearing the search");
+            Capture(window, (prefix == "" ? "modern" : "original") + (dark ? "-dark" : "-light") + "-patient-cards");
+            var container = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+            container.Content = new PatientCardModel { DisplayName = "سارة علي", PhoneNumber = "07809876543" }; Pump(40);
+            CheckText("سارة علي", "07809876543", "after reusing a card for another patient");
+            container.Content = new PatientCardModel(); Pump(40);
+            CheckText("", "", "after rebinding empty fields (no stale patient text)");
+            window.Close();
+        }
+    }
+    static void LoadingAndNumbers()
+    {
+        var overlay = new Border { Background = Brushes.LightGray, Visibility = Visibility.Collapsed };
+        var owner = new UserControl { Content = overlay };
+        var window = Host(owner);
+        LoadingFeedback.Set(owner, overlay, true, false); LoadingFeedback.Set(owner, overlay, false, false); Pump(180);
+        Assert(overlay.Visibility == Visibility.Collapsed, "Fast loads do not flash a loading overlay");
+        LoadingFeedback.Set(owner, overlay, true, true); Pump(180);
+        Assert(overlay.Visibility == Visibility.Visible && !overlay.IsHitTestVisible, "Background refresh leaves existing content usable");
+        LoadingFeedback.Set(owner, overlay, false, true);
+        MotionPreferences.Set(MotionLevel.Off, false); LoadingFeedback.Set(owner, overlay, true, false); Pump(180);
+        Assert(!Find<ProgressBar>(overlay).Single().IsIndeterminate, "Loading respects disabled motion");
+        LoadingFeedback.Set(owner, overlay, false, false);
+        var label = new TextBlock(); owner.Content = label;
+        AnimatedNumber.Show(label, 100, "{0:N0}"); AnimatedNumber.Show(label, 250, "{0:N0}");
+        Assert(label.Text == "250", "Reduced motion displays the authoritative total immediately");
+        MotionPreferences.Set(MotionLevel.Full, false); AnimatedNumber.Show(label, 500, "{0:N0}"); Pump(600);
+        Assert(label.Text == "500", "Animated totals finish at the exact authoritative value");
+        window.Close();
+    }
+    static void SectionsAndSettings()
+    {
+        foreach (bool dark in new[] { false, true })
+        {
+            Theme(dark);
+            foreach (string prefix in new[] { "", "OriginalTheme/" })
+            {
+                var settings = Layout(prefix + "SettingsView.xaml");
+                var settingsWindow = Host(settings, prefix == "" ? 1376 : 1100, 850);
+                var choice = (ComboBox)settings.FindName("MotionLevelComboBox");
+                choice.SelectedIndex = (int)MotionPreferences.Current;
+                choice.BringIntoView(); Pump(160);
+                Assert(choice.Items.Count == 3 && choice.ActualHeight > 0 && choice.ActualWidth >= 120, "Both themes expose all motion choices");
+                Capture(settingsWindow, (prefix == "" ? "modern" : "original") + (dark ? "-dark" : "-light") + "-settings");
+                settingsWindow.Close();
+                var form = Layout(prefix + "AddPatientView.xaml");
+                var window = Host(form, prefix == "" ? 1376 : 1100, 850);
+                var sections = Find<AnimatedSection>(form).ToArray();
+                Assert(sections.Length == 3, "Visit forms expose vital signs, prescription and image sections");
+                var section = sections[0]; section.BringIntoView(); Pump(80);
+                var weight = (TextBox)form.FindName("TxtWeight"); weight.Text = "70";
+                section.IsExpanded = false; Pump(350);
+                var body = (Border)section.Template.FindName("PART_SectionBody", section);
+                Assert(body.Visibility == Visibility.Collapsed, "Collapsed optional sections leave the tab order");
+                section.IsExpanded = true; Pump(350);
+                Assert(body.Visibility == Visibility.Visible && double.IsNaN(body.Height) && weight.Text == "70", "Expanding preserves values and allows natural layout");
+                MotionPreferences.Set(MotionLevel.Off, false); section.IsExpanded = false;
+                Assert(body.Visibility == Visibility.Collapsed, "Section collapse is immediate when motion is disabled");
+                ValidationAssist.Show(weight, "قيمة تجريبية"); Pump(300);
+                Assert(section.IsExpanded && weight.IsKeyboardFocused, "Validation opens the containing section and focuses the field");
+                weight.Text = "71"; MotionPreferences.Set(MotionLevel.Full, false);
+                Capture(window, (prefix == "" ? "modern" : "original") + (dark ? "-dark" : "-light") + "-visit");
+                window.Close();
+            }
+        }
+    }
+    static void Charts(Type type)
+    {
+        var view = (UserControl)Activator.CreateInstance(type)!;
+        var canvas = (Canvas)view.FindName("IncomeChartCanvas");
+        int year = (int)type.GetField("_selectedYear", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+        int month = (int)type.GetField("_selectedMonth", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
+        var data = new List<Visit> { new() { VisitDate = new DateTime(year, month, 1), TodayPaid = 50 }, new() { VisitDate = new DateTime(year, month, DateTime.DaysInMonth(year, month)), TodayPaid = 123 } };
+        type.GetMethod("DrawIncomeChart", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, new object[] { data });
+        if (canvas.Parent is Viewbox box) box.Child = null;
+        else if (canvas.Parent is Panel panel) panel.Children.Remove(canvas);
+        else throw new Exception("Unexpected chart layout parent");
+        var window = Host(new Viewbox { Child = canvas }, 1200, 500);
+        canvas.Focus();
+        void Key(Key key) => canvas.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(canvas), 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
+        Key(System.Windows.Input.Key.End);
+        Assert(AutomationProperties.GetItemStatus(canvas).Contains("123"), "Keyboard chart inspection reaches the last value");
+        Key(System.Windows.Input.Key.Home);
+        Assert(AutomationProperties.GetItemStatus(canvas).Contains("50"), "Keyboard chart inspection reaches the first value");
+        Key(System.Windows.Input.Key.Escape);
+        Assert(AutomationProperties.GetItemStatus(canvas) == "", "Escape dismisses chart inspection");
+        window.Close();
+    }
+    [STAThread]
+    static int Main()
+    {
+        MotionLevel previous = MotionPreferences.Current;
+        try
+        {
+            System.IO.Directory.CreateDirectory(output);
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml") });
+            Theme(false); MotionPreferences.Set(MotionLevel.Full, false);
+            PatientCards(); FeedbackAndValidation(); SearchAndScroll(); LoadingAndNumbers(); SectionsAndSettings();
+            Charts(typeof(MyClinic.StatisticsView)); Charts(typeof(MyClinic.OriginalTheme.StatisticsView));
+            MotionPreferences.Set(previous, false); app.Shutdown();
+            Console.WriteLine($"PASS: {checks} UX assertions, both themes and both palettes. Previews: {output}"); return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); MotionPreferences.Set(previous, false); return 1; }
+    }
+}

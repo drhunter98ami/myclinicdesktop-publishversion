@@ -274,6 +274,12 @@ namespace MyClinic
 
         private void AddPatient_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!MotionPreferences.Enabled)
+            {
+                AddPatient_MouseLeave(sender, e);
+                return;
+            }
+
             if (!IsDarkThemeActive())
                 return;
 
@@ -1228,34 +1234,16 @@ namespace MyClinic
         private async void BtnSaveVisit_Click(object sender, RoutedEventArgs e)
         {
             string phoneNumber = TxtPhoneNumber.Text.Trim();
-            if (string.IsNullOrWhiteSpace(phoneNumber))
+            bool valid = ValidationAssist.Check(TxtPhoneNumber, !string.IsNullOrWhiteSpace(phoneNumber), "رقم الهاتف مطلوب لحفظ بيانات المريض.");
+            bool ageValid = TryParseNullableInt(TxtAge.Text, out int? age);
+            valid &= ValidationAssist.Check(TxtAge, ageValid, "يرجى إدخال عمر صحيح أو ترك الحقل فارغاً.");
+            bool costValid = TryParseMoney(TxtCurrentCost.Text, out decimal currentCost) && currentCost >= 0;
+            valid &= ValidationAssist.Check(TxtCurrentCost, costValid, "يرجى إدخال تكلفة صحيحة للزيارة.");
+            bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && todayPaid >= 0;
+            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "يرجى إدخال دفعة صحيحة لليوم.");
+            if (!valid)
             {
-                MessageBox.Show("رقم الهاتف مطلوب لحفظ بيانات المريض.", "بيانات ناقصة", MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtPhoneNumber.Focus();
-                return;
-            }
-
-            if (!TryParseNullableInt(TxtAge.Text, out int? age))
-            {
-                MessageBox.Show("يرجى إدخال عمر صحيح أو ترك الحقل فارغاً.", "قيمة غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtAge.Focus();
-                TxtAge.SelectAll();
-                return;
-            }
-
-            if (!TryParseMoney(TxtCurrentCost.Text, out decimal currentCost) || currentCost < 0)
-            {
-                MessageBox.Show("يرجى إدخال تكلفة صحيحة للزيارة.", "قيمة مالية غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtCurrentCost.Focus();
-                TxtCurrentCost.SelectAll();
-                return;
-            }
-
-            if (!TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) || todayPaid < 0)
-            {
-                MessageBox.Show("يرجى إدخال دفعة صحيحة لليوم.", "قيمة مالية غير صحيحة", MessageBoxButton.OK, MessageBoxImage.Warning);
-                TxtTodayPaid.Focus();
-                TxtTodayPaid.SelectAll();
+                ValidationAssist.FocusFirst(TxtPhoneNumber, TxtAge, TxtCurrentCost, TxtTodayPaid);
                 return;
             }
 
@@ -1263,6 +1251,10 @@ namespace MyClinic
 
             bool isFemale = CmbGender.SelectedIndex == 1;
             bool isPregnant = isFemale && ChkPregnant.IsChecked == true;
+            using var saveFeedback = SaveFeedback.Begin(this, sender, BtnSaveVisit, BtnSaveVisitTop);
+            if (!saveFeedback.CanStart) return;
+            await saveFeedback.ShowBusyAsync();
+
 
             try
             {
@@ -1391,7 +1383,7 @@ namespace MyClinic
                 GlobalEvents.NotifyPatientRecordAdded();
                 GlobalEvents.NotifyFileKitCanalCountChanged();
 
-                MessageBox.Show("تم حفظ المريض والزيارة بنجاح.", "تم الحفظ", MessageBoxButton.OK, MessageBoxImage.Information);
+                saveFeedback.Success("تم حفظ المريض والزيارة بنجاح.");
                 ResetForm();
                 NavigateToDashboard(visit, patient, isExistingPatient, savedVisitDateTime);
             }
@@ -1554,7 +1546,7 @@ namespace MyClinic
             string medicineName = TxtPrescriptionMedicine.Text.Trim();
             if (string.IsNullOrWhiteSpace(medicineName))
             {
-                MessageBox.Show("يرجى إدخال اسم الدواء قبل إضافته إلى الوصفة.", "الوصفة الطبية", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ValidationAssist.Show(TxtPrescriptionMedicine, "يرجى إدخال اسم الدواء قبل إضافته إلى الوصفة.");
                 TxtPrescriptionMedicine.Focus();
                 return;
             }

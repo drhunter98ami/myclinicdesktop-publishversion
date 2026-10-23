@@ -29,3 +29,23 @@ and lab rows, load visit images on demand, and release closed-window resources.
 Database models, migrations, startup upgrade handling, database/image paths, installer
 behavior, backup format, and package dependencies were not changed. No persistent
 data conversion is introduced by these performance changes.
+
+## UX regression checks
+
+Run `./Diagnostics/RunUxChecks.ps1` to check the shared UI behavior. The harness uses
+synthetic controls and loads form layouts with their code-behind handlers removed;
+it does not open clinic data or save user settings. It renders light and dark previews
+for both interface themes under `obj/UxSmoke/previews/`.
+
+The checks cover inline error layout and focus, hidden-field errors, duplicate-save
+protection, stable submitted fields, compact button feedback, nonblocking notices,
+search highlights and filter chips, actual patient-card template bindings on initial
+load, clearing searches and recycled data contexts, scroll restoration, delayed loading placeholders,
+exact final animated totals, expandable sections retaining their inputs, motion choices,
+and keyboard inspection of the statistics chart.
+
+Motion is configured under Settings → Appearance → Motion. Off, Subtle, and Full
+share the Windows animation preference; Windows disabling animations takes precedence.
+The optional `MotionPreference.txt` in the existing application settings folder stores
+only this presentation preference. Its absence or an invalid value selects Subtle.
+No clinic database schema, calculation rule, or upgrade conversion is added.

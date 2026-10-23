@@ -584,7 +584,8 @@ namespace MyClinic.OriginalTheme
             }
 
             // Total label
-            TblTotal.Text = $"الإجمالي: {FormatPieValue(total)}";
+            AnimatedNumber.Show(TblTotal, total,
+                _pieMetric == PieMetric.Count ? "الإجمالي: {0:N0}" : "الإجمالي: {0:N0} ل.س");
 
             // Legend
             BuildLegend(slices, total);
@@ -821,6 +822,19 @@ namespace MyClinic.OriginalTheme
             {
                 DrawIncomeColumns(points, max, left, top, plotHeight, slotWidth);
             }
+            var inspectionPoints = points.Select((point, index) =>
+            {
+                DateTime date = _subTab switch
+                {
+                    SubTab.Daily => _selectedDay.Date,
+                    SubTab.Monthly => new DateTime(_selectedYear, _selectedMonth, index + 1),
+                    _ => new DateTime(_selectedYear, index + 1, 1)
+                };
+                string label = date.ToString(_subTab == SubTab.Yearly ? "MM/yyyy" : "dd/MM/yyyy", CultureInfo.InvariantCulture);
+                return new ChartDatum(label, point.Amount,
+                    new Point(left + (index + 0.5) * slotWidth, top + plotHeight - point.Amount / max * plotHeight));
+            }).ToList();
+            ChartInspector.Attach(IncomeChartCanvas, inspectionPoints, top, top + plotHeight);
         }
 
         private List<(string Label, double Amount)> BuildIncomeChartPoints(List<Visit> visits, DateTime start, DateTime end)
