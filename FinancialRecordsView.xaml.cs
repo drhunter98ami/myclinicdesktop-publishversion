@@ -16,13 +16,13 @@ namespace MyClinic
 {
     public partial class FinancialRecordsView : UserControl
     {
-        private readonly ObservableCollection<IncomeRowModel> _incomeRows = new();
-        private readonly ObservableCollection<ExpenseRowModel> _expenseRows = new();
-        private readonly ObservableCollection<UpcomingPaymentRowModel> _upcomingPayments = new();
+        private readonly BulkObservableCollection<IncomeRowModel> _incomeRows = new();
+        private readonly BulkObservableCollection<ExpenseRowModel> _expenseRows = new();
+        private readonly BulkObservableCollection<UpcomingPaymentRowModel> _upcomingPayments = new();
         
-        private readonly ObservableCollection<PatientSuggestionModel> _patientSuggestions = new();
-        private readonly ObservableCollection<PatientHistoryModel> _patientHistory = new();
-        private readonly ObservableCollection<UnpaidAccountModel> _unpaidAccounts = new();
+        private readonly BulkObservableCollection<PatientSuggestionModel> _patientSuggestions = new();
+        private readonly BulkObservableCollection<PatientHistoryModel> _patientHistory = new();
+        private readonly BulkObservableCollection<UnpaidAccountModel> _unpaidAccounts = new();
         
         private readonly List<VisitFinanceSnapshot> _allVisits = new();
         private readonly List<ExpenseSnapshot> _allExpenses = new();
@@ -161,11 +161,36 @@ namespace MyClinic
             _refreshRequested = true;
         }
 
-        public async Task EnsureDataCurrentAsync()
+        private Task? _refreshTask;
+
+        public Task EnsureDataCurrentAsync()
         {
-            if (!_refreshRequested && _hasLoadedData) return;
-            
-            _refreshRequested = false;
+            if (_refreshTask != null) return _refreshTask;
+            if (!_refreshRequested && _hasLoadedData) return Task.CompletedTask;
+            _refreshRequested = true;
+            return _refreshTask = RefreshPendingAsync();
+        }
+
+        private async Task RefreshPendingAsync()
+        {
+            // Store the shared task before any synchronous SQLite work can complete.
+            await Task.Yield();
+            try
+            {
+                do
+                {
+                    _refreshRequested = false;
+                    await RefreshDataAsync();
+                } while (_refreshRequested && IsVisible);
+            }
+            finally
+            {
+                _refreshTask = null;
+            }
+        }
+
+        private async Task RefreshDataAsync()
+        {
             SetLoadingState(true);
 
             try
@@ -175,8 +200,9 @@ namespace MyClinic
                 _allVisits.Clear(); 
                 _allExpenses.Clear();
 
-                using (var context = new AppDbContext())
+                var data = await Task.Run(async () =>
                 {
+                    using var context = new AppDbContext();
                     var loadedVisits = await context.Visits
                                                    .Include(v => v.Patient)
                                                    .AsNoTracking() 
@@ -209,7 +235,6 @@ namespace MyClinic
                     foreach (var visit in visits)
                         visit.SetCostAdjustment(CalculateAutomaticTreatmentCost(visit.SelectedTreatmentsJson, visit.UsdToSypRateSnapshot));
 
-                    _allVisits.AddRange(visits);
 
                     List<ExpenseEntry> loadedExpenses = await context.Expenses
                         .AsNoTracking()
@@ -223,8 +248,6 @@ namespace MyClinic
                         Amount = expense.Amount
                     }).ToList();
 
-                    _allExpenses.AddRange(expenses);
-                    
                     // تحميل الدفعات القادمة
                     var loadedUpcoming = await context.UpcomingPayments
                         .AsNoTracking()
@@ -238,9 +261,12 @@ namespace MyClinic
                         AmountText = FormatMoney(u.Amount)
                     }).ToList();
                     
-                    ReplaceCollection(_upcomingPayments, upcomingModels);
-                    EmptyUpcomingText.Visibility = _upcomingPayments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                }
+                    return (visits, expenses, upcomingModels);
+                });
+                _allVisits.AddRange(data.visits);
+                _allExpenses.AddRange(data.expenses);
+                ReplaceCollection(_upcomingPayments, data.upcomingModels);
+                EmptyUpcomingText.Visibility = _upcomingPayments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
                 _hasLoadedData = true;
                 ApplyFilters();
@@ -522,6 +548,8 @@ namespace MyClinic
                 .GroupBy(v => v.PatientId)
                 .ToDictionary(g => g.Key, g => g.OrderBy(v => v.VisitDate).ToList());
 
+            var treatmentQueues = new Dictionary<int, List<(string Name, double TotalCostSyp)>>();
+
             // Build the flat queue of (name, totalCostSyp) for one patient.
             // USD costs are converted to SYP using the rate snapshotted at the time
             // each visit was saved, so later rate changes never alter historic values.
@@ -623,7 +651,11 @@ namespace MyClinic
                     {
                         // Payment visit: allocate this payment against the patient's
                         // cumulative treatment queue (FIFO across all visits).
-                        var queue = BuildTreatmentQueue(pVisits);
+                        if (!treatmentQueues.TryGetValue(visit.PatientId, out var queue))
+                        {
+                            queue = BuildTreatmentQueue(pVisits);
+                            treatmentQueues.Add(visit.PatientId, queue);
+                        }
                         double cumulativePaidBefore = pVisits
                             .Where(v => v.VisitDate < visit.VisitDate)
                             .Sum(v => v.TodayPaid);
@@ -782,75 +814,83 @@ namespace MyClinic
             UnpaidAccountsOverlay.Visibility = Visibility.Collapsed;
         }
 
+        private int _unpaidLoadVersion;
+
         private async Task LoadUnpaidAccounts()
         {
+            int loadVersion = ++_unpaidLoadVersion;
             try
             {
-                using var db = new AppDbContext();
-                var allVisits = await db.Visits.Include(v => v.Patient).AsNoTracking().ToListAsync();
+                var unpaidList = await Task.Run(async () =>
+                {
+                    using var db = new AppDbContext();
+                    var allVisits = await db.Visits.Include(v => v.Patient).AsNoTracking().ToListAsync();
 
-                var unpaidList = allVisits
-                    .Where(v => v.Patient != null)
-                    .GroupBy(v => v.PatientId)
-                    .Select(g => {
-                        var patient = g.First().Patient!;
-                        var snapshots = g.Select(v =>
-                        {
-                            var snapshot = new VisitFinanceSnapshot
+                    return allVisits
+                        .Where(v => v.Patient != null)
+                        .GroupBy(v => v.PatientId)
+                        .Select(g => {
+                            var patient = g.First().Patient!;
+                            var snapshots = g.Select(v =>
                             {
-                                CurrentCost = v.CurrentCost,
-                                TodayPaid = v.TodayPaid,
-                                VisitDate = v.VisitDate,
-                                SelectedTreatmentsJson = v.SelectedTreatmentsJson,
-                                UsdToSypRateSnapshot = v.UsdToSypRateSnapshot
-                            };
-                            snapshot.SetCostAdjustment(CalculateAutomaticTreatmentCost(snapshot.SelectedTreatmentsJson, snapshot.UsdToSypRateSnapshot));
-                            return snapshot;
-                        }).ToList();
-                        double totalPositiveCost = snapshots.Sum(v => v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost));
-                        double totalForgiven = snapshots.Sum(v => v.ForgivenessAmount);
-                        double totalPaid = g.Sum(v => v.TodayPaid);
-                        
-                        double remaining = Math.Round(totalPositiveCost - totalPaid - totalForgiven, 2);
-
-                        double runningBalance = 0;
-                        DateTime? activeDebtStartDate = null;
-
-                        foreach (var v in snapshots.OrderBy(visit => visit.VisitDate))
-                        {
-                            double visitImpact = (v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost))
-                                - v.ForgivenessAmount - v.TodayPaid;
-                            runningBalance = Math.Round(runningBalance + visitImpact, 2);
-
-                            if (runningBalance > 0)
-                            {
-                                if (activeDebtStartDate == null)
+                                var snapshot = new VisitFinanceSnapshot
                                 {
-                                    activeDebtStartDate = v.VisitDate;
+                                    CurrentCost = v.CurrentCost,
+                                    TodayPaid = v.TodayPaid,
+                                    VisitDate = v.VisitDate,
+                                    SelectedTreatmentsJson = v.SelectedTreatmentsJson,
+                                    UsdToSypRateSnapshot = v.UsdToSypRateSnapshot
+                                };
+                                snapshot.SetCostAdjustment(CalculateAutomaticTreatmentCost(snapshot.SelectedTreatmentsJson, snapshot.UsdToSypRateSnapshot));
+                                return snapshot;
+                            }).ToList();
+                            double totalPositiveCost = snapshots.Sum(v => v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost));
+                            double totalForgiven = snapshots.Sum(v => v.ForgivenessAmount);
+                            double totalPaid = g.Sum(v => v.TodayPaid);
+                        
+                            double remaining = Math.Round(totalPositiveCost - totalPaid - totalForgiven, 2);
+
+                            double runningBalance = 0;
+                            DateTime? activeDebtStartDate = null;
+
+                            foreach (var v in snapshots.OrderBy(visit => visit.VisitDate))
+                            {
+                                double visitImpact = (v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost))
+                                    - v.ForgivenessAmount - v.TodayPaid;
+                                runningBalance = Math.Round(runningBalance + visitImpact, 2);
+
+                                if (runningBalance > 0)
+                                {
+                                    if (activeDebtStartDate == null)
+                                    {
+                                        activeDebtStartDate = v.VisitDate;
+                                    }
+                                }
+                                else
+                                {
+                                    activeDebtStartDate = null;
                                 }
                             }
-                            else
+
+                            DateTime firstDebtDate = activeDebtStartDate ?? g.Min(v => v.VisitDate);
+
+                            return new UnpaidAccountModel
                             {
-                                activeDebtStartDate = null;
-                            }
-                        }
+                                PatientName = patient.FullName,
+                                PhoneNumber = patient.PhoneNumber ?? "",
+                                TotalCost = totalPositiveCost,
+                                TotalPaid = totalPaid,
+                                TotalForgiven = totalForgiven,
+                                RemainingAmount = remaining,
+                                FirstDebtDate = firstDebtDate
+                            };
+                        })
+                        .Where(u => u.RemainingAmount > 0)
+                        .ToList();
 
-                        DateTime firstDebtDate = activeDebtStartDate ?? g.Min(v => v.VisitDate);
+                });
 
-                        return new UnpaidAccountModel
-                        {
-                            PatientName = patient.FullName,
-                            PhoneNumber = patient.PhoneNumber ?? "",
-                            TotalCost = totalPositiveCost,
-                            TotalPaid = totalPaid,
-                            TotalForgiven = totalForgiven,
-                            RemainingAmount = remaining,
-                            FirstDebtDate = firstDebtDate
-                        };
-                    })
-                    .Where(u => u.RemainingAmount > 0)
-                    .ToList();
-
+                if (loadVersion != _unpaidLoadVersion) return;
                 if (CmbUnpaidSort != null)
                 {
                     int sortIndex = CmbUnpaidSort.SelectedIndex;
@@ -868,6 +908,7 @@ namespace MyClinic
             }
             catch (Exception)
             {
+                if (loadVersion != _unpaidLoadVersion) return;
                 MessageBox.Show("حدث خطأ أثناء تحميل سجل الديون.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1077,13 +1118,9 @@ namespace MyClinic
             }
         }
 
-        private static void ReplaceCollection<T>(ObservableCollection<T> target, IEnumerable<T> items)
+        private static void ReplaceCollection<T>(BulkObservableCollection<T> target, IEnumerable<T> items)
         {
-            target.Clear();
-            foreach (T item in items)
-            {
-                target.Add(item);
-            }
+            target.ReplaceAll(items);
         }
 
         private static bool TryParseMoney(string? value, out decimal result)

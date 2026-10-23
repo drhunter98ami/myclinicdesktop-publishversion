@@ -259,6 +259,9 @@ namespace MyClinic.OriginalTheme
                 .GroupBy(v => v.PatientId)
                 .ToDictionary(g => g.Key, g => g.OrderBy(v => v.VisitDate).ThenBy(v => v.Id).ToList());
 
+            // Queues are read-only during allocation; build each patient's queue once per refresh.
+            var treatmentQueues = new Dictionary<int, List<(string Name, double TotalCostSyp)>>();
+
             foreach (var visit in selectedVisits)
             {
                 if (visit.TodayPaid <= 0.009) continue;
@@ -269,7 +272,11 @@ namespace MyClinic.OriginalTheme
                     continue;
                 }
 
-                var queue = BuildTreatmentQueue(history);
+                if (!treatmentQueues.TryGetValue(visit.PatientId, out var queue))
+                {
+                    queue = BuildTreatmentQueue(history);
+                    treatmentQueues.Add(visit.PatientId, queue);
+                }
                 double cumulativePaidBefore = history
                     .Where(v => v.VisitDate < visit.VisitDate || (v.VisitDate == visit.VisitDate && v.Id < visit.Id))
                     .Sum(v => v.TodayPaid);
@@ -513,12 +520,15 @@ namespace MyClinic.OriginalTheme
         // Pie drawing
         // ═════════════════════════════════════════════════════════════════════
 
+        private ChartLegendInteraction? _pieInteraction;
+
         private void DrawPie(List<PieSlice> slices)
         {
             PieCanvas.Children.Clear();
             LegendPanel.Children.Clear();
 
             double total = slices.Sum(s => s.Amount);
+            _pieInteraction = new ChartLegendInteraction(TblTotal, $"الإجمالي: {FormatPieValue(total)}", _mainTab == MainTab.Expenses);
 
             // No data
             if (total <= 0 || slices.Count == 0)
@@ -534,50 +544,37 @@ namespace MyClinic.OriginalTheme
             double cx = 140, cy = 140, r = 128, innerR = 56;
             double startAngle = -90.0; // start at 12 o'clock
 
+            int sliceIndex = 0;
+            int visibleSlices = slices.Count(slice => slice.Amount > 0);
             foreach (var slice in slices)
             {
+                if (slice.Amount <= 0) continue;
                 double sweep = (slice.Amount / total) * 360.0;
                 // Clamp to avoid degenerate arcs at exactly 360
                 if (sweep >= 360) sweep = 359.9999;
 
                 var brush = HexBrush(slice.Color);
 
-                if (slices.Count == 1)
-                {
-                    // Full ring
-                    var outer = new Ellipse
-                    {
-                        Width = r * 2, Height = r * 2,
-                        Fill = brush,
-                        Tag = slice.Label,
-                        Cursor = Cursors.Hand,
-                        ToolTip = $"{slice.Label}: {FormatPieValue(slice.Amount)}"
-                    };
-                    outer.MouseLeftButtonUp += ExpenseLegendRow_Click;
-                    Canvas.SetLeft(outer, cx - r);
-                    Canvas.SetTop(outer,  cy - r);
-                    PieCanvas.Children.Add(outer);
-                }
-                else
-                {
-                    var path = CreateDonutSlice(cx, cy, r, innerR, startAngle, sweep, brush);
-                    path.Tag = slice.Label;
-                    path.Cursor = Cursors.Hand;
-                    path.ToolTip = $"{slice.Label}: {FormatPieValue(slice.Amount)}";
-                    path.MouseLeftButtonUp += ExpenseLegendRow_Click;
-                    PieCanvas.Children.Add(path);
-                }
+                var path = CreateDonutSlice(cx, cy, r, innerR, startAngle, sweep, brush);
+                path.Tag = slice.Label;
+                path.ToolTip = $"{slice.Label}: {FormatPieValue(slice.Amount)}";
+                path.MouseLeftButtonUp += ExpenseLegendRow_Click;
+                PieCanvas.Children.Add(path);
+                ChartMotion.EnterSlice(path, cx, cy, sliceIndex++);
+                _pieInteraction.AddSlice(slice.Label, path, startAngle + sweep / 2,
+                    $"{slice.Label}: {FormatPieValue(slice.Amount)} ({slice.Amount / total:P1})");
 
                 startAngle += sweep;
             }
 
             // Centre hole (white/card bg)
-            if (slices.Count > 1)
+            if (visibleSlices > 0)
             {
                 var hole = new Ellipse
                 {
                     Width  = innerR * 2,
                     Height = innerR * 2,
+                    IsHitTestVisible = false,
                     Fill   = (Brush)Application.Current.Resources["AppWindowBg"]
                              ?? new SolidColorBrush(Color.FromRgb(11, 17, 32))
                 };
@@ -650,6 +647,9 @@ namespace MyClinic.OriginalTheme
                 row.Tag = slice.Label;
                 row.Cursor = Cursors.Hand;
                 row.MouseLeftButtonUp += ExpenseLegendRow_Click;
+                _pieInteraction?.AddRow(slice.Label, row,
+                    () => ExpenseLegendRow_Click(row, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)),
+                    $"{slice.Label}: {FormatPieValue(slice.Amount)} ({pct:N1}%)");
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -853,6 +853,7 @@ namespace MyClinic.OriginalTheme
                 Canvas.SetLeft(bar, x);
                 Canvas.SetTop(bar, y);
                 IncomeChartCanvas.Children.Add(bar);
+                ChartMotion.GrowBar(bar, i);
                 AddChartLabel(points[i].Label, x - 8, top + plotHeight + 8, barWidth + 16, 18);
                 AddChartLabel(points[i].Amount.ToString("N0", CultureInfo.CurrentCulture), x - 12, Math.Max(0, y - 20), barWidth + 24, 18);
             }
@@ -879,14 +880,17 @@ namespace MyClinic.OriginalTheme
                     true));
             }
             geometry.Figures.Add(figure);
-            IncomeChartCanvas.Children.Add(new System.Windows.Shapes.Path
+            var incomeLine = new System.Windows.Shapes.Path
             {
                 Data = geometry,
                 Stroke = HexBrush("#2196F3"),
                 StrokeThickness = 3,
                 StrokeLineJoin = PenLineJoin.Round,
-                ToolTip = "الدخل"
-            });
+                ToolTip = "الدخل",
+                IsHitTestVisible = false
+            };
+            IncomeChartCanvas.Children.Add(incomeLine);
+            ChartMotion.RevealLine(incomeLine, 1100, 360);
 
             for (int i = 0; i < points.Count; i++)
             {
@@ -902,6 +906,7 @@ namespace MyClinic.OriginalTheme
                 Canvas.SetLeft(marker, coordinates[i].X - marker.Width / 2);
                 Canvas.SetTop(marker, coordinates[i].Y - marker.Height / 2);
                 IncomeChartCanvas.Children.Add(marker);
+                ChartMotion.EnterMarker(marker, i);
                 AddChartLabel(points[i].Label, coordinates[i].X - 20, top + plotHeight + 8, 40, 18);
                 AddChartLabel(points[i].Amount.ToString("N0", CultureInfo.CurrentCulture), coordinates[i].X - 30, Math.Max(0, coordinates[i].Y - 24), 60, 18);
             }
@@ -909,10 +914,11 @@ namespace MyClinic.OriginalTheme
 
         private void AddChartLabel(string text, double x, double y, double width, double height)
         {
-            TextBlock label = new() { Text = text, Width = width, Height = height, FontSize = 10, TextAlignment = TextAlignment.Center, Foreground = (Brush)FindResource("AppTextSecondary") };
+            TextBlock label = new() { IsHitTestVisible = false, Text = text, Width = width, Height = height, FontSize = 10, TextAlignment = TextAlignment.Center, Foreground = (Brush)FindResource("AppTextSecondary") };
             Canvas.SetLeft(label, x);
             Canvas.SetTop(label, y);
             IncomeChartCanvas.Children.Add(label);
+            ChartMotion.FadeIn(label, 160);
         }
 
         // ═════════════════════════════════════════════════════════════════════

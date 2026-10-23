@@ -41,6 +41,11 @@ namespace MyClinic.OriginalTheme
             ApplyFilters();
         }
 
+        internal void ReleaseResources()
+        {
+            GlobalEvents.OnExchangeRateChanged -= OnExchangeRateChanged;
+        }
+
         private void OnExchangeRateChanged()
         {
             LoadExchangeRate();

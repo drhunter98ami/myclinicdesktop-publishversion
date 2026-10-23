@@ -1,6 +1,8 @@
 <Window x:Class="MyClinic.OriginalTheme.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:motion="clr-namespace:MyClinic"
+        motion:InteractionMotion.Enabled="True"
         Title="My Clinic" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized"

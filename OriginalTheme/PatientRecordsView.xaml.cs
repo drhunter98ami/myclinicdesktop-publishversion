@@ -26,15 +26,15 @@ namespace MyClinic.OriginalTheme
 
         private readonly List<PatientCardModel> _allPatients = new();
 
-        // Use a plain List + manual Dispatcher refresh instead of ObservableCollection
-        // to batch all updates in one pass (avoids O(n) individual CollectionChanged events)
-        private readonly ObservableCollection<PatientCardModel> _filteredPatients = new();
-        private readonly ObservableCollection<VisitHistoryItem> _selectedPatientVisits = new();
+        // Bulk resets avoid per-row layout work during filtering and refreshes.
+        private readonly BulkObservableCollection<PatientCardModel> _filteredPatients = new();
+        private readonly BulkObservableCollection<VisitHistoryItem> _selectedPatientVisits = new();
 
         // Cache keyed by visit DB id (unique) instead of DateTime ticks (can collide)
         private readonly Dictionary<int, IReadOnlyList<VisitAttachmentItem>> _attachmentCache = new();
 
         private PatientCardModel? _selectedPatient;
+        private int _visitLoadVersion;
         private bool _hasLoadedData;
         private bool _refreshRequested = true;
         private long _refreshGeneration;
@@ -86,6 +86,8 @@ namespace MyClinic.OriginalTheme
 
         private void PatientRecordsView_Unloaded(object sender, RoutedEventArgs e)
         {
+            _searchDebounceTimer?.Stop();
+            _attachmentCache.Clear();
             GlobalEvents.OnPatientRecordAdded -= HandlePatientAdded;
         }
 
@@ -240,6 +242,9 @@ namespace MyClinic.OriginalTheme
                     List<VisitAttachmentItem> items = await Task.Run(
                         () => LoadAttachmentItems(visit.AttachmentPaths).ToList());
 
+                    // Bound decoded image retention while keeping the active visit intact.
+                    if (_attachmentCache.Count >= 12 && !_attachmentCache.ContainsKey(visit.VisitId))
+                        _attachmentCache.Remove(_attachmentCache.Keys.First());
                     _attachmentCache[visit.VisitId] = items;
 
                 // Only update if this modal is still the active one
@@ -383,12 +388,15 @@ namespace MyClinic.OriginalTheme
 
         private async Task RefreshDataAsync(long requestGeneration)
         {
+            // Let navigation/Loaded/visibility requests coalesce before reading SQLite.
+            await Task.Yield();
+            requestGeneration = _refreshGeneration;
             SetLoadingState(true);
             bool refreshSucceeded = false;
 
             try
             {
-                List<PatientCardModel> loaded = await LoadPatientsAsync();
+                List<PatientCardModel> loaded = await Task.Run(LoadPatientsAsync);
 
                 _allPatients.Clear();
                 _allPatients.AddRange(loaded);
@@ -441,49 +449,8 @@ namespace MyClinic.OriginalTheme
                     (string.IsNullOrWhiteSpace(phoneFilter) || p.PhoneNumber.Contains(phoneFilter, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
-            // Batch update: remove stale, add new — minimises CollectionChanged events
-            // compared to Clear() + re-add which fires n+1 layout passes
-            for (int i = _filteredPatients.Count - 1; i >= 0; i--)
-            {
-                var existing = _filteredPatients[i];
-                
-                // Match by ID instead of memory reference
-                var matchedItem = result.FirstOrDefault(x => x.Id == existing.Id);
-
-                if (matchedItem == null)
-                {
-                    // Item is no longer in the DB or doesn't match the search
-                    _filteredPatients.RemoveAt(i);
-                }
-                else
-                {
-                    // Item exists. Replace it to refresh data (like VisitCount and LatestVisitDate)
-                    if (!ReferenceEquals(existing, matchedItem))
-                    {
-                        _filteredPatients[i] = matchedItem;
-                    }
-                }
-            }
-
-            // Add newly created patients
-            foreach (PatientCardModel p in result)
-            {
-                if (!_filteredPatients.Any(x => x.Id == p.Id))
-                {
-                    _filteredPatients.Add(p);
-                }
-            }
-
-            // Re-order to match original sort
-            for (int i = 0; i < result.Count; i++)
-            {
-                // Since we replaced items above, IndexOf will now correctly find the exact reference
-                int current = _filteredPatients.IndexOf(result[i]);
-                if (current != i && current >= 0)
-                {
-                    _filteredPatients.Move(current, i);
-                }
-            }
+            // Keep the exact filtered order, with one UI notification and linear work.
+            _filteredPatients.ReplaceAll(result);
 
             EmptyStateTitle.Text       = "لا توجد نتائج مطابقة";
             EmptyStateDescription.Text = "جرّب البحث باسم مختلف أو رقم هاتف آخر.";
@@ -541,17 +508,21 @@ namespace MyClinic.OriginalTheme
 
         private async Task LoadPatientVisitsAsync(int patientId)
         {
+            int loadVersion = ++_visitLoadVersion;
             try
             {
-                using var db = new AppDbContext();
-
-                List<Visit> dbVisits = await db.Visits
+                List<Visit> dbVisits = await Task.Run(async () =>
+                {
+                    using var db = new AppDbContext();
+                    return await db.Visits
                     .AsNoTracking()
                     .Where(v => v.PatientId == patientId)
                     .Include(v => v.ToothRecords)
                     .Include(v => v.EditHistories)
                     .OrderByDescending(v => v.VisitDate)
                     .ToListAsync();
+                });
+                if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
 
                 HashSet<int> dbIds = dbVisits.Select(v => v.Id).ToHashSet();
 
@@ -566,43 +537,19 @@ namespace MyClinic.OriginalTheme
                     () => allVisits.Select(MapVisit).ToList());
 
                 // Show the list immediately — user sees visits right away
-                _selectedPatientVisits.Clear();
-                foreach (VisitHistoryItem v in mapped)
-                    _selectedPatientVisits.Add(v);
+                if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
+                _selectedPatientVisits.ReplaceAll(mapped);
 
                 EmptyVisitsText.Text       = "لا توجد زيارات محفوظة لهذا المريض حتى الآن.";
                 EmptyVisitsText.Visibility = _selectedPatientVisits.Count == 0
                     ? Visibility.Visible : Visibility.Collapsed;
 
-                // ── Phase 2: Pre-load attachment thumbnails in background ──────────
-                // Only for visits not already in cache — runs silently after UI is shown
-                List<VisitHistoryItem> needsLoad = mapped
-                    .Where(v => v.AttachmentPaths.Count > 0 && !_attachmentCache.ContainsKey(v.VisitId))
-                    .ToList();
-
-                if (needsLoad.Count > 0)
-                {
-                    // Load thumbnails in parallel, bounded to 3 concurrent tasks to avoid
-                    // flooding the thread pool / disk I/O with too many simultaneous decodes
-                    using SemaphoreSlim sem = new(3);
-                    await Task.WhenAll(needsLoad.Select(async v =>
-                    {
-                        await sem.WaitAsync();
-                        try
-                        {
-                            IReadOnlyList<VisitAttachmentItem> items =
-                                await Task.Run(() => LoadAttachmentItems(v.AttachmentPaths));
-                            _attachmentCache[v.VisitId] = items;
-                        }
-                        finally
-                        {
-                            sem.Release();
-                        }
-                    }));
-                }
+                // Attachment thumbnails are loaded by OpenVisitDetails_Click on demand.
+                // Opening a patient's history no longer decodes every historical image.
             }
             catch (Exception ex)
             {
+                if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
                 _selectedPatientVisits.Clear();
                 EmptyVisitsText.Text       = $"تعذر تحميل الزيارات: {ex.Message}";
                 EmptyVisitsText.Visibility = Visibility.Visible;

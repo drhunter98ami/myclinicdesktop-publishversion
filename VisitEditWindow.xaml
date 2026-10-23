@@ -185,7 +185,7 @@
                 IsHitTestVisible="False"
                 Panel.ZIndex="0"
                 Visibility="Collapsed">
-            <Ellipse x:Name="EditSpotlightEllipse"
+            <Ellipse x:Name="EditSpotlightEllipse" CacheMode="BitmapCache"
                      Width="520"
                      Height="520"
                      IsHitTestVisible="False">

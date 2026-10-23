@@ -19,7 +19,7 @@ namespace MyClinic.OriginalTheme
         private enum ViewMode { Daily, Monthly }
         private enum StatusFilter { Upcoming, Past, All }
 
-        private readonly ObservableCollection<AppointmentCardModel> _appointments = new();
+        private readonly BulkObservableCollection<AppointmentCardModel> _appointments = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
         private readonly List<Patient> _allPatients = new(); 
         private readonly List<VisitAttendanceRecord> _visitAttendanceRecords = new();
@@ -59,6 +59,12 @@ namespace MyClinic.OriginalTheme
 
             GlobalEvents.OnPatientRecordAdded += HandlePatientRecordAdded;
             GlobalEvents.OnFileKitCanalCountChanged += HandleFileKitCanalCountChanged;
+        }
+
+        internal void ReleaseResources()
+        {
+            GlobalEvents.OnPatientRecordAdded -= HandlePatientRecordAdded;
+            GlobalEvents.OnFileKitCanalCountChanged -= HandleFileKitCanalCountChanged;
         }
 
         public void RefreshWelcomeName()
@@ -240,29 +246,33 @@ namespace MyClinic.OriginalTheme
 
         public Task EnsureDataCurrentAsync()
         {
-            if (_refreshTask is not null)
-            {
-                return _refreshTask;
-            }
-
-            if (!_refreshRequested && _hasLoadedData)
-            {
-                return Task.CompletedTask;
-            }
-
-            _refreshTask = RefreshAppointmentsAsync();
-            return _refreshTask;
+            if (_refreshTask != null) return _refreshTask;
+            if (!_refreshRequested && _hasLoadedData) return Task.CompletedTask;
+            _refreshRequested = true;
+            return _refreshTask = RefreshPendingAsync();
         }
 
-        public async Task RefreshNowAsync()
+        public Task RefreshNowAsync()
         {
-            if (_refreshTask is not null)
-            {
-                await _refreshTask;
-            }
+            RequestRefresh();
+            return EnsureDataCurrentAsync();
+        }
 
-            _refreshRequested = true;
-            await EnsureDataCurrentAsync();
+        private async Task RefreshPendingAsync()
+        {
+            await Task.Yield();
+            try
+            {
+                do
+                {
+                    _refreshRequested = false;
+                    await RefreshAppointmentsAsync();
+                } while (_refreshRequested && IsVisible);
+            }
+            finally
+            {
+                _refreshTask = null;
+            }
         }
 
         private async Task RefreshAppointmentsAsync()
@@ -271,21 +281,16 @@ namespace MyClinic.OriginalTheme
 
             try
             {
-                using var db = new AppDbContext();
-
-                List<AppointmentEntry> appointments = await db.Appointments
-                    .AsNoTracking()
-                    .ToListAsync();
-
-                List<Visit> visits = await db.Visits
-                    .AsNoTracking()
-                    .Include(visit => visit.Patient)
-                    .OrderBy(visit => visit.VisitDate)
-                    .ToListAsync();
-
-                List<Patient> patients = await db.Patients
-                    .AsNoTracking()
-                    .ToListAsync();
+                var data = await Task.Run(async () =>
+                {
+                    using var db = new AppDbContext();
+                    var appointments = await db.Appointments.AsNoTracking().ToListAsync();
+                    var visits = await db.Visits.AsNoTracking().Include(visit => visit.Patient)
+                        .OrderBy(visit => visit.VisitDate).ToListAsync();
+                    var patients = await db.Patients.AsNoTracking().ToListAsync();
+                    return (appointments, visits, patients);
+                });
+                var (appointments, visits, patients) = data;
 
                 var appointmentKeys = appointments
                     .Select(appointment => BuildCalendarKey(appointment.PhoneNumber, appointment.AppointmentDateTime))
@@ -365,7 +370,6 @@ namespace MyClinic.OriginalTheme
                 UpdateSearchSuggestions();
 
                 _hasLoadedData = true;
-                _refreshRequested = false;
             }
             catch (Exception)
             {
@@ -378,7 +382,6 @@ namespace MyClinic.OriginalTheme
             finally
             {
                 SetLoadingState(false);
-                _refreshTask = null;
             }
         }
 
@@ -950,11 +953,7 @@ namespace MyClinic.OriginalTheme
 
         private void ReplaceAppointments(IEnumerable<AppointmentCardModel> items)
         {
-            _appointments.Clear();
-            foreach (AppointmentCardModel item in items)
-            {
-                _appointments.Add(item);
-            }
+            _appointments.ReplaceAll(items);
         }
 
         private void ApplyAppointmentsFilter()

@@ -241,6 +241,9 @@ namespace MyClinic.OriginalTheme
 
         protected override void OnClosed(EventArgs e)
         {
+            _clockTimer?.Stop();
+            _dashboardView?.ReleaseResources();
+            _labView?.ReleaseResources();
             NetworkChange.NetworkAvailabilityChanged -= NetworkAvailabilityChanged;
             NetworkChange.NetworkAddressChanged -= NetworkAddressChanged;
             base.OnClosed(e);
@@ -510,7 +513,7 @@ namespace MyClinic.OriginalTheme
         {
             _dashboardView ??= new DashboardView();
             _dashboardView.RefreshWelcomeName();
-            MainContent.Content = _dashboardView;
+            NavigationTransition.Show(MainContent, _dashboardView);
             _dashboardView.RequestRefresh();
             _ = _dashboardView.RefreshNowAsync();
             SetActiveNavigation(BtnDashboard);
@@ -529,14 +532,14 @@ namespace MyClinic.OriginalTheme
 
         public void ShowAddPatient()
         {
-            MainContent.Content = new AddPatientView();
+            NavigationTransition.Show(MainContent, new AddPatientView());
             SetActiveNavigation(BtnDashboard);
         }
 
         public void ShowPatientRecords()
         {
             _patientRecordsView ??= new PatientRecordsView();
-            MainContent.Content = _patientRecordsView;
+            NavigationTransition.Show(MainContent, _patientRecordsView);
             _patientRecordsView.RequestRefresh();
             _ = _patientRecordsView.EnsureDataCurrentAsync();
             SetActiveNavigation(BtnPatients);
@@ -545,7 +548,7 @@ namespace MyClinic.OriginalTheme
         public void ShowFinancialRecords()
         {
             _financialRecordsView ??= new FinancialRecordsView();
-            MainContent.Content = _financialRecordsView;
+            NavigationTransition.Show(MainContent, _financialRecordsView);
             _financialRecordsView.RequestRefresh();
             _ = _financialRecordsView.EnsureDataCurrentAsync();
             SetActiveNavigation(BtnFinancials);
@@ -555,7 +558,7 @@ namespace MyClinic.OriginalTheme
         public void ShowShortages()
         {
             _shortagesView ??= new ShortagesView();
-            MainContent.Content = _shortagesView;
+            NavigationTransition.Show(MainContent, _shortagesView);
             SetActiveNavigation(BtnShortages);
         }
 
@@ -563,7 +566,7 @@ namespace MyClinic.OriginalTheme
         public void ShowLab()
         {
             _labView ??= new LabView();
-            MainContent.Content = _labView;
+            NavigationTransition.Show(MainContent, _labView);
             SetActiveNavigation(BtnLab);
         }
 
@@ -571,7 +574,7 @@ namespace MyClinic.OriginalTheme
         public void ShowSettings()
         {
             _settingsView ??= new SettingsView();
-            MainContent.Content = _settingsView;
+            NavigationTransition.Show(MainContent, _settingsView);
             SetActiveNavigation(BtnSettings);
         }
 
@@ -579,7 +582,7 @@ namespace MyClinic.OriginalTheme
         public void ShowStatistics()
         {
             _statisticsView ??= new StatisticsView();
-            MainContent.Content = _statisticsView;
+            NavigationTransition.Show(MainContent, _statisticsView);
             SetActiveNavigation(BtnStatistics);
         }
 

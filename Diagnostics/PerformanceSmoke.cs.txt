@@ -1,0 +1,181 @@
+using System.Collections;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
+using MyClinic.Models;
+
+static class Check
+{
+    static readonly Dictionary<string, object> results = new();
+    static object? Field(object o, string name) => o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(o);
+    static object? Prop(object o, string name) => o.GetType().GetProperty(name)!.GetValue(o);
+    static object? Call(object o, string name, params object[] args) => o.GetType().GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(o, args);
+    static void Set(object o, string name, object? value) => o.GetType().GetProperty(name)!.SetValue(o, value);
+    static void Assert(bool condition, string message) { if (!condition) throw new Exception(message); }
+    static void Pump(int ms)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+        timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static T? Find<T>(DependencyObject node) where T : DependencyObject
+    {
+        if (node is T found) return found;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        {
+            var child = Find<T>(VisualTreeHelper.GetChild(node, i));
+            if (child != null) return child;
+        }
+        return null;
+    }
+    static void Virtualization(Type type)
+    {
+        var view = (UserControl)Activator.CreateInstance(type)!;
+        foreach (string name in new[] { "IncomeItemsControl", "ExpenseItemsControl", "UpcomingItemsControl", "IncomeTreatmentsItemsControl", "UnpaidItemsControl", "PatientHistoryItemsControl" })
+            Assert(((ItemsControl)view.FindName(name)).Style == Application.Current.FindResource("VirtualizedRecordsStyle"), name + " uses recycling");
+        var list = (ItemsControl)view.FindName("IncomeItemsControl");
+        ((Panel)list.Parent).Children.Remove(list);
+        var rowType = type.GetNestedType("IncomeRowModel")!;
+        var rows = Enumerable.Range(1, 5000).Select(i =>
+        {
+            var row = Activator.CreateInstance(rowType)!;
+            Set(row, "VisitId", i); Set(row, "PatientName", "Synthetic patient"); Set(row, "PaidAmountText", i.ToString());
+            return row;
+        }).ToArray();
+        list.ItemsSource = rows;
+        var window = new Window { Content = list, Width = 1000, Height = 350, Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false };
+        window.Show(); Pump(200);
+        var panel = Find<VirtualizingStackPanel>(list)!;
+        Assert(panel != null && panel.Children.Count < 100, "Only visible financial rows should be generated");
+        Find<ScrollViewer>(list)!.ScrollToEnd(); Pump(200);
+        Assert(list.ItemContainerGenerator.ContainerFromIndex(4999) != null, "Last row remains accessible by scrolling");
+        Assert(panel.Children.Count < 100, "Scrolling keeps generated rows bounded");
+        Console.WriteLine($"PASS: {type.Namespace} renders {panel.Children.Count} of 5,000 financial rows and reaches the last row.");
+        window.Content = null; window.Close();
+        var task = new TaskCompletionSource();
+        type.GetField("_refreshTask", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(view, task.Task);
+        Call(view, "RequestRefresh");
+        Assert(ReferenceEquals(type.GetMethod("EnsureDataCurrentAsync")!.Invoke(view, null), task.Task), "Concurrent refresh callers share the same task");
+        Assert((bool)Field(view, "_refreshRequested")!, "A newer refresh request stays pending");
+    }
+    static void Patients(Type type)
+    {
+        var view = (UserControl)Activator.CreateInstance(type)!;
+        var all = (IList)Field(view, "_allPatients")!;
+        Type model = all.GetType().GetGenericArguments()[0];
+        for (int i = 0; i < 5000; i++)
+        {
+            var item = Activator.CreateInstance(model)!;
+            Set(item, "Id", i + 1); Set(item, "DisplayName", $"Patient {i:00000}"); Set(item, "PhoneNumber", $"09{i:00000000}");
+            all.Add(item);
+        }
+        int events = 0;
+        var filtered = (IList)Field(view, "_filteredPatients")!;
+        ((INotifyCollectionChanged)filtered).CollectionChanged += (_, _) => events++;
+        var sw = Stopwatch.StartNew();
+        Call(view, "ApplyFilters"); Call(view, "ApplyFilters");
+        sw.Stop();
+        Assert(filtered.Count == 5000, "Patient filter must retain every matching patient");
+        for (int i = 0; i < 5000; i++) Assert(ReferenceEquals(all[i], filtered[i]), "Patient order must be preserved");
+        Console.WriteLine($"{type.Namespace}: 5,000-patient filter twice = {sw.Elapsed.TotalMilliseconds:F1} ms, {events} collection notifications");
+        results[type.FullName!] = filtered.Cast<object>().Select(x => (int)Prop(x, "Id")!).ToArray();
+    }
+    static List<Visit> Visits()
+    {
+        var random = new Random(88);
+        var start = new DateTime(2026, 10, 1);
+        return Enumerable.Range(1, 500).Select(i => new Visit
+        {
+            Id = i, PatientId = 1, VisitDate = start.AddMinutes(i / 2),
+            TodayPaid = i % 11 == 0 ? 0 : random.Next(1, 1000) / 10d,
+            CurrentCost = i % 13 == 0 ? -25 : random.Next(5, 100),
+            UsdToSypRateSnapshot = i % 7 == 0 ? 0 : 1000,
+            SelectedTreatmentsJson = i % 17 == 0 ? "bad json" : JsonSerializer.Serialize(new[]
+            {
+                new SelectedTreatment { TreatmentName = "A", Currency = "USD", Cost = 0.15m, Quantity = i % 3 },
+                new SelectedTreatment { TreatmentName = "B", Currency = "ل.س", Cost = 12.25m, Quantity = 2 }
+            })
+        }).ToList();
+    }
+    static void Statistics(Type type)
+    {
+        var method = type.GetMethod("BuildTreatmentIncomeTotals", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var visits = Visits();
+        var sw = Stopwatch.StartNew();
+        var totals = (Dictionary<string, double>)method.Invoke(null, new object[] { visits, visits })!;
+        sw.Stop();
+        Console.WriteLine($"{type.Namespace}: FIFO statistics for 500 visits = {sw.Elapsed.TotalMilliseconds:F1} ms");
+        results[type.FullName!] = totals.OrderBy(x => x.Key).ToArray();
+    }
+    static void Finance(Type type)
+    {
+        var view = (UserControl)Activator.CreateInstance(type)!;
+        ((DatePicker)view.FindName("DpFilterDate")).SelectedDate = new DateTime(2026, 10, 1);
+        var all = (IList)Field(view, "_allVisits")!;
+        var model = all.GetType().GetGenericArguments()[0];
+        foreach (var visit in Visits())
+        {
+            var item = Activator.CreateInstance(model, true)!;
+            foreach (string key in new[] { "PatientId", "VisitDate", "CurrentCost", "TodayPaid", "SelectedTreatmentsJson", "UsdToSypRateSnapshot" })
+                Set(item, key, Prop(visit, key));
+            Set(item, "VisitId", visit.Id); Set(item, "PatientName", "Synthetic patient"); Set(item, "PhoneNumber", "09000000");
+            var cost = type.GetMethod("CalculateAutomaticTreatmentCost", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, new object?[] { visit.SelectedTreatmentsJson, visit.UsdToSypRateSnapshot });
+            item.GetType().GetMethod("SetCostAdjustment")!.Invoke(item, new[] { cost });
+            all.Add(item);
+        }
+        var rows = (IList)Field(view, "_incomeRows")!;
+        int events = 0;
+        ((INotifyCollectionChanged)rows).CollectionChanged += (_, _) => events++;
+        var sw = Stopwatch.StartNew();
+        Call(view, "ApplyFilters"); sw.Stop();
+        results[type.FullName!] = rows.Cast<object>().Select(row => new
+        {
+            Id = Prop(row, "VisitId"), Paid = Prop(row, "PaidAmountText"), Adjustment = Prop(row, "AdjustmentText"), Raw = Prop(row, "RawAmount"),
+            Lines = ((IEnumerable)Prop(row, "AllocatedTreatments")!).Cast<object>().Select(line => new
+            {
+                Name = Prop(line, "TreatmentName"), Amount = Prop(line, "AllocatedAmount"), Total = Prop(line, "TreatmentTotal")
+            }).ToArray()
+        }).ToArray();
+        Console.WriteLine($"{type.Namespace}: financial filtering for 500 visits = {sw.Elapsed.TotalMilliseconds:F1} ms, {events} notifications");
+    }
+    [STAThread]
+    static int Main(string[] args)
+    {
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml")
+            });
+            foreach (string key in new[] { "AppTextPrimary", "AppTextSecondary", "AppBorder", "AppWindowBg", "AppCardBg", "SettingsCardBg", "SettingsOutlineBtnBorder", "DashCalendarTodayNumFg" })
+                app.Resources[key] = key.Contains("Bg") ? Brushes.White : Brushes.SlateGray;
+            Patients(typeof(MyClinic.PatientRecordsView)); Patients(typeof(MyClinic.OriginalTheme.PatientRecordsView));
+            Statistics(typeof(MyClinic.StatisticsView)); Statistics(typeof(MyClinic.OriginalTheme.StatisticsView));
+            Finance(typeof(MyClinic.FinancialRecordsView)); Finance(typeof(MyClinic.OriginalTheme.FinancialRecordsView));
+            string json = JsonSerializer.Serialize(results);
+            string fingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json)));
+            string baseline = System.IO.File.ReadAllText("Diagnostics/performance-baseline.sha256").Trim();
+            Assert(fingerprint == baseline, "Patient order, financial rows, FIFO allocations and statistics must match the pre-optimization baseline exactly");
+            Console.WriteLine("PASS: Results exactly match the pre-optimization baseline in both themes.");
+            Virtualization(typeof(MyClinic.FinancialRecordsView));
+            Virtualization(typeof(MyClinic.OriginalTheme.FinancialRecordsView));
+            Parallel.For(0, 1000, i =>
+            {
+                MyClinic.AppRuntimeCache.AddOrUpdateVisit(new Visit { Id = i, PatientId = i });
+                _ = MyClinic.AppRuntimeCache.RecentVisits;
+            });
+            Assert(MyClinic.AppRuntimeCache.RecentVisits.Count == 1000, "Background readers and UI saves preserve cached visits");
+            Console.WriteLine("PASS: Refresh coalescing, bounded row generation and concurrent runtime-cache access.");
+            app.Shutdown(); return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}

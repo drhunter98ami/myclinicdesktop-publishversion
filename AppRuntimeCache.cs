@@ -7,12 +7,22 @@ namespace MyClinic
     public static class AppRuntimeCache
     {
         private static readonly Dictionary<int, Visit> RecentVisitsById = new();
+        private static readonly object SyncRoot = new();
 
-        public static IReadOnlyCollection<Visit> RecentVisits => RecentVisitsById.Values.ToList();
+        public static IReadOnlyCollection<Visit> RecentVisits
+        {
+            get
+            {
+                lock (SyncRoot)
+                    return RecentVisitsById.Values.ToList();
+            }
+        }
 
         public static void AddOrUpdateVisit(Visit visit)
         {
-            RecentVisitsById[visit.Id] = CloneVisit(visit);
+            Visit snapshot = CloneVisit(visit);
+            lock (SyncRoot)
+                RecentVisitsById[visit.Id] = snapshot;
         }
 
         private static Visit CloneVisit(Visit source)

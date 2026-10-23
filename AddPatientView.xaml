@@ -2,6 +2,7 @@
 <UserControl x:Class="MyClinic.AddPatientView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:motion="clr-namespace:MyClinic"
              xmlns:local="clr-namespace:MyClinic"
              FlowDirection="RightToLeft"
              Background="Transparent"
@@ -351,7 +352,7 @@
                 Panel.ZIndex="0"
                 IsHitTestVisible="False"
                 Visibility="Collapsed">
-            <Ellipse x:Name="AddPatientBackSpotlight"
+            <Ellipse x:Name="AddPatientBackSpotlight" CacheMode="BitmapCache"
                      Width="620"
                      Height="620"
                      IsHitTestVisible="False">
@@ -370,7 +371,7 @@
         </Canvas>
 
         <!-- الترويسة العلوية المنسقة بنفس ثيم بطاقة الترحيب في الصور -->
-        <Border Grid.Row="0"
+        <Border motion:NavigationTransition.Motion="Header" motion:NavigationTransition.Order="0" Grid.Row="0"
                 Panel.ZIndex="2"
                 Margin="0,0,0,14"
                 Padding="26,18"
@@ -467,7 +468,7 @@
                 <!-- ROW 0: Top Section (Side-by-Side Layout) -->
 
                 <!-- Left Column (Clinical Data Top) -->
-                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Top">
+                <StackPanel motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="1" Grid.Row="0" Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Top">
 
                     <!-- اختيار العلاجات -->
                     <Border Style="{StaticResource Card}">
@@ -475,7 +476,7 @@
                             <TextBlock Text="اختيار العلاجات" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
 
                             <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl x:Name="TreatmentItemsControl">
+                                <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="TreatmentItemsControl">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Background="{DynamicResource VisitSubCardBg}"
@@ -911,7 +912,7 @@
                 </StackPanel>
 
                 <!-- Right Column (Personal Data Sidebar Top + Previous Visit Cards) -->
-                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Top">
+                <StackPanel motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="2" Grid.Row="0" Grid.Column="1" VerticalAlignment="Top">
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="البيانات الشخصية" Foreground="{DynamicResource AppTextPrimary}" FontSize="19" FontWeight="Bold" Margin="0,0,0,14" HorizontalAlignment="Center"/>
@@ -1240,7 +1241,7 @@
                 </StackPanel>
 
                 <!-- ROW 1: Bottom Section (Dental Chart + Prescriptions + Attachments & Notes) -->
-                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,4,0,0" VerticalAlignment="Top">
+                <StackPanel motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="4" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,4,0,0" VerticalAlignment="Top">
                     <StackPanel HorizontalAlignment="Stretch" Margin="0,0,0,16">
                         <!-- مبدل مخطط الأسنان (بالغين / أطفال) -->
                         <Border Background="{DynamicResource VisitSubCardBg}"
@@ -1499,7 +1500,7 @@
         </ScrollViewer>
 
         <!-- الشريط السفلي لحفظ الزيارة -->
-        <Border Grid.Row="2"
+        <Border motion:NavigationTransition.Motion="Toolbar" motion:NavigationTransition.Order="5" Grid.Row="2"
                 Panel.ZIndex="2"
                 Margin="0,10,0,0"
                 CornerRadius="18"
@@ -1532,7 +1533,7 @@
                 Panel.ZIndex="10"
                 IsHitTestVisible="False"
                 Visibility="Collapsed">
-            <Ellipse x:Name="AddPatientSurfaceSpotlight"
+            <Ellipse x:Name="AddPatientSurfaceSpotlight" CacheMode="BitmapCache"
                      Width="440"
                      Height="440"
                      IsHitTestVisible="False">

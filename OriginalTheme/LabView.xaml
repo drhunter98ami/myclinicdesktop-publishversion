@@ -1,6 +1,7 @@
 <UserControl x:Class="MyClinic.OriginalTheme.LabView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:motion="clr-namespace:MyClinic"
              FlowDirection="RightToLeft"
              Background="{DynamicResource AppWindowBg}"
              FontFamily="Segoe UI">
@@ -392,10 +393,10 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,0,20,20">
             <!-- Header -->
-            <TextBlock Text="المخبر" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,25"/>
+            <TextBlock motion:NavigationTransition.Motion="Header" motion:NavigationTransition.Order="0" Text="المخبر" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,25"/>
 
             <!-- Summary Cards -->
-            <Grid Margin="0,0,0,25">
+            <Grid motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="1" Margin="0,0,0,25">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -428,7 +429,7 @@
             </Grid>
 
             <!-- Add Work Section -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,25">
+            <Border motion:NavigationTransition.Motion="Card" motion:NavigationTransition.Order="3" Style="{StaticResource CardStyle}" Margin="0,0,0,25">
                 <StackPanel>
                     <TextBlock Text="إضافة أعمال" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,15"/>
 
@@ -471,7 +472,7 @@
             </Border>
 
             <!-- Search and Filter Section -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,25">
+            <Border motion:NavigationTransition.Motion="Toolbar" motion:NavigationTransition.Order="4" Style="{StaticResource CardStyle}" Margin="0,0,0,25">
                 <StackPanel>
                     <TextBlock Text="البحث والتصفية" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,15"/>
 
@@ -504,7 +505,7 @@
             </Border>
 
             <!-- Date Filter Section -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,25">
+            <Border motion:NavigationTransition.Motion="Toolbar" motion:NavigationTransition.Order="5" Style="{StaticResource CardStyle}" Margin="0,0,0,25">
                 <StackPanel>
                     <TextBlock Text="تصفية حسب التاريخ" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,15"/>
 
@@ -543,11 +544,16 @@
             </Border>
 
             <!-- Works List -->
-            <Border Style="{StaticResource CardStyle}">
+            <Border motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="6" Style="{StaticResource CardStyle}">
                 <StackPanel>
                     <TextBlock Text="الأعمال المرسلة" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,15"/>
 
-                    <DataGrid x:Name="DgLabWorks" 
+                    <DataGrid motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="DgLabWorks"
+                                      MaxHeight="480"
+                                      EnableRowVirtualization="True"
+                                      EnableColumnVirtualization="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      ScrollViewer.CanContentScroll="True"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
