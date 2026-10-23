@@ -49,3 +49,16 @@ share the Windows animation preference; Windows disabling animations takes prece
 The optional `MotionPreference.txt` in the existing application settings folder stores
 only this presentation preference. Its absence or an invalid value selects Subtle.
 No clinic database schema, calculation rule, or upgrade conversion is added.
+
+## Statistics dashboard checks
+
+Run `./Diagnostics/RunStatisticsChecks.ps1` to verify the shared analytics dashboard.
+The harness uses synthetic records and offscreen WPF windows; it does not open clinic
+data or change saved preferences. Light/dark previews, compact layouts, donut charts,
+and ranked category views are saved under `obj/StatisticsSmoke/previews/`.
+
+Checks cover elapsed-date comparisons, leap years, unequal month lengths, missing
+comparison dates, blank future periods, daily averages, peak days, numeric versus
+currency labels, chart resizing, gradient areas, comparison toggles, keyboard/tooltips,
+expense drill-down callbacks, exact animated totals, and motion-off behavior. Both
+the modern and original statistics views use the same dashboard and breakdown controls.

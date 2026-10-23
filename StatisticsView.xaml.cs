@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System;
 using System.Collections.Generic;
@@ -22,14 +22,12 @@ namespace MyClinic
         private enum MainTab { Income, Expenses, Visits, Treatments }
         private enum SubTab  { Daily, Monthly, Yearly }
         private enum PieMetric { Money, Count }
-        private enum IncomeChartType { Area, Columns }
 
         private const string OtherLabel = ExpenseCategories.OtherLabel;
 
         private MainTab _mainTab   = MainTab.Income;
         private SubTab  _subTab    = SubTab.Monthly;
         private PieMetric _pieMetric = PieMetric.Money;
-        private IncomeChartType _incomeChartType = IncomeChartType.Area;
 
         private DateTime _selectedDay   = AppClock.Today;
         private int      _selectedMonth = AppClock.Today.Month;
@@ -47,8 +45,8 @@ namespace MyClinic
         public StatisticsView()
         {
             InitializeComponent();
+            Unloaded += (_, _) => ++_refreshVersion;
             UpdateSubTabStyles();
-            UpdateIncomeChartStyles();
             Loaded += StatisticsView_Loaded;
             Unloaded += StatisticsView_Unloaded;
         }
@@ -58,7 +56,6 @@ namespace MyClinic
             GlobalEvents.OnThemeChanged -= HandleThemeChanged;
             GlobalEvents.OnThemeChanged += HandleThemeChanged;
             ApplyThemeVisuals(IsDarkThemeActive());
-            UpdateIncomeChartStyles();
             await RefreshAsync();
         }
 
@@ -79,7 +76,6 @@ namespace MyClinic
         private async void HandleThemeChanged(bool isDark)
         {
             ApplyThemeVisuals(isDark);
-            UpdateIncomeChartStyles();
             if (IsLoaded)
                 await RefreshAsync();
         }
@@ -214,22 +210,6 @@ namespace MyClinic
             await RefreshAsync();
         }
 
-        private async void BtnIncomeArea_Click(object sender, RoutedEventArgs e)
-        {
-            _incomeChartType = IncomeChartType.Area;
-            UpdateIncomeChartStyles();
-            if (_mainTab == MainTab.Income)
-                await RefreshAsync();
-        }
-
-        private async void BtnIncomeColumns_Click(object sender, RoutedEventArgs e)
-        {
-            _incomeChartType = IncomeChartType.Columns;
-            UpdateIncomeChartStyles();
-            if (_mainTab == MainTab.Income)
-                await RefreshAsync();
-        }
-
         private void StepDate(int delta)
         {
             switch (_subTab)
@@ -252,59 +232,77 @@ namespace MyClinic
         // Main refresh
         // ═════════════════════════════════════════════════════════════════════
 
+        private int _refreshVersion;
+
         private async Task RefreshAsync()
         {
+            int version = ++_refreshVersion;
             UpdateDateLabel();
-
-            switch (_mainTab)
+            AnalyticsDashboard.SetLoading();
+            CategoryBreakdown.Opacity = .5;
+            CategoryBreakdown.IsEnabled = false;
+            var period = _subTab switch { SubTab.Daily => StatisticsPeriod.Day, SubTab.Monthly => StatisticsPeriod.Month, _ => StatisticsPeriod.Year };
+            DateTime start = SelectedPeriodStart(), end = SelectedPeriodEnd();
+            DateTime previousStart = StatisticsAnalytics.PreviousPeriodStart(start, period);
+            DateTime exclusiveEnd = end.AddDays(1);
+            MainTab tab = _mainTab;
+            try
             {
-                case MainTab.Income:
-                    await RefreshIncomeAsync();
-                    break;
-                case MainTab.Expenses:
-                    await RefreshExpensesAsync();
-                    break;
-                case MainTab.Visits:
-                    await RefreshVisitsAsync();
-                    break;
-                case MainTab.Treatments:
-                    await RefreshTreatmentsAsync();
-                    break;
+                using var ctx = new AppDbContext();
+                var names = tab is MainTab.Income or MainTab.Treatments
+                    ? (await ctx.TreatmentCosts.AsNoTracking().Select(t => t.TreatmentName).ToListAsync())
+                        .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.Ordinal).OrderBy(n => n).ToList()
+                    : new List<string>();
+                if (version != _refreshVersion) return;
+                List<Visit> visits = new();
+                List<ExpenseEntry> expenses = new();
+                if (tab == MainTab.Expenses)
+                    expenses = await ctx.Expenses.AsNoTracking().Where(e => e.ExpenseDate >= previousStart && e.ExpenseDate < exclusiveEnd).ToListAsync();
+                else
+                {
+                    // Income allocation requires complete treatment/payment histories.
+                    var query = ctx.Visits.AsNoTracking();
+                    if (tab != MainTab.Income) query = query.Where(v => v.VisitDate >= previousStart && v.VisitDate < exclusiveEnd);
+                    visits = await query.ToListAsync();
+                }
+                if (version != _refreshVersion) return;
+                DateTime today = AppClock.Today;
+                var selected = visits.Where(v => IsInSelectedPeriod(v) && v.VisitDate.Date <= today).ToList();
+                switch (tab)
+                {
+                    case MainTab.Income: ShowIncome(visits, selected, names); break;
+                    case MainTab.Expenses: ShowExpenses(expenses.Where(e => e.ExpenseDate >= start && e.ExpenseDate < exclusiveEnd && e.ExpenseDate.Date <= today).ToList()); break;
+                    case MainTab.Visits: ShowVisits(selected); break;
+                    case MainTab.Treatments: ShowTreatments(selected, names); break;
+                }
+                IEnumerable<StatisticsObservation> observations = tab == MainTab.Expenses
+                    ? expenses.Select(e => new StatisticsObservation(e.ExpenseDate, e.Amount))
+                    : visits.Select(v => new StatisticsObservation(v.VisitDate, tab switch
+                    {
+                        MainTab.Income => v.TodayPaid,
+                        MainTab.Visits => 1,
+                        _ => ParseTreatments(v.SelectedTreatmentsJson).Sum(t => Math.Max(1, t.Quantity))
+                    }));
+                string title = tab switch { MainTab.Income => "المبالغ المحصلة", MainTab.Expenses => "المصاريف", MainTab.Visits => "الزيارات", _ => "المعالجات" };
+                AnalyticsDashboard.ShowData(StatisticsAnalytics.Build(observations, start, period, today, title,
+                    tab is MainTab.Income or MainTab.Expenses, tab == MainTab.Expenses));
+                CategoryBreakdown.Opacity = 1;
+                CategoryBreakdown.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Statistics refresh failed: {ex}");
+                if (version != _refreshVersion) return;
+                AnalyticsDashboard.ShowError();
+                CategoryBreakdown.Visibility = Visibility.Collapsed;
             }
         }
 
         // ── Income ────────────────────────────────────────────────────────────
 
-        private async Task RefreshIncomeAsync()
+        private void ShowIncome(List<Visit> allVisits, List<Visit> visits, List<string> knownTreatments)
         {
             _pieMetric = PieMetric.Money;
-            // 1. Load treatment names from settings (to get the full list)
-            List<string> knownTreatments;
-            List<Visit>  allVisits;
-
-            using (var ctx = new AppDbContext())
-            {
-                knownTreatments = (await ctx.TreatmentCosts
-                    .AsNoTracking()
-                    .Select(t => t.TreatmentName)
-                    .ToListAsync())
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.Ordinal)
-                    .OrderBy(name => name)
-                    .ToList();
-
-                // Payment allocation needs the patient's complete treatment/payment
-                // history, even when the pie itself is filtered to one day/month/year.
-                allVisits = await ctx.Visits
-                    .AsNoTracking()
-                    .ToListAsync();
-            }
-
-            var visits = allVisits
-                .Where(IsInSelectedPeriod)
-                .Where(v => v.CurrentCost != 0 || v.TodayPaid > 0)
-                .ToList();
-
             // 2. Aggregate actual paid amounts per treatment using the same FIFO
             //    allocation as الشؤون المالية. Billed-but-unpaid treatment costs
             //    must not be included in an income chart.
@@ -313,7 +311,6 @@ namespace MyClinic
             // 3. Build slice list: known treatments first, then unknowns, أخرى last
             var slices = BuildIncomeSlices(knownTreatments, totals);
             DrawPie(slices);
-            DrawIncomeChart(visits);
         }
 
         private static Dictionary<string, double> BuildTreatmentIncomeTotals(
@@ -406,18 +403,9 @@ namespace MyClinic
                 .ToList();
         }
 
-        private async Task RefreshVisitsAsync()
+        private void ShowVisits(List<Visit> visits)
         {
             _pieMetric = PieMetric.Count;
-            IncomeChartPanel.Visibility = Visibility.Collapsed;
-
-            List<Visit> visits;
-            using (var ctx = new AppDbContext())
-            {
-                visits = await ApplyDateFilter(ctx.Visits.AsNoTracking())
-                    .ToListAsync();
-            }
-
             int newVisitCount = visits.Count(visit => ParseTreatments(visit.SelectedTreatmentsJson).Count > 0);
             int reviewCount = visits.Count - newVisitCount;
 
@@ -438,28 +426,9 @@ namespace MyClinic
             });
         }
 
-        private async Task RefreshTreatmentsAsync()
+        private void ShowTreatments(List<Visit> visits, List<string> knownTreatments)
         {
             _pieMetric = PieMetric.Count;
-            IncomeChartPanel.Visibility = Visibility.Collapsed;
-
-            List<string> knownTreatments;
-            List<Visit> visits;
-            using (var ctx = new AppDbContext())
-            {
-                knownTreatments = (await ctx.TreatmentCosts
-                    .AsNoTracking()
-                    .Select(t => t.TreatmentName)
-                    .ToListAsync())
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.Ordinal)
-                    .OrderBy(name => name)
-                    .ToList();
-
-                visits = await ApplyDateFilter(ctx.Visits.AsNoTracking())
-                    .ToListAsync();
-            }
-
             var totals = new Dictionary<string, double>(StringComparer.Ordinal);
             foreach (var visit in visits)
             {
@@ -541,18 +510,9 @@ namespace MyClinic
 
         // ── Expenses ──────────────────────────────────────────────────────────
 
-        private async Task RefreshExpensesAsync()
+        private void ShowExpenses(List<ExpenseEntry> expenses)
         {
             _pieMetric = PieMetric.Money;
-            IncomeChartPanel.Visibility = Visibility.Collapsed;
-            List<ExpenseEntry> expenses;
-            using (var ctx = new AppDbContext())
-            {
-                var query = ctx.Expenses.AsNoTracking().AsQueryable();
-                query = ApplyDateFilterExpenses(query);
-                expenses = await query.ToListAsync();
-            }
-
             // Category totals
             var totals = new Dictionary<string, double>(StringComparer.Ordinal);
 
@@ -586,76 +546,23 @@ namespace MyClinic
         // Pie drawing
         // ═════════════════════════════════════════════════════════════════════
 
-        private ChartLegendInteraction? _pieInteraction;
-
         private void DrawPie(List<PieSlice> slices)
         {
-            PieCanvas.Children.Clear();
-            LegendPanel.Children.Clear();
-
-            double total = slices.Sum(s => s.Amount);
-            _pieInteraction = new ChartLegendInteraction(TblTotal, $"الإجمالي: {FormatPieValue(total)}", _mainTab == MainTab.Expenses);
-
-            // No data
-            if (total <= 0 || slices.Count == 0)
-            {
-                TblNoData.Visibility = Visibility.Visible;
-                TblTotal.Text        = slices.Count > 0 ? $"الإجمالي: {FormatPieValue(0)}" : "";
-                LegendPanel.Children.Clear();
-                if (slices.Count > 0) BuildLegend(slices, total);
-                return;
-            }
-            TblNoData.Visibility = Visibility.Collapsed;
-
-            double cx = 140, cy = 140, r = 128, innerR = 56;
-            double startAngle = -90.0; // start at 12 o'clock
-
-            int sliceIndex = 0;
-            int visibleSlices = slices.Count(slice => slice.Amount > 0);
-            foreach (var slice in slices)
-            {
-                if (slice.Amount <= 0) continue;
-                double sweep = (slice.Amount / total) * 360.0;
-                // Clamp to avoid degenerate arcs at exactly 360
-                if (sweep >= 360) sweep = 359.9999;
-
-                var brush = HexBrush(slice.Color);
-
-                var path = CreateDonutSlice(cx, cy, r, innerR, startAngle, sweep, brush);
-                path.Tag = slice.Label;
-                path.ToolTip = $"{slice.Label}: {FormatPieValue(slice.Amount)}";
-                path.MouseLeftButtonUp += ExpenseLegendRow_Click;
-                PieCanvas.Children.Add(path);
-                ChartMotion.EnterSlice(path, cx, cy, sliceIndex++);
-                _pieInteraction.AddSlice(slice.Label, path, startAngle + sweep / 2,
-                    $"{slice.Label}: {FormatPieValue(slice.Amount)} ({slice.Amount / total:P1})");
-
-                startAngle += sweep;
-            }
-
-            // Centre hole (card bg)
-            if (visibleSlices > 0)
-            {
-                var hole = new Ellipse
+            CategoryBreakdown.Visibility = Visibility.Visible;
+            CategoryBreakdown.ShowData(slices.Select(s => new StatisticsCategory(s.Label, s.Amount, CategoryColor(s.Label))),
+                _pieMetric == PieMetric.Money, _mainTab == MainTab.Expenses ? category =>
                 {
-                    Width  = innerR * 2,
-                    Height = innerR * 2,
-                    IsHitTestVisible = false,
-                    Fill   = Application.Current.Resources["SettingsCardBg"] as Brush
-                             ?? Application.Current.Resources["AppCardBg"] as Brush
-                             ?? new SolidColorBrush(Color.FromRgb(18, 26, 36))
-                };
-                Canvas.SetLeft(hole, cx - innerR);
-                Canvas.SetTop(hole,  cy - innerR);
-                PieCanvas.Children.Add(hole);
-            }
+                    var sender = new Grid { Tag = category };
+                    ExpenseLegendRow_Click(sender, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left));
+                } : null);
+        }
 
-            // Total label
-            AnimatedNumber.Show(TblTotal, total,
-                _pieMetric == PieMetric.Count ? "الإجمالي: {0:N0}" : "الإجمالي: {0:N0} ل.س");
-
-            // Legend
-            BuildLegend(slices, total);
+        // Stable across sorting, tab changes, interface styles, and application restarts.
+        private static string CategoryColor(string label)
+        {
+            uint hash = 2166136261;
+            foreach (char c in label) hash = unchecked((hash ^ c) * 16777619);
+            return SliceColors[hash % (uint)SliceColors.Length];
         }
 
         private static System.Windows.Shapes.Path CreateDonutSlice(
@@ -692,86 +599,6 @@ namespace MyClinic
                 Stroke = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0)),
                 StrokeThickness = 1
             };
-        }
-
-        private void BuildLegend(List<PieSlice> slices, double total)
-        {
-            // Title
-            var title = new TextBlock
-            {
-                Text       = "التفاصيل",
-                FontSize   = 13,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = (Brush)Application.Current.Resources["AppTextSecondary"],
-                Margin     = new Thickness(0, 0, 0, 10)
-            };
-            LegendPanel.Children.Add(title);
-
-            foreach (var slice in slices)
-            {
-                double pct = total > 0 ? (slice.Amount / total) * 100 : 0;
-
-                var row = new Grid { Margin = new Thickness(0, 4, 0, 4) };
-                row.Tag = slice.Label;
-                row.Cursor = Cursors.Hand;
-                row.MouseLeftButtonUp += ExpenseLegendRow_Click;
-                _pieInteraction?.AddRow(slice.Label, row,
-                    () => ExpenseLegendRow_Click(row, new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)),
-                    $"{slice.Label}: {FormatPieValue(slice.Amount)} ({pct:N1}%)");
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                // Colour swatch
-                var swatch = new Border
-                {
-                    Width        = 12,
-                    Height       = 12,
-                    CornerRadius = new CornerRadius(3),
-                    Background   = HexBrush(slice.Color),
-                    Margin       = new Thickness(0, 0, 8, 0),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                Grid.SetColumn(swatch, 0);
-
-                // Label + percentage
-                var labelBlock = new TextBlock
-                {
-                    Text                = $"{slice.Label}  ({pct:N1}%)",
-                    FontSize            = 13,
-                    Foreground          = (Brush)Application.Current.Resources["AppTextPrimary"],
-                    VerticalAlignment   = VerticalAlignment.Center,
-                    TextTrimming        = TextTrimming.CharacterEllipsis
-                };
-                Grid.SetColumn(labelBlock, 1);
-
-                // Amount
-                var amtBlock = new TextBlock
-                {
-                    Text              = FormatPieValue(slice.Amount),
-                    FontSize          = 13,
-                    FontWeight        = FontWeights.SemiBold,
-                    Foreground        = HexBrush(slice.Color),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin            = new Thickness(12, 0, 0, 0)
-                };
-                Grid.SetColumn(amtBlock, 2);
-
-                row.Children.Add(swatch);
-                row.Children.Add(labelBlock);
-                row.Children.Add(amtBlock);
-
-                LegendPanel.Children.Add(row);
-
-                // Thin separator
-                LegendPanel.Children.Add(new Border
-                {
-                    Height     = 1,
-                    Background = (Brush)Application.Current.Resources["AppBorder"],
-                    Margin     = new Thickness(0, 2, 0, 2),
-                    Opacity    = 0.5
-                });
-            }
         }
 
         private async void ExpenseLegendRow_Click(object sender, MouseButtonEventArgs e)
@@ -851,156 +678,6 @@ namespace MyClinic
             {
                 MessageBox.Show($"تعذر تحميل تفاصيل الفئة.\n{ex.Message}", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private void DrawIncomeChart(List<Visit> visits)
-        {
-            IncomeChartCanvas.Children.Clear();
-            IncomeChartPanel.Visibility = Visibility.Visible;
-            IncomeChartTitle.Text = _incomeChartType == IncomeChartType.Area
-                ? "الدخل حسب الفترة"
-                : "الدخل حسب الفترة - أعمدة";
-            DateTime start = SelectedPeriodStart();
-            DateTime end = SelectedPeriodEnd();
-            List<(string Label, double Amount)> points = BuildIncomeChartPoints(visits, start, end);
-
-            const double chartWidth = 1100, chartHeight = 360, left = 64, top = 24, right = 16, bottom = 54;
-            double plotWidth = chartWidth - left - right;
-            double plotHeight = chartHeight - top - bottom;
-            double max = Math.Max(1, points.Max(p => p.Amount));
-            double slotWidth = plotWidth / points.Count;
-            var yAxis = new Rectangle { Width = 1, Height = plotHeight, Fill = Brushes.Gray };
-            Canvas.SetLeft(yAxis, left);
-            Canvas.SetTop(yAxis, top);
-            IncomeChartCanvas.Children.Add(yAxis);
-
-            var xAxis = new Rectangle { Width = plotWidth, Height = 1, Fill = Brushes.Gray };
-            Canvas.SetLeft(xAxis, left);
-            Canvas.SetTop(xAxis, top + plotHeight);
-            IncomeChartCanvas.Children.Add(xAxis);
-            AddChartLabel($"{max:N0}", 0, top - 5, 42, 18);
-            AddChartLabel("0", 0, top + plotHeight - 8, 42, 18);
-
-            if (_incomeChartType == IncomeChartType.Area)
-            {
-                DrawIncomeArea(points, max, left, top, plotWidth, plotHeight, slotWidth);
-            }
-            else
-            {
-                DrawIncomeColumns(points, max, left, top, plotHeight, slotWidth);
-            }
-            var inspectionPoints = points.Select((point, index) =>
-            {
-                DateTime date = _subTab switch
-                {
-                    SubTab.Daily => _selectedDay.Date,
-                    SubTab.Monthly => new DateTime(_selectedYear, _selectedMonth, index + 1),
-                    _ => new DateTime(_selectedYear, index + 1, 1)
-                };
-                string label = date.ToString(_subTab == SubTab.Yearly ? "MM/yyyy" : "dd/MM/yyyy", CultureInfo.InvariantCulture);
-                return new ChartDatum(label, point.Amount,
-                    new Point(left + (index + 0.5) * slotWidth, top + plotHeight - point.Amount / max * plotHeight));
-            }).ToList();
-            ChartInspector.Attach(IncomeChartCanvas, inspectionPoints, top, top + plotHeight);
-        }
-
-        private List<(string Label, double Amount)> BuildIncomeChartPoints(List<Visit> visits, DateTime start, DateTime end)
-        {
-            if (_subTab == SubTab.Daily)
-                return new List<(string, double)> { (_selectedDay.ToString("dd/MM", CultureInfo.InvariantCulture), visits.Sum(v => v.TodayPaid)) };
-
-            if (_subTab == SubTab.Monthly)
-            {
-                return Enumerable.Range(0, (end - start).Days + 1)
-                    .Select(i => start.AddDays(i))
-                    .Select(day => (day.ToString("dd", CultureInfo.InvariantCulture), visits.Where(v => v.VisitDate.Date == day.Date).Sum(v => v.TodayPaid)))
-                    .ToList();
-            }
-
-            return Enumerable.Range(1, 12)
-                .Select(month => ($"{month:00}", visits.Where(v => v.VisitDate.Month == month).Sum(v => v.TodayPaid)))
-                .ToList();
-        }
-
-        private void DrawIncomeColumns(List<(string Label, double Amount)> points, double max, double left, double top, double plotHeight, double slotWidth)
-        {
-            for (int i = 0; i < points.Count; i++)
-            {
-                double barHeight = points[i].Amount / max * plotHeight;
-                double barWidth = Math.Max(4, slotWidth * 0.62);
-                double x = left + i * slotWidth + (slotWidth - barWidth) / 2;
-                double y = top + plotHeight - barHeight;
-                Rectangle bar = new() { Width = barWidth, Height = Math.Max(1, barHeight), Fill = HexBrush(IsDarkThemeActive() ? "#14B8A6" : "#2250DF"), RadiusX = 4, RadiusY = 4, ToolTip = $"{points[i].Label}: {points[i].Amount:N0} ل.س" };
-                Canvas.SetLeft(bar, x);
-                Canvas.SetTop(bar, y);
-                IncomeChartCanvas.Children.Add(bar);
-                ChartMotion.GrowBar(bar, i);
-                AddChartLabel(points[i].Label, x - 8, top + plotHeight + 8, barWidth + 16, 18);
-                AddChartLabel(points[i].Amount.ToString("N0", CultureInfo.CurrentCulture), x - 12, Math.Max(0, y - 20), barWidth + 24, 18);
-            }
-        }
-
-        private void DrawIncomeArea(List<(string Label, double Amount)> points, double max, double left, double top, double plotWidth, double plotHeight, double slotWidth)
-        {
-            List<Point> coordinates = points
-                .Select((point, index) => new Point(
-                    left + (points.Count == 1 ? plotWidth / 2 : index * slotWidth + slotWidth / 2),
-                    top + plotHeight - point.Amount / max * plotHeight))
-                .ToList();
-            PathGeometry geometry = new();
-            PathFigure figure = new() { StartPoint = coordinates[0], IsClosed = false };
-            for (int i = 1; i < coordinates.Count; i++)
-            {
-                Point previous = coordinates[i - 1];
-                Point current = coordinates[i];
-                double midpoint = (current.X - previous.X) / 2;
-                figure.Segments.Add(new BezierSegment(
-                    new Point(previous.X + midpoint, previous.Y),
-                    new Point(current.X - midpoint, current.Y),
-                    current,
-                    true));
-            }
-            geometry.Figures.Add(figure);
-            Brush lineStroke = HexBrush(IsDarkThemeActive() ? "#2DD4BF" : "#2250DF");
-            var incomeLine = new System.Windows.Shapes.Path
-            {
-                Data = geometry,
-                Stroke = lineStroke,
-                StrokeThickness = 3,
-                StrokeLineJoin = PenLineJoin.Round,
-                ToolTip = "الدخل",
-                IsHitTestVisible = false
-            };
-            IncomeChartCanvas.Children.Add(incomeLine);
-            ChartMotion.RevealLine(incomeLine, 1100, 360);
-
-            for (int i = 0; i < points.Count; i++)
-            {
-                Ellipse marker = new()
-                {
-                    Width = 12,
-                    Height = 12,
-                    Fill = IsDarkThemeActive() ? HexBrush("#0F172A") : Brushes.White,
-                    Stroke = lineStroke,
-                    StrokeThickness = 3,
-                    ToolTip = $"{points[i].Label}: {points[i].Amount:N0} ل.س"
-                };
-                Canvas.SetLeft(marker, coordinates[i].X - marker.Width / 2);
-                Canvas.SetTop(marker, coordinates[i].Y - marker.Height / 2);
-                IncomeChartCanvas.Children.Add(marker);
-                ChartMotion.EnterMarker(marker, i);
-                AddChartLabel(points[i].Label, coordinates[i].X - 20, top + plotHeight + 8, 40, 18);
-                AddChartLabel(points[i].Amount.ToString("N0", CultureInfo.CurrentCulture), coordinates[i].X - 30, Math.Max(0, coordinates[i].Y - 24), 60, 18);
-            }
-        }
-
-        private void AddChartLabel(string text, double x, double y, double width, double height)
-        {
-            TextBlock label = new() { IsHitTestVisible = false, Text = text, Width = width, Height = height, FontSize = 10, TextAlignment = TextAlignment.Center, Foreground = (Brush)FindResource("AppTextSecondary") };
-            Canvas.SetLeft(label, x);
-            Canvas.SetTop(label, y);
-            IncomeChartCanvas.Children.Add(label);
-            ChartMotion.FadeIn(label, 160);
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -1226,23 +903,7 @@ namespace MyClinic
             BtnTabExpenses.Style = _mainTab == MainTab.Expenses ? active : inactive;
             BtnTabVisits.Style = _mainTab == MainTab.Visits ? active : inactive;
             BtnTabTreatments.Style = _mainTab == MainTab.Treatments ? active : inactive;
-            BtnIncomeArea.Visibility = _mainTab == MainTab.Income ? Visibility.Visible : Visibility.Collapsed;
-            BtnIncomeColumns.Visibility = _mainTab == MainTab.Income ? Visibility.Visible : Visibility.Collapsed;
             // BtnExportPdf (combined report) is visible on every tab.
-        }
-
-        private void UpdateIncomeChartStyles()
-        {
-            bool isDark = IsDarkThemeActive();
-            Brush activeFg = HexBrush(isDark ? "#5EEAD4" : "#2250DF");
-            Brush activeBorder = HexBrush(isDark ? "#2DD4BF" : "#2250DF");
-            Brush inactiveFg = Application.Current.Resources["AppTextSecondary"] as Brush ?? Brushes.Gray;
-            Brush inactiveBorder = Application.Current.Resources["SettingsOutlineBtnBorder"] as Brush ?? Brushes.Gray;
-
-            BtnIncomeArea.Foreground = _incomeChartType == IncomeChartType.Area ? activeFg : inactiveFg;
-            BtnIncomeArea.BorderBrush = _incomeChartType == IncomeChartType.Area ? activeBorder : inactiveBorder;
-            BtnIncomeColumns.Foreground = _incomeChartType == IncomeChartType.Columns ? activeFg : inactiveFg;
-            BtnIncomeColumns.BorderBrush = _incomeChartType == IncomeChartType.Columns ? activeBorder : inactiveBorder;
         }
 
         private void UpdateSubTabStyles()

@@ -1,4 +1,4 @@
-<UserControl x:Class="MyClinic.OriginalTheme.StatisticsView"
+﻿<UserControl x:Class="MyClinic.OriginalTheme.StatisticsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:motion="clr-namespace:MyClinic"
@@ -185,8 +185,6 @@
                 <!-- Date navigation -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="BtnNow" Content="الآن" Style="{StaticResource NowBtn}" Margin="0,0,10,0" Click="BtnNow_Click"/>
-                    <Button x:Name="BtnIncomeArea" Content="منحني" Style="{StaticResource ExportBtn}" Margin="0,0,6,0" Click="BtnIncomeArea_Click"/>
-                    <Button x:Name="BtnIncomeColumns" Content="أعمدة" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnIncomeColumns_Click"/>
                     <!-- Single combined PDF report (income + expenses, expenses, treatments) for the selected period -->
                     <Button x:Name="BtnExportPdf" Content="تصدير التقرير PDF" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportPdf_Click"/>
                     <!-- forward (toward future) -->
@@ -222,88 +220,10 @@
 
         <!-- ══ Row 3 — Pie chart + legend ══ -->
         <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="24,24,24,24" FlowDirection="LeftToRight">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Total label above pie + pie canvas -->
-                <StackPanel motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="3" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" FlowDirection="RightToLeft">
-
-                    <!-- No data message -->
-                    <TextBlock x:Name="TblNoData"
-                               Text="لا توجد بيانات لهذه الفترة"
-                               FontSize="16"
-                               Foreground="{DynamicResource AppTextSecondary}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,16"
-                               Visibility="Collapsed"/>
-
-                    <!-- Pie canvas — FlowDirection LTR to avoid arc mirroring -->
-                    <Canvas x:Name="PieCanvas"
-                            Width="280" Height="280"
-                            FlowDirection="LeftToRight"
-                            HorizontalAlignment="Center"/>
-
-                    <!-- Total amount -->
-                    <TextBlock x:Name="TblTotal"
-                                           MaxWidth="360"
-                                           TextWrapping="Wrap"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource AppTextPrimary}"
-                               HorizontalAlignment="Center"
-                               Margin="0,16,0,0"
-                               TextAlignment="Center"/>
-
-                </StackPanel>
-
-                <!-- Income period chart -->
-                <Border motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="5" Grid.Row="2" Grid.Column="0"
-                        x:Name="IncomeChartPanel"
-                        Background="{DynamicResource AppCardBg}"
-                        BorderBrush="{DynamicResource AppBorder}"
-                        BorderThickness="1"
-                        CornerRadius="16"
-                        Padding="18,16"
-                        Margin="0,24,0,0"
-                        VerticalAlignment="Top"
-                        Visibility="Collapsed">
-                    <StackPanel FlowDirection="RightToLeft">
-                        <TextBlock x:Name="IncomeChartTitle" Text="الدخل حسب الفترة"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource AppTextPrimary}"
-                                   HorizontalAlignment="Right"
-                                   Margin="0,0,0,10"/>
-                        <Canvas x:Name="IncomeChartCanvas"
-                                Width="1100"
-                                Height="360"
-                                HorizontalAlignment="Center"
-                                ClipToBounds="True"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Legend -->
-                <Border motion:NavigationTransition.Motion="Card" motion:NavigationTransition.Order="4" Grid.Row="1" Grid.Column="0"
-                        Background="{DynamicResource AppCardBg}"
-                        BorderBrush="{DynamicResource AppBorder}"
-                        BorderThickness="1"
-                        CornerRadius="16"
-                        Padding="20,16"
-                        Margin="0,24,0,0"
-                        VerticalAlignment="Top"
-                        Width="360"
-                        HorizontalAlignment="Center">
-                    <StackPanel x:Name="LegendPanel" Orientation="Vertical" FlowDirection="RightToLeft"/>
-                </Border>
-
-            </Grid>
+            <StackPanel Margin="12,4,12,24">
+                <motion:StatisticsDashboard x:Name="AnalyticsDashboard"/>
+                <motion:StatisticsBreakdown x:Name="CategoryBreakdown"/>
+            </StackPanel>
         </ScrollViewer>
 
     </Grid>

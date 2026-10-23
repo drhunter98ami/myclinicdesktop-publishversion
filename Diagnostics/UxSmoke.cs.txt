@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
@@ -243,15 +243,19 @@ static class UxChecks
     static void Charts(Type type)
     {
         var view = (UserControl)Activator.CreateInstance(type)!;
-        var canvas = (Canvas)view.FindName("IncomeChartCanvas");
-        int year = (int)type.GetField("_selectedYear", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
-        int month = (int)type.GetField("_selectedMonth", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view)!;
-        var data = new List<Visit> { new() { VisitDate = new DateTime(year, month, 1), TodayPaid = 50 }, new() { VisitDate = new DateTime(year, month, DateTime.DaysInMonth(year, month)), TodayPaid = 123 } };
-        type.GetMethod("DrawIncomeChart", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(view, new object[] { data });
-        if (canvas.Parent is Viewbox box) box.Child = null;
-        else if (canvas.Parent is Panel panel) panel.Children.Remove(canvas);
-        else throw new Exception("Unexpected chart layout parent");
-        var window = Host(new Viewbox { Child = canvas }, 1200, 500);
+        var dashboard = (StatisticsDashboard)view.FindName("AnalyticsDashboard");
+        var assembly = typeof(StatisticsDashboard).Assembly;
+        var observation = assembly.GetType("MyClinic.StatisticsObservation")!;
+        var entries = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(observation))!;
+        entries.Add(Activator.CreateInstance(observation, new object[] { new DateTime(2026, 9, 1), 50d }));
+        entries.Add(Activator.CreateInstance(observation, new object[] { new DateTime(2026, 9, 30), 123d }));
+        var analytics = assembly.GetType("MyClinic.StatisticsAnalytics")!;
+        var period = Enum.Parse(assembly.GetType("MyClinic.StatisticsPeriod")!, "Month");
+        var data = analytics.GetMethod("Build")!.Invoke(null, new object[] { entries, new DateTime(2026, 9, 1), period, new DateTime(2026, 10, 23), "الدخل", true, false });
+        typeof(StatisticsDashboard).GetMethod("ShowData", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(dashboard, new[] { data });
+        ((Panel)dashboard.Parent).Children.Remove(dashboard);
+        var window = Host(dashboard, 1200, 800); Pump(200);
+        var canvas = (Canvas)typeof(StatisticsDashboard).GetField("_plot", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(dashboard)!;
         canvas.Focus();
         void Key(Key key) => canvas.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(canvas), 0, key) { RoutedEvent = Keyboard.KeyDownEvent });
         Key(System.Windows.Input.Key.End);

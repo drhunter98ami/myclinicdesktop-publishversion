@@ -1,0 +1,164 @@
+using System.Collections;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+using MyClinic;
+using MyClinic.Models;
+
+static class StatisticsChecks
+{
+    static int checks;
+    const BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic;
+    static readonly Assembly assembly = typeof(StatisticsDashboard).Assembly;
+    static readonly string output = System.IO.Path.GetFullPath("obj/StatisticsSmoke/previews");
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); checks++; }
+    static T Prop<T>(object target, string name) => (T)target.GetType().GetProperty(name)!.GetValue(target)!;
+    static T Field<T>(object target, string name) => (T)target.GetType().GetField(name, Hidden)!.GetValue(target)!;
+    static object? Call(object target, string method, params object?[] values) => target.GetType().GetMethod(method, Hidden)!.Invoke(target, values);
+    static object Analytics(DateTime start, string period, DateTime today, (DateTime Date, double Value)[] observations, bool money = true, string title = "المبالغ المحصلة")
+    {
+        var type = assembly.GetType("MyClinic.StatisticsObservation")!;
+        var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(type))!;
+        foreach (var observation in observations) list.Add(Activator.CreateInstance(type, observation.Date, observation.Value));
+        return assembly.GetType("MyClinic.StatisticsAnalytics")!.GetMethod("Build")!.Invoke(null,
+            new object[] { list, start, Enum.Parse(assembly.GetType("MyClinic.StatisticsPeriod")!, period), today, title, money, false })!;
+    }
+    static object[] Buckets(object data) => ((IEnumerable)data.GetType().GetProperty("Buckets")!.GetValue(data)!).Cast<object>().ToArray();
+    static void Calendar()
+    {
+        var partial = Analytics(new(2026, 10, 1), "Month", new(2026, 10, 23), new[]
+        {
+            (new DateTime(2026,10,1),100d), (new DateTime(2026,10,23),200d), (new DateTime(2026,10,24),900d),
+            (new DateTime(2026,9,1),50d), (new DateTime(2026,9,23),100d), (new DateTime(2026,9,24),500d)
+        });
+        Assert(Prop<double>(partial,"Total") == 300 && Prop<double>(partial,"PreviousTotal") == 150,"Partial months compare matching elapsed dates and exclude future observations");
+        Assert(Prop<int>(partial,"ElapsedDays") == 23 && Math.Abs(Prop<double>(partial,"Average") - 300d/23) < .001,"Daily averages include elapsed days without activity");
+        Assert(Prop<DateTime?>(partial,"PeakDate") == new DateTime(2026,10,23),"Peak day uses the daily aggregate");
+        Assert(Buckets(partial).Length == 31 && Prop<double?>(Buckets(partial)[23],"Value") == null,"Future buckets remain null");
+        var leap = Analytics(new(2024,1,1),"Year",new(2024,3,1),new[] { (new DateTime(2023,3,1),75d), (new DateTime(2023,3,2),900d) });
+        Assert(Prop<DateTime>(leap,"PreviousEnd") == new DateTime(2023,3,1) && Prop<double>(leap,"PreviousTotal") == 75,"Leap year comparison aligns month/day");
+        Assert(Prop<double?>(Buckets(leap)[2],"PreviousValue") == 75 && Prop<double?>(Buckets(leap)[3],"Value") == null,"Partial yearly bins exclude future months and previous future days");
+        var feb29 = Analytics(new(2024,1,1),"Year",new(2024,2,29),Array.Empty<(DateTime,double)>());
+        Assert(Prop<DateTime>(feb29,"PreviousEnd") == new DateTime(2023,2,28),"Leap day comparison clamps to the prior calendar month");
+        var completed = Analytics(new(2026,2,1),"Month",new(2026,3,2),new[] { (new DateTime(2026,1,31),99d) });
+        Assert(Prop<double>(completed,"PreviousTotal") == 99 && Buckets(completed).Length == 28,"Completed unequal months compare full totals");
+        var longMonth = Analytics(new(2026,3,1),"Month",new(2026,4,1),Array.Empty<(DateTime,double)>());
+        Assert(Prop<double?>(Buckets(longMonth)[30],"PreviousValue") == null,"Missing dates in shorter prior months are not invented zeros");
+        var future = Analytics(new(2026,11,1),"Month",new(2026,10,23),Array.Empty<(DateTime,double)>());
+        Assert(Prop<int>(future,"ElapsedDays") == 0 && Buckets(future).All(b=>Prop<double?>(b,"Value")==null),"Entire future periods stay blank");
+        var day = Analytics(new(2026,10,23),"Day",new(2026,10,23),new[] { (new DateTime(2026,10,23),10d), (new DateTime(2026,10,23,12,0,0),20d), (new DateTime(2026,10,22),15d) });
+        Assert(Prop<double>(day,"Total") == 30 && Prop<double>(day,"PreviousTotal") == 15,"Daily totals aggregate timestamps and compare the preceding day");
+    }
+    static void Pump(int ms = 100)
+    {
+        var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_,_)=> {timer.Stop(); frame.Continue=false;}; timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static IEnumerable<T> Find<T>(DependencyObject root) where T : DependencyObject
+    {
+        if(root is T t) yield return t;
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++) foreach(var child in Find<T>(VisualTreeHelper.GetChild(root,i))) yield return child;
+    }
+    static void Theme(bool dark)
+    {
+        string code=System.IO.File.ReadAllText("MainWindow.xaml.cs"); int first=code.IndexOf("res[\"AppWindowBg\"]",code.IndexOf("private void SetTheme(bool isDark)")); int second=code.IndexOf("res[\"AppWindowBg\"]",first+1);
+        string section=dark?code[first..second]:code[second..]; var res=Application.Current.Resources;
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\"")) res[m.Groups[1].Value]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value));
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateGradient\\(\"([^\"]+)\",\\s*\"([^\"]+)\"")) res[m.Groups[1].Value]=new LinearGradientBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value),(Color)ColorConverter.ConvertFromString(m.Groups[3].Value),45);
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*([0-9.]+);")) res[m.Groups[1].Value]=double.Parse(m.Groups[2].Value,System.Globalization.CultureInfo.InvariantCulture);
+    }
+    static Window Host(UIElement child,double width=1220,double height=1080)
+    {
+        var window=new Window { Content=new Border { Background=Application.Current.Resources["AppWindowBg"] as Brush, Padding=new Thickness(20), Child=child },Width=width,Height=height,Left=-12000,Top=-12000,ShowActivated=false,ShowInTaskbar=false };
+        window.Show(); Pump(); return window;
+    }
+    static void Capture(Window window,string name)
+    {
+        var root=(FrameworkElement)window.Content; var bitmap=new RenderTargetBitmap((int)root.ActualWidth,(int)root.ActualHeight,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
+        var png=new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(bitmap)); using var stream=System.IO.File.Create(System.IO.Path.Combine(output,name+".png")); png.Save(stream);
+    }
+    static void Visuals(bool dark)
+    {
+        Theme(dark);
+        var start=new DateTime(2026,10,1); var entries=Enumerable.Range(0,23).Select(i=>(start.AddDays(i), i%7==4?0d:120000d+(i*43183)%780000)).Concat(Enumerable.Range(0,30).Select(i=>(new DateTime(2026,9,1).AddDays(i),90000d+(i*52877)%500000))).ToArray();
+        var data=Analytics(start,"Month",new(2026,10,23),entries);
+        var dashboard=new StatisticsDashboard(); Call(dashboard,"ShowData",data);
+        var breakdown=new StatisticsBreakdown();
+        var category=assembly.GetType("MyClinic.StatisticsCategory")!; var list=(IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(category))!;
+        foreach(var item in new[] { ("حشوات تجميلية",4200000d,"#3B82F6"),("معالجة جذور",2800000d,"#14B8A6"),("تركيبات سنية",1700000d,"#8B5CF6"),("تنظيف الأسنان",800000d,"#F59E0B") }) list.Add(Activator.CreateInstance(category,item.Item1,item.Item2,item.Item3));
+        string? selected=null; Call(breakdown,"ShowData",list,true,new Action<string>(s=>selected=s));
+        var root=new StackPanel(); root.Children.Add(dashboard); root.Children.Add(breakdown);
+        var window=Host(new ScrollViewer { Content=root,VerticalScrollBarVisibility=ScrollBarVisibility.Auto }); Pump(250);
+        var canvas=Field<Canvas>(dashboard,"_plot"); Assert(double.IsNaN(canvas.Width)&&canvas.ActualWidth>900,"Chart uses measured width rather than a scaled fixed canvas");
+        Assert(Find<System.Windows.Shapes.Path>(canvas).Count()>=2,"Area chart includes both line and gradient fill");
+        Assert(canvas.Children.OfType<Line>().Count()>=5,"Chart includes readable gridlines and references");
+        Assert(Find<Polyline>(dashboard).Any(),"Summary includes a trend sparkline");
+        Assert(Find<TextBlock>(breakdown).Any(t=>t.Text=="9,500,000"),"Donut displays the total in its center");
+        var scroll = Find<ScrollViewer>((DependencyObject)window.Content).First();
+        scroll.ScrollToBottom(); Pump(); Capture(window,dark?"donut-dark":"donut-light"); scroll.ScrollToTop(); Pump();
+        canvas.Focus();
+        void Key(Key key)=>canvas.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(canvas),0,key) { RoutedEvent=Keyboard.KeyDownEvent });
+        Key(System.Windows.Input.Key.End); Assert(Regex.Replace(AutomationProperties.GetItemStatus(canvas), @"\p{Cf}", "").Contains("23/10/2026")&&AutomationProperties.GetItemStatus(canvas).Contains("السابق"),"Keyboard inspection stops at elapsed data and includes previous values: " + AutomationProperties.GetItemStatus(canvas));
+        var tip=canvas.Children.OfType<Border>().Last(); Assert(Canvas.GetLeft(tip)+tip.ActualWidth<=canvas.ActualWidth&&Canvas.GetTop(tip)>=0,"Tooltip stays within chart bounds");
+        Pump(); Capture(window,dark?"dashboard-dark":"dashboard-light"); Key(System.Windows.Input.Key.Escape); Assert(AutomationProperties.GetItemStatus(canvas)=="","Escape dismisses tooltip");
+        Field<CheckBox>(dashboard,"_compare").IsChecked=false; Pump(); canvas.Focus(); Key(System.Windows.Input.Key.Home); Assert(!AutomationProperties.GetItemStatus(canvas).Contains("السابق"),"Comparison toggle updates tooltip content");
+        Field<Button>(dashboard,"_bars").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(); Assert(canvas.Children.OfType<Rectangle>().Any(),"Bar view renders nonzero values");
+        Field<Button>(breakdown,"_rankButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(); Assert(Field<StackPanel>(breakdown,"_ranking").Visibility==Visibility.Visible,"Ranked horizontal bars are selectable");
+        var rank=Field<StackPanel>(breakdown,"_ranking").Children.OfType<StackPanel>().First();
+        rank.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,0,MouseButton.Left){ RoutedEvent=UIElement.MouseLeftButtonUpEvent }); Assert(selected=="حشوات تجميلية","Expense drill-down remains available in ranked view");
+        Capture(window,dark?"bars-ranked-dark":"bars-ranked-light");
+        scroll.ScrollToBottom(); Pump(); Capture(window,dark?"ranked-detail-dark":"ranked-detail-light"); scroll.ScrollToTop(); Pump();
+        window.Width=760; Pump(180); Assert(canvas.ActualWidth<700&&canvas.ActualWidth>500,"Chart adapts to compact width");
+        Assert(Field<Grid>(dashboard,"_cards").ColumnDefinitions.Count==2,"Summary cards wrap into two columns"); Capture(window,dark?"compact-dark":"compact-light");
+        Call(dashboard,"ShowData",Analytics(new(2026,11,1),"Month",new(2026,10,23),Array.Empty<(DateTime,double)>())); Pump(); Assert(!canvas.Children.OfType<Ellipse>().Any(e=>e.Visibility==Visibility.Visible),"Future period has no fabricated current markers");
+        Call(dashboard,"ShowData",Analytics(start,"Month",new(2026,10,23),Array.Empty<(DateTime,double)>(),false,"الزيارات")); Pump(); canvas.Focus(); Key(System.Windows.Input.Key.Home); Assert(!AutomationProperties.GetItemStatus(canvas).Contains("ل.س"),"Count charts do not display currency");
+        MotionPreferences.Set(MotionLevel.Full,false);
+        Call(dashboard,"ShowData",data); Pump(80);
+        var changed=Analytics(start,"Month",new(2026,10,23),new[]{(start,50d)});
+        Call(dashboard,"ShowData",changed); Pump(80);
+        Assert(!MotionPreferences.Enabled || Field<TextBlock[]>(dashboard,"_values")[0].HasAnimatedProperties,"Summary transitions animate when motion is enabled");
+        Pump(900); Assert(Field<TextBlock[]>(dashboard,"_values")[0].Text.Contains("50"),"Animated summary settles on the exact new total");
+        MotionPreferences.Set(MotionLevel.Off,false); Call(dashboard,"ShowData",data); Pump();
+        Assert(!canvas.Children.OfType<Rectangle>().Any(b=>b.HasAnimatedProperties),"Motion off renders resting bar values immediately");
+        Call(dashboard,"ShowError"); Assert(Find<TextBlock>(dashboard).Any(t=>t.Text.Contains("تعذر")),"Loading failure replaces stale chart data"); window.Close();
+    }
+    static void Integration(Type type)
+    {
+        // Instantiate but never host the parent view: its database-loading events cannot fire.
+        var view=(UserControl)Activator.CreateInstance(type)!;
+        Assert(view.FindName("AnalyticsDashboard") is StatisticsDashboard && view.FindName("CategoryBreakdown") is StatisticsBreakdown,"Both interface styles use the shared analytics controls");
+        var visits=new List<Visit>{new(){ VisitDate=new(2026,10,1),TodayPaid=100,SelectedTreatmentsJson="[{\"TreatmentName\":\"تنظيف\",\"Quantity\":2}]" }};
+        foreach(string tab in new[]{"Income","Expenses","Visits","Treatments"})
+        {
+            type.GetField("_mainTab",Hidden)!.SetValue(view,Enum.Parse(type.GetNestedType("MainTab",BindingFlags.NonPublic)!,tab));
+            switch(tab)
+            {
+                case "Income": Call(view,"ShowIncome",visits,visits,new List<string>{"تنظيف"}); break;
+                case "Expenses": Call(view,"ShowExpenses",new List<ExpenseEntry>{new(){Amount=50,Description="أخرى"}}); break;
+                case "Visits": Call(view,"ShowVisits",visits); break;
+                default: Call(view,"ShowTreatments",visits,new List<string>{"تنظيف"}); break;
+            }
+            Assert(((StatisticsBreakdown)view.FindName("CategoryBreakdown")).Visibility==Visibility.Visible,$"{type.Namespace} {tab} breakdown renders");
+        }
+    }
+    [STAThread] static int Main()
+    {
+        var motion=MotionPreferences.Current;
+        try
+        {
+            System.IO.Directory.CreateDirectory(output); var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source=new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml") });
+            MotionPreferences.Set(MotionLevel.Off,false); Calendar(); Visuals(false); Visuals(true);
+            Integration(typeof(MyClinic.StatisticsView)); Integration(typeof(MyClinic.OriginalTheme.StatisticsView));
+            MotionPreferences.Set(motion,false); app.Shutdown(); Console.WriteLine($"PASS: {checks} statistics assertions. Synthetic previews: {output}"); return 0;
+        }
+        catch(Exception ex) { Console.Error.WriteLine(ex); MotionPreferences.Set(motion,false); return 1; }
+    }
+}
