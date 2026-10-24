@@ -27,7 +27,7 @@ namespace MyClinic.Services
         private static readonly HttpClient HttpClient = CreateHttpClient();
 
         public static Version CurrentVersion =>
-            Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(2, 0, 0);
+            Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(3, 0, 0);
 
         public static async Task<UpdateInfo?> GetLatestUpdateAsync(CancellationToken cancellationToken = default)
         {

@@ -1,5 +1,5 @@
 #define MyAppName "My Clinic"
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "3.0.0"
 #define MyAppPublisher "Dr. Ahmed Khalif"
 #define MyAppExeName "MyClinic.exe"
 ; Notice the path is updated to match your .NET 9 Windows target framework

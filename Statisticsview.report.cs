@@ -21,8 +21,7 @@ namespace MyClinic
     /// <summary>
     /// One combined PDF report for the selected day / month / year:
     ///   1) الدخل والمصاريف   2) المصاريف   3) العلاجات
-    /// Every page is drawn on a WPF Canvas (A4 portrait, 1240x1754 px), rendered to JPEG and
-    /// wrapped into a PDF by BuildImagePdf (no third-party libraries).
+    /// A4 pages retain selectable Arabic text, embedded fonts and vector charts.
     /// </summary>
     public partial class StatisticsView
     {
@@ -54,6 +53,8 @@ namespace MyClinic
             public List<Visit> Visits = new();         // "registered" visits (cost != 0 or paid > 0)
             public List<ExpenseEntry> Expenses = new();
             public List<string> KnownTreatments = new();
+            public List<ExpenseEntry> ComparisonExpenses = new();
+            public DateTime CreatedAt = AppClock.Now;
         }
 
         private sealed class ReportDoc
@@ -62,13 +63,20 @@ namespace MyClinic
             public Canvas C = null!;
             public double Y;
             public string Footer = "";
+            public string Section = "";
+            public DateTime CreatedAt;
 
             public void NewPage(string? footer = null)
             {
                 if (footer != null) Footer = footer;
                 C = new Canvas { Width = PgW, Height = PgH, Background = Brushes.White, FlowDirection = FlowDirection.LeftToRight };
                 Pages.Add((C, Footer));
-                Y = 70;
+                Y = 100;
+                if (footer == null)
+                {
+                    Txt(C, Footer, PgR, 36, 20, CNavy, true);
+                    HLine(C, PgM, PgR, 76, CBorder);
+                }
             }
 
             public void Ensure(double h)
@@ -83,6 +91,8 @@ namespace MyClinic
 
         private async void BtnExportPdf_Click(object sender, RoutedEventArgs e)
         {
+            if (!IsEnabled) return;
+            IsEnabled = false; // Keep period selection stable while loading the export snapshot.
             try
             {
                 ReportData data = await LoadReportDataAsync();
@@ -114,6 +124,7 @@ namespace MyClinic
             {
                 MessageBox.Show($"تعذر تصدير التقرير حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally { IsEnabled = true; }
         }
 
         private async Task<ReportData> LoadReportDataAsync()
@@ -121,8 +132,11 @@ namespace MyClinic
             var data = new ReportData();
             using (var ctx = new AppDbContext())
             {
+                DateTime previousStart = StatisticsAnalytics.PreviousPeriodStart(SelectedPeriodStart(), ReportPeriod());
+                DateTime exclusiveEnd = SelectedPeriodEnd().AddDays(1);
                 data.AllVisits = await ctx.Visits.AsNoTracking().ToListAsync();
-                data.Expenses = await ApplyDateFilterExpenses(ctx.Expenses.AsNoTracking().AsQueryable())
+                data.ComparisonExpenses = await ctx.Expenses.AsNoTracking()
+                    .Where(x => x.ExpenseDate >= previousStart && x.ExpenseDate < exclusiveEnd)
                     .OrderBy(x => x.ExpenseDate)
                     .ToListAsync();
                 data.KnownTreatments = (await ctx.TreatmentCosts
@@ -134,42 +148,89 @@ namespace MyClinic
                     .ToList();
             }
 
-            data.PeriodVisits = data.AllVisits.Where(IsInSelectedPeriod).OrderBy(v => v.VisitDate).ThenBy(v => v.Id).ToList();
+            data.Expenses = data.ComparisonExpenses.Where(x => x.ExpenseDate.Date >= SelectedPeriodStart()
+                && x.ExpenseDate.Date <= SelectedPeriodEnd() && x.ExpenseDate.Date <= data.CreatedAt.Date).ToList();
+            data.PeriodVisits = data.AllVisits.Where(v => IsInSelectedPeriod(v) && v.VisitDate.Date <= data.CreatedAt.Date)
+                .OrderBy(v => v.VisitDate).ThenBy(v => v.Id).ToList();
             data.Visits = data.PeriodVisits.Where(v => v.CurrentCost != 0 || v.TodayPaid > 0).ToList();
             return data;
         }
 
         private byte[] BuildReportPdf(ReportData data)
         {
-            var doc = new ReportDoc();
+            var doc = new ReportDoc { CreatedAt = data.CreatedAt };
+            BuildOverview(doc, data);
             BuildIncomeSection(doc, data);
             BuildExpensesSection(doc, data);
             BuildTreatmentsSection(doc, data);
 
-            List<byte[]> images = new();
             int total = doc.Pages.Count;
             for (int i = 0; i < total; i++)
             {
                 Canvas page = doc.Pages[i].Canvas;
-                Txt(page, $"{doc.Pages[i].Footer} — صفحة {i + 1} من {total}", PgW / 2, PgH - 72, 15, CMuted, false, Anchor.Center);
-                images.Add(RenderPageJpeg(page));
+                HLine(page, PgM, PgR, PgH - 92, CBorder);
+                Txt(page, $"{doc.Pages[i].Footer} · صفحة {i + 1} من {total}", PgW / 2, PgH - 72, 18, CMuted, false, Anchor.Center);
             }
-            return BuildImagePdf(images);
+            return StatisticsPdfWriter.Build(doc.Pages.Select(p => p.Canvas).ToList(), $"عيادتي - التقرير الإحصائي - {CurrentPeriodLabel()}");
         }
 
-        private static byte[] RenderPageJpeg(Canvas page)
+        private StatisticsPeriod ReportPeriod() => _subTab switch
         {
-            page.Measure(new Size(PgW, PgH));
-            page.Arrange(new Rect(0, 0, PgW, PgH));
-            page.UpdateLayout();
+            SubTab.Daily => StatisticsPeriod.Day,
+            SubTab.Yearly => StatisticsPeriod.Year,
+            _ => StatisticsPeriod.Month
+        };
 
-            RenderTargetBitmap bitmap = new((int)PgW, (int)PgH, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(page);
-            JpegBitmapEncoder encoder = new() { QualityLevel = 92 };
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using MemoryStream stream = new();
-            encoder.Save(stream);
-            return stream.ToArray();
+        private void BuildOverview(ReportDoc d, ReportData r)
+        {
+            ReportBanner(d, "نظرة عامة على أداء العيادة", PeriodHeaderLine(), $"نظرة عامة · {CurrentPeriodLabel()}");
+            double income = r.Visits.Sum(v => v.TodayPaid), expense = r.Expenses.Sum(x => x.Amount), net = income - expense;
+            int count = r.PeriodVisits.Sum(v => ParseTreatments(v.SelectedTreatmentsJson).Sum(t => Math.Max(1, t.Quantity)));
+            KpiRow(d,
+                new Kpi("المبالغ المحصلة (ل.س)", Num(income), "الدفعات المستلمة خلال الفترة", CTeal, CTeal),
+                new Kpi("المصاريف (ل.س)", Num(expense), $"{r.Expenses.Count} عملية", CRed, CRed),
+                new Kpi("صافي التحصيل (ل.س)", Num(net), "المحصّل ناقص المصاريف", net < 0 ? CRed : CNavy, CNavy),
+                new Kpi("العلاجات المنفذة", Num(count), "الكمية المسجلة خلال الفترة", CNavy, CBlue));
+            string chartTitle = _subTab switch
+            {
+                SubTab.Daily => "المبالغ المحصلة والمصاريف حسب الساعة",
+                SubTab.Yearly => "المبالغ المحصلة والمصاريف الشهرية",
+                _ => "المبالغ المحصلة والمصاريف اليومية"
+            };
+            ChartPanel(d, chartTitle, 260, (c, x, y, w, h) => DrawGroupedBars(c, x, y, w, h, BuildBuckets(r)));
+
+            StatisticsAnalytics Analyze(IEnumerable<StatisticsObservation> observations) => StatisticsAnalytics.Build(
+                observations, SelectedPeriodStart(), ReportPeriod(), r.CreatedAt.Date, "", true);
+            var collected = Analyze(r.AllVisits.Select(v => new StatisticsObservation(v.VisitDate, v.TodayPaid)));
+            var spent = Analyze(r.ComparisonExpenses.Select(e => new StatisticsObservation(e.ExpenseDate, e.Amount)));
+            var treatments = Analyze(r.AllVisits.Select(v => new StatisticsObservation(v.VisitDate,
+                ParseTreatments(v.SelectedTreatmentsJson).Sum(t => Math.Max(1, t.Quantity)))));
+            SectionTitle(d, "المقارنة مع الفترة السابقة");
+            string Change(double current, double previous) => previous == 0 ? current == 0 ? "لا تغيير" : "لا توجد قاعدة"
+                : $"{(current > previous ? "زيادة" : current < previous ? "انخفاض" : "لا تغيير")} {Pct(Math.Abs(current - previous) / Math.Abs(previous) * 100)}";
+            var comparisons = new List<string[]>
+            {
+                new[] { "المبالغ المحصلة (ل.س)", Num(income), Num(collected.PreviousTotal), Change(income, collected.PreviousTotal) },
+                new[] { "المصاريف (ل.س)", Num(expense), Num(spent.PreviousTotal), Change(expense, spent.PreviousTotal) },
+                new[] { "صافي التحصيل (ل.س)", Num(net), Num(collected.PreviousTotal - spent.PreviousTotal), Change(net, collected.PreviousTotal - spent.PreviousTotal) },
+                new[] { "العلاجات المنفذة", Num(count), Num(treatments.PreviousTotal), Change(count, treatments.PreviousTotal) }
+            };
+            Table(d, new[] { "المؤشر", "الحالي", "السابق", "التغير" }, new[] { .36, .20, .20, .24 }, "RCCC",
+                new[] { CNavy, CNavy, CMuted, CNavy }, comparisons, false);
+            string Range(DateTime start, DateTime end) => $"{start:dd/MM/yyyy} - {end:dd/MM/yyyy}";
+            string cutoff = r.CreatedAt.Date < SelectedPeriodStart() ? "الفترة المختارة مستقبلية؛ لا توجد نتائج فعلية للمقارنة."
+                : $"الحالي: {Range(SelectedPeriodStart(), r.CreatedAt.Date < SelectedPeriodEnd() ? r.CreatedAt.Date : SelectedPeriodEnd())}؛ السابق: {Range(collected.PreviousStart, collected.PreviousEnd)}.";
+            d.Y += Para(d.C, cutoff, PgR, d.Y, PgCW, 19, CMuted) + 16;
+            SectionTitle(d, "أبرز النتائج");
+            var notes = new List<string>
+            {
+                $"المحصّل {Money(income)}، والمصاريف {Money(expense)}، وصافي التحصيل {Money(net)}."
+            };
+            CatInfo? topExpense = BuildExpenseCategories(r.Expenses).FirstOrDefault(c => c.Rows.Count > 0);
+            if (topExpense != null) notes.Add($"أكبر فئة مصاريف: {topExpense.Label} بقيمة {Money(topExpense.Total)}.");
+            notes.Add($"نُفذ {count} علاجاً؛ ويتضمن التقرير التالي جميع الرسوم والتفاصيل والجداول.");
+            Bullets(d, notes);
+            d.Y += Para(d.C, "أساس التقرير: الدفعات المحصلة والمصاريف المسجلة، وليس الربح المحاسبي. قد تسدد الدفعات علاجات من فترات سابقة. جميع المبالغ بالليرة السورية.", PgR, d.Y, PgCW, 19, CMuted);
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -179,7 +240,7 @@ namespace MyClinic
         private void BuildIncomeSection(ReportDoc d, ReportData r)
         {
             string footer = $"تقرير الدخل والمصاريف · {CurrentPeriodLabel()}";
-            ReportBanner(d, "ملخص الدخل والمصاريف", PeriodHeaderLine(), footer);
+            ReportBanner(d, "تفاصيل التحصيل والمصاريف", PeriodHeaderLine(), footer);
 
             double income = r.Visits.Sum(v => v.TodayPaid);
             double expenses = r.Expenses.Sum(x => x.Amount);
@@ -191,19 +252,11 @@ namespace MyClinic
             List<CatInfo> cats = BuildExpenseCategories(r.Expenses);
 
             KpiRow(d,
-                new Kpi("إجمالي الدخل", Num(income), $"{paidCount} زيارة مدفوعة", CTeal, CTeal),
-                new Kpi("إجمالي المصاريف", Num(expenses), $"{r.Expenses.Count} بند مصروف", CRed, CRed),
-                new Kpi("صافي الربح", Num(net), $"هامش الربح {Pct(margin)}", net < 0 ? CRed : CNavy, CNavy),
-                new Kpi("متوسط الزيارة", Num(avgVisit), $"من {r.Visits.Count} زيارة مسجلة", CNavy, CAmber));
-
-            string chartTitle = _subTab switch
-            {
-                SubTab.Daily => "الدخل والمصاريف حسب الساعة",
-                SubTab.Yearly => "الدخل والمصاريف الشهرية",
-                _ => "الدخل والمصاريف اليومية"
-            };
-            ChartPanel(d, chartTitle, 340, (c, x, y, w, h) => DrawGroupedBars(c, x, y, w, h, buckets));
-            ChartPanel(d, "صافي الربح التراكمي", 340, (c, x, y, w, h) => DrawCumulative(c, x, y, w, h, buckets));
+                new Kpi("المبالغ المحصلة (ل.س)", Num(income), $"{paidCount} زيارة مدفوعة", CTeal, CTeal),
+                new Kpi("المصاريف (ل.س)", Num(expenses), $"{r.Expenses.Count} بند مصروف", CRed, CRed),
+                new Kpi("صافي التحصيل (ل.س)", Num(net), income > 0 ? $"نسبته من المحصّل {Pct(margin)}" : "النسبة غير متاحة", net < 0 ? CRed : CNavy, CNavy),
+                new Kpi("متوسط الدفعة (ل.س)", Num(avgVisit), $"المحصّل ÷ {paidCount} زيارة مدفوعة", CNavy, CAmber));
+            ChartPanel(d, "صافي التحصيل التراكمي", 340, (c, x, y, w, h) => DrawCumulative(c, x, y, w, h, buckets));
 
             // Expense distribution (donut) + visit-amount distribution (bars)
             var donutItems = cats.Where(ct => ct.Rows.Count > 0)
@@ -219,7 +272,7 @@ namespace MyClinic
             // Key findings
             var findings = new List<string>
             {
-                $"بلغ إجمالي الدخل {Num(income)} مقابل مصاريف {Num(expenses)}، وبذلك حقق {PeriodWord()} {(net >= 0 ? "صافي ربح" : "صافي خسارة")} قدره {Num(Math.Abs(net))} (هامش {Pct(margin)})."
+                $"بلغ المحصّل {Money(income)} مقابل مصاريف {Money(expenses)}؛ صافي التحصيل {Money(net)}."
             };
             if (_subTab != SubTab.Daily && buckets.Any(b => b.Income > 0))
             {
@@ -310,11 +363,13 @@ namespace MyClinic
             {
                 var rows = detailItems.Select(it => new[]
                 {
-                    it.Date.ToString("dd/MM HH:mm", Inv), it.Type, TruncateExport(it.Desc, 58), it.Cat, Num(it.Amount)
+                    it.Date.ToString("dd/MM/yyyy HH:mm", Inv), it.Type, it.Desc, it.Cat, Num(it.Amount)
                 }).ToList();
-                rows.Add(new[] { "", "", "الإجمالي (دخل + مصاريف)", "", Num(detailItems.Sum(it => it.Amount)) });
-                Table(d, new[] { "التاريخ", "النوع", "الوصف", "التصنيف", "المبلغ" }, new[] { .17, .10, .37, .16, .20 }, "RCRCC",
-                      new[] { CNavy, "type", CNavy, CMuted, CNavy }, rows, true);
+                Table(d, new[] { "التاريخ", "النوع", "الوصف", "التصنيف", "المبلغ (ل.س)" }, new[] { .20, .09, .36, .15, .20 }, "RCRCC",
+                      new[] { CNavy, "type", CNavy, CMuted, CNavy }, rows, false);
+                SectionTitle(d, "إجماليات الحركة المالية");
+                Table(d, new[] { "البند", "المبلغ (ل.س)" }, new[] { .70, .30 }, "RC", new[] { CNavy, "sign" },
+                    new List<string[]> { new[] { "إجمالي المبالغ المحصلة", Num(income) }, new[] { "إجمالي المصاريف", Num(expenses) }, new[] { "صافي التحصيل (المحصّل - المصاريف)", Num(net) } }, true);
             }
         }
 
