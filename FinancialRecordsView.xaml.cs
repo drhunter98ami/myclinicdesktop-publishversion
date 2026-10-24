@@ -1,1482 +1,331 @@
 using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
-using System.Linq;
-using System.Text.Json;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
-namespace MyClinic
+namespace MyClinic;
+
+public partial class FinancialRecordsView : UserControl
 {
-    public partial class FinancialRecordsView : UserControl
+    private bool _initialized, _updating, _hasLoadedData, _refreshRequested = true, _busy;
+    private Task? _refreshTask;
+    private bool _loadError;
+    private FinancePeriod _period = FinancePeriod.Month;
+    private FinanceDateRange _range;
+    private List<Patient> _patients = new();
+    private List<Visit> _visits = new();
+    private List<ExpenseEntry> _expenses = new();
+    private List<UpcomingPayment> _upcoming = new();
+    private List<FinanceAccount> _accounts = new();
+    private List<FinanceVisitRow> _rows = new();
+    private List<FinanceUpcomingRow> _filteredUpcoming = new();
+    private int _upcomingPage;
+    private const int UpcomingPageSize = 50;
+    private FinanceAccount? _selectedAccount;
+    private int? _expenseEditId, _upcomingEditId;
+    private TaskCompletionSource<bool>? _confirmation;
+    private IInputElement? _confirmationFocus, _patientReturnFocus;
+    private readonly DispatcherTimer _searchDelay = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private Border? _rangeIndicator;
+    private Grid? _rangeHost;
+
+    public FinancialRecordsView()
     {
-        private readonly BulkObservableCollection<IncomeRowModel> _incomeRows = new();
-        private readonly BulkObservableCollection<ExpenseRowModel> _expenseRows = new();
-        private readonly BulkObservableCollection<UpcomingPaymentRowModel> _upcomingPayments = new();
-        
-        private readonly BulkObservableCollection<PatientSuggestionModel> _patientSuggestions = new();
-        private readonly BulkObservableCollection<PatientHistoryModel> _patientHistory = new();
-        private readonly BulkObservableCollection<UnpaidAccountModel> _unpaidAccounts = new();
-        
-        private readonly List<VisitFinanceSnapshot> _allVisits = new();
-        private readonly List<ExpenseSnapshot> _allExpenses = new();
-
-        private FinancialRangeMode _rangeMode = FinancialRangeMode.Month;
-        private bool _refreshRequested = true;
-        private bool _hasLoadedData;
-
-        // Tracks the patient currently opened in the search overlay
-        private int? _selectedPatientSearchId; 
-
-        public FinancialRecordsView()
+        InitializeComponent();
+        _updating = true;
+        CmbExpenseCategory.ItemsSource = CmbUpcomingCategory.ItemsSource = ExpenseCategories.Labels;
+        CategoryFilter.ItemsSource = new[] { "كل الفئات" }.Concat(ExpenseCategories.Labels).ToList();
+        CategoryFilter.SelectedIndex = UpcomingStatusFilter.SelectedIndex = AccountAgeFilter.SelectedIndex = CmbUnpaidSort.SelectedIndex = 0;
+        DpFilterDate.SelectedDate = DpFilterEnd.SelectedDate = DpExpenseDate.SelectedDate = DpPaymentDate.SelectedDate = AppClock.Today;
+        _range = FinanceDateRange.For(_period, AppClock.Today);
+        _searchDelay.Tick += (_, _) => { _searchDelay.Stop(); UpdateSuggestions(); };
+        _updating = false; _initialized = true;
+        ConfigureFinancePalette(false, false);
+        Loaded += FinancialRecordsView_Loaded; Unloaded += FinancialRecordsView_Unloaded;
+        IsVisibleChanged += FinancialRecordsView_IsVisibleChanged;
+        foreach (DatePicker date in new[] { DpFilterDate, DpFilterEnd, DpExpenseDate, DpPaymentDate, DpUpcomingDue })
+            date.DateValidationError += (_, e) => { e.ThrowException = false; ShowStatus("أدخل تاريخاً صحيحاً أو اختره من التقويم.", true); };
+        ApplyFilters();
+    }
+    private void FinancialRecordsView_Loaded(object sender, RoutedEventArgs e)
+    {
+        GlobalEvents.OnFinancialRecordAdded -= FinancialChanged; GlobalEvents.OnFinancialRecordAdded += FinancialChanged;
+        GlobalEvents.OnPatientRecordAdded -= FinancialChanged; GlobalEvents.OnPatientRecordAdded += FinancialChanged;
+        MotionPreferences.Changed -= MotionChanged; MotionPreferences.Changed += MotionChanged;
+        GlobalEvents.OnThemeChanged -= FinanceThemeChanged; GlobalEvents.OnThemeChanged += FinanceThemeChanged;
+        bool original = Window.GetWindow(this) is OriginalTheme.MainWindow;
+        bool dark = (TryFindResource("AppTextPrimary") as SolidColorBrush)?.Color.R > 180;
+        ConfigureFinancePalette(original, dark);
+        InstallRangeIndicator(); UpdateRangeButtons(); RefreshFinancialData();
+    }
+    private void FinancialRecordsView_Unloaded(object sender, RoutedEventArgs e)
+    {
+        GlobalEvents.OnFinancialRecordAdded -= FinancialChanged; GlobalEvents.OnPatientRecordAdded -= FinancialChanged;
+        MotionPreferences.Changed -= MotionChanged; _searchDelay.Stop(); FinishConfirmation(false);
+        GlobalEvents.OnThemeChanged -= FinanceThemeChanged;
+    }
+    private void FinancialRecordsView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    { if (IsVisible && _initialized) RefreshFinancialData(); }
+    private void FinancialChanged() => Dispatcher.Invoke(() => { RequestRefresh(); if (IsVisible) _ = EnsureDataCurrentAsync(); });
+    private void MotionChanged(object? sender, EventArgs e)
+    {
+        LoadingProgress.IsIndeterminate = MotionPreferences.Enabled;
+        if (MotionPreferences.Enabled) return;
+        FinanceMotion.StopTree(this);
+        foreach (var label in new[] { TxtTotalIncome, TxtTotalExpenses, TxtNetAmount }) AnimatedNumber.Cancel(label);
+    }
+    private void FinanceThemeChanged(bool dark) => ConfigureFinancePalette(Window.GetWindow(this) is OriginalTheme.MainWindow, dark);
+    private void ConfigureFinancePalette(bool original, bool dark)
+    {
+        SolidColorBrush Brush(string color) => new((Color)ColorConverter.ConvertFromString(color));
+        Resources["FinancePositive"] = Brush(dark ? "#5EEAD4" : "#087666");
+        Resources["FinanceNegative"] = Brush(dark ? "#E35D64" : "#991B1B");
+        Resources["FinanceWarning"] = Brush(dark ? "#FCD34D" : "#8A5800");
+        if (!original) return;
+        Resources["AppTextSecondary"] = Brush(dark ? "#B0BDCE" : "#52627A");
+        Resources["AppSidebarHoverBg"] = Brush(dark ? "#243449" : "#E8F2F1");
+        foreach (var (key, source) in new[] { ("SettingsCardBg", "AppCardBg"), ("SettingsCardBorder", "AppBorder"),
+            ("SettingsInputBg", "AppInputBg"), ("SettingsInputBorder", "AppBorder"), ("SettingsTableContainerBg", "AppInputBg"),
+            ("SettingsTableRowBorder", "AppBorder"), ("SettingsOutlineBtnBg", "AppCardBg"), ("SettingsOutlineBtnBorder", "AppBorder") })
+            Resources[key] = TryFindResource(source) ?? (dark ? Brushes.DarkSlateGray : Brushes.White);
+        Resources["DashCalendarTodayNumFg"] = Brush(dark ? "#5EEAD4" : "#0F766E");
+        Resources["DashCalendarTodayBorder"] = Resources["DashCalendarTodayNumFg"];
+        Resources["DashActiveFilterBg"] = Brush("#0F766E");
+        Resources["SettingsPrimaryBtnBg"] = Brush("#0F766E");
+        Resources["SettingsDeleteBtnBorder"] = Resources["FinanceNegative"];
+    }
+    public void RefreshDateForAppTimeChange(DateTime previousAppTime)
+    {
+        if (DpFilterDate.SelectedDate?.Date == previousAppTime.Date) DpFilterDate.SelectedDate = AppClock.Today;
+        DpExpenseDate.SelectedDate = DpPaymentDate.SelectedDate = AppClock.Today; RefreshFinancialData();
+    }
+    public void RequestRefresh() => _refreshRequested = true;
+    public async Task FocusExpenseAsync(int id)
+    {
+        RequestRefresh(); await EnsureDataCurrentAsync();
+        var expense = _expenses.FirstOrDefault(e => e.Id == id);
+        if (expense == null) { ShowStatus("لم يعد المصروف المرتبط موجوداً.", true); return; }
+        _updating = true; WorkspaceSearch.Clear(); CategoryFilter.SelectedIndex = 0;
+        _period = FinancePeriod.Day; DpFilterDate.SelectedDate = expense.ExpenseDate.Date;
+        FinanceTabs.SelectedIndex = 1; _updating = false; ApplyFilters();
+        var row = ExpenseItemsControl.Items.OfType<FinanceExpenseRow>().FirstOrDefault(e => e.Id == id);
+        if (row != null) { ExpenseItemsControl.SelectedItem = row; ExpenseItemsControl.ScrollIntoView(row); FinanceMotion.Highlight(ExpenseItemsControl, id); }
+    }
+    public async void RefreshFinancialData() { RequestRefresh(); await EnsureDataCurrentAsync(); }
+    public Task EnsureDataCurrentAsync()
+    {
+        if (_refreshTask != null) return _refreshTask;
+        if (!_refreshRequested && _hasLoadedData) return Task.CompletedTask;
+        return _refreshTask = RefreshPendingAsync();
+    }
+    private async Task RefreshPendingAsync()
+    {
+        await Task.Yield();
+        try { do { _refreshRequested = false; await RefreshDataAsync(); } while (_refreshRequested && IsVisible); }
+        finally { _refreshTask = null; }
+    }
+    private async Task RefreshDataAsync()
+    {
+        LoadingProgress.IsIndeterminate = MotionPreferences.Enabled;
+        if (!_hasLoadedData) LoadingOverlay.Visibility = Visibility.Visible; else ShowStatus("جارٍ تحديث البيانات…");
+        try
         {
-            InitializeComponent();
-
-            foreach (string category in ExpenseCategories.Labels)
+            var data = await Task.Run(async () =>
             {
-                CmbExpenseCategory.Items.Add(category);
-                CmbUpcomingCategory.Items.Add(category);
-            }
-
-            IncomeItemsControl.ItemsSource = _incomeRows;
-            ExpenseItemsControl.ItemsSource = _expenseRows;
-            UpcomingItemsControl.ItemsSource = _upcomingPayments;
-            
-            LstPatientSuggestions.ItemsSource = _patientSuggestions;
-            PatientHistoryItemsControl.ItemsSource = _patientHistory;
-            UnpaidItemsControl.ItemsSource = _unpaidAccounts;
-
-            DpFilterDate.SelectedDate = GetSyrianTime().Date;
-
-            SetRangeMode(FinancialRangeMode.Month);
-            
-            this.Loaded += FinancialRecordsView_Loaded;
-            this.Unloaded += FinancialRecordsView_Unloaded;
-            this.IsVisibleChanged += FinancialRecordsView_IsVisibleChanged;
-        }
-
-        private static DateTime GetSyrianTime()
-        {
-            return AppClock.Now;
-        }
-
-        public void RefreshDateForAppTimeChange(DateTime previousAppTime)
-        {
-            if (DpFilterDate.SelectedDate?.Date == previousAppTime.Date)
-                DpFilterDate.SelectedDate = AppClock.Today;
-
-            RefreshFinancialData();
-        }
-
-        private void FinancialRecordsView_Loaded(object sender, RoutedEventArgs e)
-        {
-            GlobalEvents.OnFinancialRecordAdded -= GlobalEvents_OnFinancialRecordAdded;
-            GlobalEvents.OnFinancialRecordAdded += GlobalEvents_OnFinancialRecordAdded;
-            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
-            GlobalEvents.OnThemeChanged += HandleThemeChanged;
-            ApplyThemeVisuals(IsDarkThemeActive());
-            SetRangeMode(_rangeMode);
-            RefreshFinancialData();
-        }
-
-        private bool IsDarkThemeActive()
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                return mainWindow.IsDarkTheme;
-            if (Application.Current?.MainWindow is MainWindow appMainWindow)
-                return appMainWindow.IsDarkTheme;
-            return false;
-        }
-
-        private void HandleThemeChanged(bool isDark)
-        {
-            ApplyThemeVisuals(isDark);
-            SetRangeMode(_rangeMode);
-        }
-
-        private void ApplyThemeVisuals(bool isDark)
-        {
-            if (FinancialSpotlightCanvas is not null)
-                FinancialSpotlightCanvas.Visibility = isDark ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void Financial_PreviewMouseMove(object sender, MouseEventArgs e)
-        {
-            if (!MotionPreferences.Enabled)
-            {
-                Financial_MouseLeave(sender, e);
-                return;
-            }
-
-            if (!IsDarkThemeActive() || FinancialSpotlightCanvas is null || FinancialSpotlightTransform is null)
-                return;
-
-            if (FinancialSpotlightCanvas.Visibility != Visibility.Visible)
-                FinancialSpotlightCanvas.Visibility = Visibility.Visible;
-
-            Point pos = e.GetPosition(FinancialRootGrid);
-            FinancialSpotlightTransform.X = pos.X - (FinancialSpotlightEllipse.Width / 2.0);
-            FinancialSpotlightTransform.Y = pos.Y - (FinancialSpotlightEllipse.Height / 2.0);
-        }
-
-        private void Financial_MouseLeave(object sender, MouseEventArgs e)
-        {
-            if (FinancialSpotlightTransform is not null)
-            {
-                FinancialSpotlightTransform.X = -1200;
-                FinancialSpotlightTransform.Y = -1200;
-            }
-        }
-
-        private void FinancialRecordsView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            if (this.IsVisible)
-            {
-                RefreshFinancialData();
-            }
-        }
-
-        private void FinancialRecordsView_Unloaded(object sender, RoutedEventArgs e)
-        {
-            GlobalEvents.OnFinancialRecordAdded -= GlobalEvents_OnFinancialRecordAdded;
-            GlobalEvents.OnThemeChanged -= HandleThemeChanged;
-        }
-
-        private void GlobalEvents_OnFinancialRecordAdded()
-        {
-            Dispatcher.Invoke(() =>
-            {
-                RefreshFinancialData();
+                using var db = new AppDbContext();
+                var patients = await db.Patients.AsNoTracking().ToListAsync();
+                var visits = await db.Visits.AsNoTracking().ToListAsync();
+                var expenses = await db.Expenses.AsNoTracking().ToListAsync();
+                var upcoming = await db.UpcomingPayments.AsNoTracking().ToListAsync();
+                return (patients, visits, expenses, upcoming);
             });
+            _patients = data.patients; _visits = data.visits; _expenses = data.expenses; _upcoming = data.upcoming;
+            RebuildLedger(); _hasLoadedData = true; _loadError = false; ApplyFilters();
+            if (_selectedAccount != null) SelectPatient(_selectedAccount.PatientId, false);
+            StatusHost.Visibility = Visibility.Collapsed;
         }
-
-        public async void RefreshFinancialData()
+        catch (Exception)
         {
-            RequestRefresh();
-            await EnsureDataCurrentAsync();
+            _loadError = true;
+            ShowStatus(_hasLoadedData ? "تعذر تحديث البيانات. المعروض من آخر تحميل ناجح؛ أعد المحاولة." : "تعذر تحميل السجل المالي. أعد المحاولة.", true, true);
+            _refreshRequested = false;
         }
-
-        public void RequestRefresh()
+        finally { LoadingOverlay.Visibility = Visibility.Collapsed; }
+    }
+    private void RebuildLedger()
+    {
+        var groups = _visits.GroupBy(v => v.PatientId).ToDictionary(g => g.Key, g => g.ToList());
+        _accounts = _patients.Select(p => FinancialLedger.BuildAccount(p, groups.GetValueOrDefault(p.Id, new()).Where(v => v.VisitDate.Date <= AppClock.Today))).ToList();
+        _rows = _patients.SelectMany(p => FinancialLedger.BuildAccount(p, groups.GetValueOrDefault(p.Id, new())).Rows).OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).ToList();
+    }
+    private bool TryRange(out FinanceDateRange range)
+    {
+        range = _range;
+        if (!TryReadDate(DpFilterDate, true, out var start)) return false;
+        DateTime? end = start;
+        if (_period == FinancePeriod.Custom && !TryReadDate(DpFilterEnd, true, out end)) return false;
+        range = FinanceDateRange.For(_period, start!.Value, end);
+        if (range.End >= range.Start) return true;
+        ShowStatus("يجب أن يكون تاريخ النهاية مساوياً للبداية أو بعدها.", true); return false;
+    }
+    private string Query => PatientRecordSearch.Normalize(WorkspaceSearch.Text);
+    private bool Matches(string text) => Query.Length == 0 || PatientRecordSearch.Normalize(text).Contains(Query);
+    private bool MatchesCategory(string category) => CategoryFilter.SelectedIndex <= 0 || category == CategoryFilter.SelectedItem as string;
+    private void ApplyFilters()
+    {
+        if (!_initialized || _updating || !TryRange(out var range)) return;
+        _range = range;
+        string key = $"{_period}|{range.Start:yyyyMMdd}|{range.End:yyyyMMdd}|{Query}|{CategoryFilter.SelectedIndex}";
+        var income = _rows.Where(r => range.Contains(r.Date) && Matches($"{r.PatientName} {r.Phone} {r.Kind} {r.Note}")).ToList();
+        var expenses = _expenses.Select(e => new FinanceExpenseRow { Id = e.Id, Date = e.ExpenseDate, Description = e.Description, Amount = FinanceMoney.From(e.Amount), Category = ExpenseCategories.Classify(e.Description) })
+            .Where(e => range.Contains(e.Date) && Matches(e.Description) && MatchesCategory(e.Category)).OrderByDescending(e => e.Date).ThenByDescending(e => e.Id).ToList();
+        var upcoming = _upcoming.Select(p => new FinanceUpcomingRow { Id = p.Id, Description = p.Description, Category = ExpenseCategories.Classify(p.Description), Recipient = p.Recipient,
+            Due = p.DueDate, Status = p.Status, Amount = FinanceMoney.From(p.Amount), ExpenseId = p.ExpenseId, CompletedAt = p.CompletedAt })
+            .Where(p => Matches(p.Description) && MatchesCategory(p.Category) && (UpcomingStatusFilter.SelectedIndex == 3 || p.Status == (UpcomingStatusFilter.SelectedIndex switch { 1 => "Paid", 2 => "Cancelled", _ => "Pending" })))
+            .OrderBy(p => p.StatusOrder).ThenBy(p => p.DueSort).ThenBy(p => p.Id).ToList();
+        var accounts = _accounts.Where(a => a.Balance > 0 && Matches($"{a.PatientName} {a.Phone}") && (AccountAgeFilter.SelectedIndex switch
+            { 1 => a.AgeDays <= 30, 2 => a.AgeDays is > 30 and <= 60, 3 => a.AgeDays is > 60 and <= 90, 4 => a.AgeDays > 90, _ => true }));
+        accounts = CmbUnpaidSort.SelectedIndex switch { 1 => accounts.OrderBy(a => a.PatientName), 2 => accounts.OrderBy(a => a.FirstDebtDate), _ => accounts.OrderByDescending(a => a.Balance) };
+        SetItems(IncomeItemsControl, income, key); SetItems(ExpenseItemsControl, expenses, key);
+        _filteredUpcoming = upcoming;
+        _upcomingPage = Math.Clamp(_upcomingPage, 0, Math.Max(0, (upcoming.Count - 1) / UpcomingPageSize));
+        SetItems(UpcomingItemsControl, upcoming.Skip(_upcomingPage * UpcomingPageSize).Take(UpcomingPageSize).ToList(), "upcoming|" + Query + CategoryFilter.SelectedIndex + UpcomingStatusFilter.SelectedIndex + "|" + _upcomingPage);
+        UpcomingPageLabel.Text = $"الصفحة {_upcomingPage + 1} من {Math.Max(1, (upcoming.Count + UpcomingPageSize - 1) / UpcomingPageSize)} · {upcoming.Count:N0} نتيجة";
+        BtnUpcomingPrevious.IsEnabled = _upcomingPage > 0;
+        BtnUpcomingNext.IsEnabled = (_upcomingPage + 1) * UpcomingPageSize < upcoming.Count;
+        SetItems(UnpaidItemsControl, accounts.ToList(), "accounts|" + Query + AccountAgeFilter.SelectedIndex);
+        decimal collected = income.Sum(r => r.Paid), spent = expenses.Sum(e => e.Amount);
+        AnimatedNumber.Show(TxtTotalIncome, (double)collected, "{0:#,0.##} ل.س");
+        AnimatedNumber.Show(TxtTotalExpenses, (double)spent, "{0:#,0.##} ل.س");
+        AnimatedNumber.Show(TxtNetAmount, (double)(collected - spent), "{0:#,0.##} ل.س");
+        TxtNetAmount.SetResourceReference(TextBlock.ForegroundProperty, collected < spent ? "FinanceNegative" : "DashCalendarTodayNumFg");
+        TxtOutstanding.Text = FinanceMoney.Format(_accounts.Sum(a => Math.Max(0, a.Balance)));
+        TxtIncomeFooterTotal.Text = FinanceMoney.Format(collected); TxtExpenseFooterTotal.Text = FinanceMoney.Format(spent);
+        var previousRange = PreviousRange(range);
+        decimal previousIncome = _rows.Where(r => previousRange.Contains(r.Date) && Matches($"{r.PatientName} {r.Phone} {r.Kind} {r.Note}")).Sum(r => r.Paid);
+        decimal previousExpense = _expenses.Where(e => previousRange.Contains(e.ExpenseDate) && Matches(e.Description) && MatchesCategory(ExpenseCategories.Classify(e.Description))).Sum(e => FinanceMoney.From(e.Amount));
+        IncomeComparison.Text = Comparison(collected, previousIncome); ExpenseComparison.Text = Comparison(spent, previousExpense);
+        NetComparison.Text = $"التغير: {FinanceMoney.Format(collected - spent - previousIncome + previousExpense)}";
+        IncomeComparison.ToolTip = ExpenseComparison.ToolTip = NetComparison.ToolTip = $"المقارنة مع {previousRange.Label} بنفس الفلاتر";
+        TxtVisitCount.Text = $"{income.Count(r => !r.FinancialOnly):N0} زيارة علاجية · {income.Count(r => r.FinancialOnly):N0} عملية مستقلة";
+        TxtPendingCount.Text = $"{_upcoming.Count(p => p.Status == "Pending"):N0} مستحق معلق";
+        TxtUnpaidTotal.Text = $"{accounts.Count():N0} مريض · الإجمالي المعروض: {FinanceMoney.Format(accounts.Sum(a => a.Balance))}";
+        EmptyIncomeText.Visibility = income.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyExpenseText.Visibility = expenses.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyUpcomingText.Visibility = upcoming.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyUnpaidText.Visibility = accounts.Any() ? Visibility.Collapsed : Visibility.Visible;
+        ((TextBlock)EmptyIncomeText.Children[0]).Text = _rows.Count == 0 ? "لا توجد سجلات مالية بعد." : "لا توجد سجلات دخل مطابقة للفلاتر.";
+        ((TextBlock)EmptyExpenseText.Children[0]).Text = _expenses.Count == 0 ? "لم تُسجل مصاريف بعد." : "لا توجد مصاريف مطابقة للفلاتر.";
+        ((TextBlock)EmptyUpcomingText.Children[0]).Text = _upcoming.Count == 0 ? "لم تُسجل مستحقات بعد." : "لا توجد مستحقات مطابقة للفلاتر.";
+        ((TextBlock)EmptyUnpaidText.Children[0]).Text = _accounts.All(a => a.Balance <= 0) ? "جميع حسابات المرضى مسددة." : "لا توجد أرصدة مستحقة تطابق البحث.";
+        ExpenseBreakdown.ItemsSource = expenses.GroupBy(e => e.Category).Select(g => new { Category = g.Key, Amount = g.Sum(e => e.Amount) }).OrderByDescending(g => g.Amount)
+            .Select(g => new { g.Category, AmountText = FinanceMoney.Format(g.Amount), Percent = spent == 0 ? 0 : (double)(g.Amount / spent * 100), Color = ExpenseCategoryBrush(g.Category) }).ToList();
+        PeriodLabel.Text = range.Label + (Query.Length > 0 ? " · نتائج البحث" : "") + (CategoryFilter.SelectedIndex > 0 ? " · فئة المصاريف: " + CategoryFilter.SelectedItem : "");
+        UpdateResultsLabel(); UpdateRangeButtons();
+    }
+    private FinanceDateRange PreviousRange(FinanceDateRange range)
+    {
+        var previous = _period switch { FinancePeriod.Month => FinanceDateRange.For(FinancePeriod.Month, range.Start.AddMonths(-1)), FinancePeriod.Year => FinanceDateRange.For(FinancePeriod.Year, range.Start.AddYears(-1)), _ => range.Previous };
+        if (!range.Contains(AppClock.Today)) return previous;
+        if (_period == FinancePeriod.Month) return new(previous.Start, previous.Start.AddDays(Math.Min(AppClock.Today.Day, previous.End.Day) - 1));
+        if (_period == FinancePeriod.Year) return new(previous.Start, AppClock.Today.AddYears(-1));
+        return previous;
+    }
+    private static string Comparison(decimal current, decimal previous) => previous == 0 ? (current == 0 ? "لا تغير عن الفترة السابقة" : "لا قيمة مقارنة سابقة") : $"{(current >= previous ? "+" : "")}{(current - previous) / Math.Abs(previous) * 100:0.#}% عن الفترة السابقة";
+    private static Brush ExpenseCategoryBrush(string category)
+    {
+        // Use the category's fixed position so filtering and ranking never change its color.
+        string[] colors = { "#166534", "#22C55E", "#047857", "#84CC16", "#0D9488", "#4D7C0F", "#10B981", "#15803D", "#65A30D" };
+        int index = ExpenseCategories.Labels.ToList().IndexOf(category);
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[Math.Max(0, index) % colors.Length]));
+        brush.Freeze();
+        return brush;
+    }
+    private void SetItems<T>(DataGrid grid, List<T> rows, string key)
+    {
+        using var scroll = ScrollState.Updating(grid, key);
+        var sorts = CollectionViewSource.GetDefaultView(grid.ItemsSource)?.SortDescriptions.ToList() ?? new();
+        grid.ItemsSource = rows; var view = CollectionViewSource.GetDefaultView(rows);
+        foreach (var sort in sorts) view.SortDescriptions.Add(sort);
+    }
+    private DataGrid ActiveGrid => FinanceTabs.SelectedIndex switch { 1 => ExpenseItemsControl, 2 => UpcomingItemsControl, 3 => UnpaidItemsControl, _ => IncomeItemsControl };
+    private void UpdateResultsLabel() => ResultsLabel.Text = FinanceTabs.SelectedIndex == 2 ? $"{UpcomingItemsControl.Items.Count:N0} معروض من {_filteredUpcoming.Count:N0} مستحق" : $"{ActiveGrid.Items.Count:N0} سجل معروض";
+    private void WorkspaceFilter_Changed(object sender, RoutedEventArgs e) { if (_initialized && !_updating) { _upcomingPage = 0; ApplyFilters(); FinanceMotion.Fade(ActiveGrid); } }
+    private void PreviousUpcomingPage_Click(object sender, RoutedEventArgs e) { if (_upcomingPage > 0) { _upcomingPage--; ApplyFilters(); } }
+    private void NextUpcomingPage_Click(object sender, RoutedEventArgs e) { if ((_upcomingPage + 1) * UpcomingPageSize < _filteredUpcoming.Count) { _upcomingPage++; ApplyFilters(); } }
+    private void DateFilter_Changed(object sender, SelectionChangedEventArgs e) { if (_initialized && !_updating) { ApplyFilters(); FinanceMotion.Fade(ActiveGrid); } }
+    private void Range_Click(object sender, RoutedEventArgs e)
+    { if (sender is Button b && Enum.TryParse<FinancePeriod>(b.Tag?.ToString(), out var period)) { _period = period; ApplyFilters(); FinanceMotion.Fade(ActiveGrid); } }
+    private void PreviousPeriod_Click(object sender, RoutedEventArgs e) => MovePeriod(-1);
+    private void NextPeriod_Click(object sender, RoutedEventArgs e) => MovePeriod(1);
+    private void MovePeriod(int direction)
+    {
+        if (!TryRange(out var range)) return;
+        _updating = true; var date = DpFilterDate.SelectedDate ?? AppClock.Today;
+        try
         {
-            _refreshRequested = true;
+            DpFilterDate.SelectedDate = _period switch { FinancePeriod.Month => date.AddMonths(direction), FinancePeriod.Year => date.AddYears(direction), FinancePeriod.Custom => range.Start.AddDays(((range.End - range.Start).Days + 1) * direction), _ => date.AddDays(direction) };
+            if (_period == FinancePeriod.Custom) DpFilterEnd.SelectedDate = range.End.AddDays(((range.End - range.Start).Days + 1) * direction);
         }
-
-        private Task? _refreshTask;
-
-        public Task EnsureDataCurrentAsync()
+        catch (ArgumentOutOfRangeException) { ShowStatus("لا يمكن الانتقال إلى هذا التاريخ.", true); }
+        finally { _updating = false; }
+        ApplyFilters(); FinanceMotion.Fade(ActiveGrid);
+    }
+    private void CurrentPeriod_Click(object sender, RoutedEventArgs e)
+    { _updating = true; DpFilterDate.SelectedDate = DpFilterEnd.SelectedDate = AppClock.Today; _updating = false; ApplyFilters(); }
+    private void ClearFilters_Click(object sender, RoutedEventArgs e)
+    {
+        _updating = true; WorkspaceSearch.Clear(); CategoryFilter.SelectedIndex = AccountAgeFilter.SelectedIndex = CmbUnpaidSort.SelectedIndex = UpcomingStatusFilter.SelectedIndex = 0;
+        _upcomingPage = 0;
+        DpFilterDate.SelectedDate = DpFilterEnd.SelectedDate = AppClock.Today; _period = FinancePeriod.Month;
+        foreach (DataGrid grid in new[] { IncomeItemsControl, ExpenseItemsControl, UpcomingItemsControl, UnpaidItemsControl })
+        { CollectionViewSource.GetDefaultView(grid.ItemsSource)?.SortDescriptions.Clear(); foreach (var column in grid.Columns) column.SortDirection = null; }
+        _updating = false; ApplyFilters();
+    }
+    private void InstallRangeIndicator()
+    {
+        if (_rangeHost != null || RangeButtons.Parent is not StackPanel parent) return;
+        int index = parent.Children.IndexOf(RangeButtons); parent.Children.Remove(RangeButtons);
+        RangeButtons.FlowDirection = FlowDirection.RightToLeft;
+        _rangeHost = new Grid { FlowDirection = FlowDirection.LeftToRight };
+        _rangeIndicator = new Border { Height = 36, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new(8), IsHitTestVisible = false };
+        _rangeIndicator.SetResourceReference(Border.BackgroundProperty, "AppSidebarHoverBg");
+        _rangeHost.Children.Add(_rangeIndicator); _rangeHost.Children.Add(RangeButtons); parent.Children.Insert(index, _rangeHost);
+        RangeButtons.SizeChanged += (_, _) => UpdateRangeButtons();
+    }
+    private void UpdateRangeButtons()
+    {
+        EndDateHost.Visibility = _period == FinancePeriod.Custom ? Visibility.Visible : Visibility.Collapsed;
+        BtnCurrentDate.Content = _period switch { FinancePeriod.Day => "اليوم", FinancePeriod.Year => "هذه السنة", FinancePeriod.Custom => "اليوم", _ => "هذا الشهر" };
+        foreach (Button button in RangeButtons.Children)
         {
-            if (_refreshTask != null) return _refreshTask;
-            if (!_refreshRequested && _hasLoadedData) return Task.CompletedTask;
-            _refreshRequested = true;
-            return _refreshTask = RefreshPendingAsync();
-        }
-
-        private async Task RefreshPendingAsync()
-        {
-            // Store the shared task before any synchronous SQLite work can complete.
-            await Task.Yield();
-            try
-            {
-                do
-                {
-                    _refreshRequested = false;
-                    await RefreshDataAsync();
-                } while (_refreshRequested && IsVisible);
-            }
-            finally
-            {
-                _refreshTask = null;
-            }
-        }
-
-        private async Task RefreshDataAsync()
-        {
-            SetLoadingState(true);
-
-            try
-            {
-
-                var data = await Task.Run(async () =>
-                {
-                    using var context = new AppDbContext();
-                    var loadedVisits = await context.Visits
-                                                   .Include(v => v.Patient)
-                                                   .AsNoTracking() 
-                                                   .OrderByDescending(v => v.VisitDate)
-                                                   .ToListAsync();
-
-                    HashSet<int> loadedVisitIds = loadedVisits
-                        .Select(visit => visit.Id)
-                        .ToHashSet();
-
-                    List<Visit> mergedVisits = loadedVisits
-                        .Concat(AppRuntimeCache.RecentVisits.Where(visit => !loadedVisitIds.Contains(visit.Id)))
-                        .OrderByDescending(visit => visit.VisitDate)
-                        .ToList();
-
-                    var visits = mergedVisits.Select(visit => new VisitFinanceSnapshot
-                    {
-                        VisitId = visit.Id,
-                        PatientId = visit.PatientId,
-                        VisitDate = visit.VisitDate,
-                        PatientName = string.IsNullOrWhiteSpace(visit.Patient?.FullName) ? "مريض بدون اسم" : visit.Patient!.FullName.Trim(),
-                        PhoneNumber = visit.Patient?.PhoneNumber ?? string.Empty,
-                        CurrentCost = visit.CurrentCost,
-                        TodayPaid = visit.TodayPaid,
-                        RemainingAmount = visit.RemainingAmount,
-                        SelectedTreatmentsJson = visit.SelectedTreatmentsJson,
-                        UsdToSypRateSnapshot = visit.UsdToSypRateSnapshot
-                    }).ToList();
-
-                    foreach (var visit in visits)
-                        visit.SetCostAdjustment(CalculateAutomaticTreatmentCost(visit.SelectedTreatmentsJson, visit.UsdToSypRateSnapshot));
-
-
-                    List<ExpenseEntry> loadedExpenses = await context.Expenses
-                        .AsNoTracking()
-                        .OrderByDescending(expense => expense.ExpenseDate)
-                        .ToListAsync();
-
-                    var expenses = loadedExpenses.Select(expense => new ExpenseSnapshot
-                    {
-                        ExpenseDate = expense.ExpenseDate,
-                        Description = expense.Description,
-                        Amount = expense.Amount
-                    }).ToList();
-
-                    // تحميل الدفعات القادمة
-                    var loadedUpcoming = await context.UpcomingPayments
-                        .AsNoTracking()
-                        .ToListAsync();
-                        
-                    var upcomingModels = loadedUpcoming.Select(u => new UpcomingPaymentRowModel
-                    {
-                        Id = u.Id,
-                        Description = u.Description,
-                        RawAmount = u.Amount,
-                        AmountText = FormatMoney(u.Amount)
-                    }).ToList();
-                    
-                    return (visits, expenses, upcomingModels);
-                });
-                if (_refreshRequested) return;
-                _allVisits.Clear();
-                _allExpenses.Clear();
-                _allVisits.AddRange(data.visits);
-                _allExpenses.AddRange(data.expenses);
-                ReplaceCollection(_upcomingPayments, data.upcomingModels);
-                EmptyUpcomingText.Visibility = _upcomingPayments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
-                _hasLoadedData = true;
-                ApplyFilters();
-
-                // التحديث التلقائي الفوري لقائمة الديون لضمان دقة "المتبقي" بأي وقت يحصل فيه تغيير بالحسابات
-                await LoadUnpaidAccounts();
-            }
-            catch (Exception)
-            {
-                _allVisits.Clear();
-                _allExpenses.Clear();
-                ApplyFilters();
-                MessageBox.Show("تعذر تحميل السجل المالي حالياً.", "السجل المالي", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            finally
-            {
-                SetLoadingState(false);
-            }
-        }
-
-        private void DpFilterDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
-        {
-            ApplyFilters();
-        }
-
-        private void DpFilterDate_CalendarOpened(object sender, RoutedEventArgs e)
-        {
-            if (sender is DatePicker datePicker)
-            {
-                var popup = datePicker.Template.FindName("PART_Popup", datePicker) as System.Windows.Controls.Primitives.Popup;
-                if (popup != null && popup.Child is System.Windows.Controls.Calendar calendar)
-                {
-                    calendar.DisplayModeChanged -= Calendar_DisplayModeChanged;
-                    calendar.DisplayModeChanged += Calendar_DisplayModeChanged;
-
-                    if (_rangeMode == FinancialRangeMode.Month)
-                        calendar.DisplayMode = CalendarMode.Year; 
-                    else if (_rangeMode == FinancialRangeMode.Year)
-                        calendar.DisplayMode = CalendarMode.Decade; 
-                }
-            }
-        }
-
-        private void Calendar_DisplayModeChanged(object sender, CalendarModeChangedEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Calendar calendar)
-            {
-                if (_rangeMode == FinancialRangeMode.Month && calendar.DisplayMode == CalendarMode.Month)
-                {
-                    DpFilterDate.SelectedDate = calendar.DisplayDate;
-                    DpFilterDate.IsDropDownOpen = false;
-                }
-                else if (_rangeMode == FinancialRangeMode.Year && calendar.DisplayMode == CalendarMode.Year)
-                {
-                    DpFilterDate.SelectedDate = calendar.DisplayDate;
-                    DpFilterDate.IsDropDownOpen = false;
-                }
-            }
-        }
-
-        private void BtnDayRange_Click(object sender, RoutedEventArgs e) => SetRangeMode(FinancialRangeMode.Day);
-        private void BtnMonthRange_Click(object sender, RoutedEventArgs e) => SetRangeMode(FinancialRangeMode.Month);
-        private void BtnYearRange_Click(object sender, RoutedEventArgs e) => SetRangeMode(FinancialRangeMode.Year);
-
-        private void BtnCurrentDate_Click(object sender, RoutedEventArgs e)
-        {
-            DpFilterDate.SelectedDate = GetSyrianTime().Date;
-        }
-
-        private async void BtnAddExpense_Click(object sender, RoutedEventArgs e)
-        {
-            if (CmbExpenseCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
-            {
-                ValidationAssist.Show(CmbExpenseCategory, "يرجى اختيار فئة المصروف.");
-                CmbExpenseCategory.Focus();
-                return;
-            }
-
-            string description = ExpenseCategories.FormatDescription(category, TxtExpenseDetails.Text.Trim());
-
-            if (!TryParseMoney(TxtExpenseAmount.Text, out decimal amount) || amount <= 0)
-            {
-                ValidationAssist.Show(TxtExpenseAmount, "يرجى إدخال قيمة صحيحة للمصروف.");
-                TxtExpenseAmount.Focus();
-                TxtExpenseAmount.SelectAll();
-                return;
-            }
-
-            DateTime expenseDate = GetSyrianTime();
-            using var saveFeedback = SaveFeedback.Begin(this, sender);
-            if (!saveFeedback.CanStart) return;
-            await saveFeedback.ShowBusyAsync();
-
-
-            try
-            {
-                ExpenseEntry newExpense = new()
-                {
-                    ExpenseDate = expenseDate,
-                    Description = description,
-                    Amount = (double)amount
-                };
-
-                using var db = new AppDbContext();
-                db.Expenses.Add(newExpense);
-                await db.SaveChangesAsync();
-
-                _allExpenses.Add(new ExpenseSnapshot
-                {
-                    ExpenseDate = newExpense.ExpenseDate,
-                    Description = newExpense.Description,
-                    Amount = newExpense.Amount
-                });
-
-                if (DpFilterDate.SelectedDate?.Date != expenseDate.Date)
-                {
-                    DpFilterDate.SelectedDate = expenseDate.Date;
-                }
-
-                TxtExpenseDetails.Clear();
-                TxtExpenseAmount.Clear();
-                CmbExpenseCategory.SelectedIndex = 0;
-
-                ApplyFilters();
-                if (_refreshTask != null) RequestRefresh();
-                saveFeedback.Success("تم الحفظ بنجاح.");
-            }
-            catch (Exception)
-            {
-                MessageBox.Show("تعذر حفظ المصروف حالياً.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-        
-        // --- Upcoming Payments Logic ---
-        
-        private async void BtnAddUpcoming_Click(object sender, RoutedEventArgs e)
-        {
-            if (CmbUpcomingCategory.SelectedItem is not string category || !ExpenseCategories.IsCategory(category))
-            {
-                ValidationAssist.Show(CmbUpcomingCategory, "يرجى اختيار فئة الدفعة.");
-                CmbUpcomingCategory.Focus();
-                return;
-            }
-
-            string desc = TxtUpcomingDescription.Text.Trim();
-            if (string.IsNullOrWhiteSpace(desc))
-            {
-                ValidationAssist.Show(TxtUpcomingDescription, "يرجى إدخال تفاصيل الدفعة.");
-                TxtUpcomingDescription.Focus();
-                return;
-            }
-
-            if (!TryParseMoney(TxtUpcomingAmount.Text, out decimal amt) || amt <= 0)
-            {
-                ValidationAssist.Show(TxtUpcomingAmount, "يرجى إدخال قيمة صحيحة للدفعة.");
-                TxtUpcomingAmount.Focus();
-                TxtUpcomingAmount.SelectAll();
-                return;
-            }
-            
-            string description = ExpenseCategories.FormatDescription(category, desc);
-            using var saveFeedback = SaveFeedback.Begin(this, sender);
-            if (!saveFeedback.CanStart) return;
-            await saveFeedback.ShowBusyAsync();
-
-
-            try
-            {
-                using var db = new AppDbContext();
-                var newUpcoming = new UpcomingPayment
-                {
-                    Description = description,
-                    Amount = (double)amt
-                };
-                
-                db.UpcomingPayments.Add(newUpcoming);
-                await db.SaveChangesAsync();
-
-                _upcomingPayments.Add(new UpcomingPaymentRowModel
-                {
-                    Id = newUpcoming.Id,
-                    Description = newUpcoming.Description,
-                    RawAmount = newUpcoming.Amount,
-                    AmountText = FormatMoney(newUpcoming.Amount)
-                });
-                
-                TxtUpcomingDescription.Clear();
-                TxtUpcomingAmount.Clear();
-                CmbUpcomingCategory.SelectedIndex = 0;
-                EmptyUpcomingText.Visibility = Visibility.Collapsed;
-                if (_refreshTask != null) RequestRefresh();
-                saveFeedback.Success("تم الحفظ بنجاح.");
-            }
-            catch (Exception)
-            {
-                MessageBox.Show("تعذر إضافة الدفعة. تأكد من إعداد جدول UpcomingPayment في قاعدة البيانات.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void BtnPayUpcoming_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.DataContext is UpcomingPaymentRowModel item)
-            {
-                try
-                {
-                    using var db = new AppDbContext();
-                    
-                    var upcoming = await db.UpcomingPayments.FindAsync(item.Id);
-                    if (upcoming != null)
-                    {
-                        db.UpcomingPayments.Remove(upcoming);
-                    }
-
-                    var newExpense = new ExpenseEntry
-                    {
-                        ExpenseDate = GetSyrianTime(),
-                        Description = item.Description,
-                        Amount = item.RawAmount
-                    };
-                    db.Expenses.Add(newExpense);
-                    
-                    await db.SaveChangesAsync();
-
-                    _upcomingPayments.Remove(item);
-                    EmptyUpcomingText.Visibility = _upcomingPayments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                    
-                    _allExpenses.Add(new ExpenseSnapshot
-                    {
-                        ExpenseDate = newExpense.ExpenseDate,
-                        Description = newExpense.Description,
-                        Amount = newExpense.Amount
-                    });
-                    
-                    ApplyFilters(); // Update expenses lists and totals immediately
-                }
-                catch (Exception)
-                {
-                    MessageBox.Show("حدث خطأ أثناء معالجة الدفعة وتحويلها لمصاريف.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        private async void BtnCancelUpcoming_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.DataContext is UpcomingPaymentRowModel item)
-            {
-                if (MessageBox.Show("هل أنت متأكد من إلغاء وحذف هذه الدفعة نهائياً؟", "تأكيد الإلغاء", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                {
-                    try
-                    {
-                        using var db = new AppDbContext();
-                        var upcoming = await db.UpcomingPayments.FindAsync(item.Id);
-                        if (upcoming != null)
-                        {
-                            db.UpcomingPayments.Remove(upcoming);
-                            await db.SaveChangesAsync();
-                        }
-                        
-                        _upcomingPayments.Remove(item);
-                        EmptyUpcomingText.Visibility = _upcomingPayments.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                    }
-                    catch (Exception)
-                    {
-                        MessageBox.Show("حدث خطأ أثناء إلغاء الدفعة.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-            }
-        }
-
-        private void ApplyFilters()
-        {
-            DateTime selectedDate = (DpFilterDate.SelectedDate ?? GetSyrianTime().Date).Date;
-            string scrollKey = $"{_rangeMode}|{selectedDate:yyyy-MM-dd}";
-            using var incomeScroll = ScrollState.Updating(IncomeItemsControl, scrollKey);
-            using var expenseScroll = ScrollState.Updating(ExpenseItemsControl, scrollKey);
-            
-            List<VisitFinanceSnapshot> filteredVisits = _allVisits
-                .Where(visit => MatchesRange(visit.VisitDate.Date, selectedDate))
-                .OrderByDescending(visit => visit.VisitDate)
-                .ToList();
-
-            List<ExpenseSnapshot> filteredExpenses = _allExpenses
-                .Where(expense => MatchesRange(expense.ExpenseDate.Date, selectedDate))
-                .OrderByDescending(expense => expense.ExpenseDate)
-                .ToList();
-
-            static Brush MakeBrush(string hex) =>
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-
-            // ── Payment-allocation engine ──────────────────────────────────────────
-            // For each patient, build a flat treatment queue (oldest visit → newest)
-            // so payments can be applied FIFO across all treatments ever added.
-            Dictionary<int, List<VisitFinanceSnapshot>> patientAllVisits = _allVisits
-                .GroupBy(v => v.PatientId)
-                .ToDictionary(g => g.Key, g => g.OrderBy(v => v.VisitDate).ToList());
-
-            var treatmentQueues = new Dictionary<int, List<(string Name, double TotalCostSyp)>>();
-
-            // Build the flat queue of (name, totalCostSyp) for one patient.
-            // USD costs are converted to SYP using the rate snapshotted at the time
-            // each visit was saved, so later rate changes never alter historic values.
-            static List<(string Name, double TotalCostSyp)> BuildTreatmentQueue(
-                List<VisitFinanceSnapshot> patientVisits)
-            {
-                var queue = new List<(string, double)>();
-                foreach (var pv in patientVisits)
-                {
-                    if (string.IsNullOrWhiteSpace(pv.SelectedTreatmentsJson)) continue;
-                    foreach (var t in ParseSelectedTreatments(pv.SelectedTreatmentsJson))
-                    {
-                        double costSyp = (double)t.Cost;
-                        if (t.Currency == "USD")
-                            costSyp *= pv.UsdToSypRateSnapshot;
-                        costSyp *= Math.Max(1, t.Quantity);
-                        if (costSyp > 0.009)
-                            queue.Add((t.TreatmentName, costSyp));
-                    }
-                }
-                return queue;
-            }
-
-            // Given a treatment queue (all costs already in SYP) and how much the
-            // patient paid before & during this visit, return the treatment lines
-            // to display in the details overlay.
-            static IReadOnlyList<AllocatedTreatmentLine> AllocatePayment(
-                List<(string Name, double TotalCostSyp)> queue,
-                double cumulativePaidBefore,
-                double thisPaid)
-            {
-                if (thisPaid <= 0.009 || queue.Count == 0)
-                    return Array.Empty<AllocatedTreatmentLine>();
-
-                double cumulativePaidAfter = cumulativePaidBefore + thisPaid;
-                var result = new List<AllocatedTreatmentLine>();
-                double runningCost = 0;
-
-                foreach (var (name, totalCost) in queue)
-                {
-                    double tStart = runningCost;
-                    double tEnd   = runningCost + totalCost;
-                    runningCost   = tEnd;
-
-                    if (tEnd   <= cumulativePaidBefore) continue;  // already fully paid
-                    if (tStart >= cumulativePaidAfter)  break;     // not yet being paid
-
-                    double allocated = Math.Min(tEnd, cumulativePaidAfter)
-                                     - Math.Max(tStart, cumulativePaidBefore);
-                    if (allocated > 0.009)
-                        result.Add(new AllocatedTreatmentLine
-                        {
-                            TreatmentName   = name,
-                            Currency        = "ل.س",
-                            AllocatedAmount = allocated,
-                            TreatmentTotal  = totalCost
-                        });
-                }
-                return result;
-            }
-            // ── End payment-allocation engine ──────────────────────────────────────
-
-            List<IncomeRowModel> incomeRows = filteredVisits
-                .Where(visit => visit.CurrentCost != 0 || visit.TodayPaid > 0)
-                .Select(visit =>
-                {
-                    bool hasPaid = visit.TodayPaid > 0;
-
-                    IReadOnlyList<AllocatedTreatmentLine> allocations;
-
-                    if (!patientAllVisits.TryGetValue(visit.PatientId, out List<VisitFinanceSnapshot>? pVisits))
-                    {
-                        allocations = Array.Empty<AllocatedTreatmentLine>();
-                    }
-                    else if (!hasPaid)
-                    {
-                        // Billing-only row (first visit, no payment yet):
-                        // show all treatments added in THIS visit converted to SYP at
-                        // the rate that was in effect when the visit was saved.
-                        allocations = ParseSelectedTreatments(visit.SelectedTreatmentsJson)
-                            .Select(t =>
-                            {
-                                double costSyp = (double)t.Cost;
-                                if (t.Currency == "USD")
-                                    costSyp *= visit.UsdToSypRateSnapshot;
-                                costSyp *= Math.Max(1, t.Quantity);
-                                return new AllocatedTreatmentLine
-                                {
-                                    TreatmentName   = t.TreatmentName,
-                                    Currency        = "ل.س",
-                                    AllocatedAmount = costSyp,
-                                    TreatmentTotal  = costSyp
-                                };
-                            })
-                            .Where(a => a.TreatmentTotal > 0.009)
-                            .ToList();
-                    }
-                    else
-                    {
-                        // Payment visit: allocate this payment against the patient's
-                        // cumulative treatment queue (FIFO across all visits).
-                        if (!treatmentQueues.TryGetValue(visit.PatientId, out var queue))
-                        {
-                            queue = BuildTreatmentQueue(pVisits);
-                            treatmentQueues.Add(visit.PatientId, queue);
-                        }
-                        double cumulativePaidBefore = pVisits
-                            .Where(v => v.VisitDate < visit.VisitDate)
-                            .Sum(v => v.TodayPaid);
-                        allocations = AllocatePayment(queue, cumulativePaidBefore, visit.TodayPaid);
-                    }
-
-                    if (allocations.Count > 0)
-                        allocations[0].SetAdjustment(visit.ForgivenessAmount);
-
-                    return new IncomeRowModel
-                    {
-                        VisitId = visit.VisitId,
-                        DateText = visit.VisitDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                        TimeText = visit.VisitDate.ToString("hh:mm tt", CultureInfo.InvariantCulture),
-                        PatientName = visit.PatientName,
-                        PhoneNumber = visit.PhoneNumber,
-                        RawAmount = visit.TodayPaid,
-                        PaidAmountText = hasPaid
-                            ? "+" + FormatMoneyCompact(visit.TodayPaid)
-                            : FormatMoneyCompact(visit.AutomaticCost > 0 ? visit.AutomaticCost : visit.CurrentCost),
-                        AdjustmentText = FormatCostAdjustment(visit.ForgivenessAmount),
-                        PaidAmountBrush = hasPaid
-                            ? MakeBrush("#10B981")   // green – payment received
-                            : MakeBrush("#F59E0B"),  // amber – billed, not yet paid
-                        AllocatedTreatments = allocations
-                    };
-                })
-                .ToList();
-
-            List<ExpenseRowModel> expenseRows = filteredExpenses
-                .Select(expense => new ExpenseRowModel
-                {
-                    DateText = expense.ExpenseDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                    TimeText = expense.ExpenseDate.ToString("hh:mm tt", CultureInfo.InvariantCulture),
-                    Description = expense.Description,
-                    AmountText = "-" + FormatMoneyCompact(expense.Amount),
-                    RawAmount = expense.Amount
-                })
-                .ToList();
-
-            ReplaceCollection(_incomeRows, incomeRows);
-            ReplaceCollection(_expenseRows, expenseRows);
-
-            double totalIncome = incomeRows.Sum(item => item.RawAmount);
-            double totalExpenses = expenseRows.Sum(item => item.RawAmount);
-            double netAmount = totalIncome - totalExpenses;
-
-            AnimatedNumber.Show(TxtTotalIncome, totalIncome, "{0:0.##} ل.س");
-            AnimatedNumber.Show(TxtTotalExpenses, totalExpenses, "{0:0.##} ل.س");
-            TxtNetAmount.Text = FormatMoney(netAmount);
-            bool isDark = IsDarkThemeActive();
-            TxtNetAmount.Foreground = netAmount < 0
-                ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#F87171" : "#DC2626"))
-                : new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#2DD4BF" : "#2250DF"));
-
-            TxtVisitCount.Text = filteredVisits.Count.ToString(CultureInfo.CurrentCulture);
-            AnimatedNumber.Show(TxtIncomeFooterTotal, totalIncome, "{0:0.##} ل.س");
-            AnimatedNumber.Show(TxtExpenseFooterTotal, totalExpenses, "{0:0.##} ل.س");
-
-            EmptyIncomeText.Visibility = _incomeRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            EmptyExpenseText.Visibility = _expenseRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-
-            UpdateCurrentDateButton();
-        }
-
-        private void UpdateCurrentDateButton()
-        {
-            if (BtnCurrentDate == null || DpFilterDate == null) return;
-
-            DateTime selectedDate = (DpFilterDate.SelectedDate ?? GetSyrianTime().Date).Date;
-            DateTime today = GetSyrianTime().Date;
-
-            bool isDifferent = false;
-            string buttonText = "";
-
-            switch (_rangeMode)
-            {
-                case FinancialRangeMode.Day:
-                    isDifferent = selectedDate.Date != today.Date;
-                    buttonText = "اليوم الحالي";
-                    break;
-                case FinancialRangeMode.Month:
-                    isDifferent = selectedDate.Year != today.Year || selectedDate.Month != today.Month;
-                    buttonText = "الشهر الحالي";
-                    break;
-                case FinancialRangeMode.Year:
-                    isDifferent = selectedDate.Year != today.Year;
-                    buttonText = "السنة الحالية";
-                    break;
-            }
-
-            BtnCurrentDate.Content = buttonText;
-            BtnCurrentDate.Visibility = isDifferent ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private void SetRangeMode(FinancialRangeMode mode)
-        {
-            _rangeMode = mode;
-
-            ApplyRangeButtonState(BtnDayRange, mode == FinancialRangeMode.Day);
-            ApplyRangeButtonState(BtnMonthRange, mode == FinancialRangeMode.Month);
-            ApplyRangeButtonState(BtnYearRange, mode == FinancialRangeMode.Year);
-
-            ApplyFilters();
-        }
-
-        private void ApplyRangeButtonState(Button button, bool isActive)
-        {
-            bool isDark = IsDarkThemeActive();
-            if (isActive)
-            {
-                button.Background = Application.Current.Resources["DashActiveFilterBg"] as Brush
-                    ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#14B8A6" : "#3547B7"));
-                button.Foreground = Brushes.White;
-                button.BorderBrush = isDark
-                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5EEAD4"))
-                    : Brushes.Transparent;
-                button.BorderThickness = isDark ? new Thickness(1) : new Thickness(0);
-            }
-            else
-            {
-                button.Background = Brushes.Transparent;
-                button.Foreground = Application.Current.Resources["AppTextSecondary"] as Brush
-                    ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#64748B"));
-                button.BorderBrush = Brushes.Transparent;
-                button.BorderThickness = new Thickness(0);
-            }
-        }
-
-        private bool MatchesRange(DateTime recordDate, DateTime selectedDate)
-        {
-            return _rangeMode switch
-            {
-                FinancialRangeMode.Day => recordDate.Date == selectedDate.Date,
-                FinancialRangeMode.Month => recordDate.Year == selectedDate.Year && recordDate.Month == selectedDate.Month,
-                FinancialRangeMode.Year => recordDate.Year == selectedDate.Year,
-                _ => true
-            };
-        }
-
-        private void SetLoadingState(bool isLoading)
-        {
-            LoadingFeedback.Set(this, LoadingOverlay, isLoading, _hasLoadedData);
-        }
-
-        // --- Unpaid Accounts Overlay Logic ---
-
-        private async void BtnOpenUnpaidOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            UnpaidAccountsOverlay.Visibility = Visibility.Visible;
-            await LoadUnpaidAccounts();
-        }
-
-        private void BtnCloseUnpaidOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            UnpaidAccountsOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private int _unpaidLoadVersion;
-
-        private async Task LoadUnpaidAccounts()
-        {
-            int loadVersion = ++_unpaidLoadVersion;
-            try
-            {
-                var unpaidList = await Task.Run(async () =>
-                {
-                    using var db = new AppDbContext();
-                    var allVisits = await db.Visits.Include(v => v.Patient).AsNoTracking().ToListAsync();
-
-                    return allVisits
-                        .Where(v => v.Patient != null)
-                        .GroupBy(v => v.PatientId)
-                        .Select(g => {
-                            var patient = g.First().Patient!;
-                            var snapshots = g.Select(v =>
-                            {
-                                var snapshot = new VisitFinanceSnapshot
-                                {
-                                    CurrentCost = v.CurrentCost,
-                                    TodayPaid = v.TodayPaid,
-                                    VisitDate = v.VisitDate,
-                                    SelectedTreatmentsJson = v.SelectedTreatmentsJson,
-                                    UsdToSypRateSnapshot = v.UsdToSypRateSnapshot
-                                };
-                                snapshot.SetCostAdjustment(CalculateAutomaticTreatmentCost(snapshot.SelectedTreatmentsJson, snapshot.UsdToSypRateSnapshot));
-                                return snapshot;
-                            }).ToList();
-                            double totalPositiveCost = snapshots.Sum(v => v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost));
-                            double totalForgiven = snapshots.Sum(v => v.ForgivenessAmount);
-                            double totalPaid = g.Sum(v => v.TodayPaid);
-                        
-                            double remaining = Math.Round(totalPositiveCost - totalPaid - totalForgiven, 2);
-
-                            double runningBalance = 0;
-                            DateTime? activeDebtStartDate = null;
-
-                            foreach (var v in snapshots.OrderBy(visit => visit.VisitDate))
-                            {
-                                double visitImpact = (v.AutomaticCost > 0 ? Math.Max(v.AutomaticCost, v.CurrentCost) : Math.Max(0, v.CurrentCost))
-                                    - v.ForgivenessAmount - v.TodayPaid;
-                                runningBalance = Math.Round(runningBalance + visitImpact, 2);
-
-                                if (runningBalance > 0)
-                                {
-                                    if (activeDebtStartDate == null)
-                                    {
-                                        activeDebtStartDate = v.VisitDate;
-                                    }
-                                }
-                                else
-                                {
-                                    activeDebtStartDate = null;
-                                }
-                            }
-
-                            DateTime firstDebtDate = activeDebtStartDate ?? g.Min(v => v.VisitDate);
-
-                            return new UnpaidAccountModel
-                            {
-                                PatientName = patient.FullName,
-                                PhoneNumber = patient.PhoneNumber ?? "",
-                                TotalCost = totalPositiveCost,
-                                TotalPaid = totalPaid,
-                                TotalForgiven = totalForgiven,
-                                RemainingAmount = remaining,
-                                FirstDebtDate = firstDebtDate
-                            };
-                        })
-                        .Where(u => u.RemainingAmount > 0)
-                        .ToList();
-
-                });
-
-                if (loadVersion != _unpaidLoadVersion) return;
-                if (CmbUnpaidSort != null)
-                {
-                    int sortIndex = CmbUnpaidSort.SelectedIndex;
-                    if (sortIndex == 0) // Highest Amount
-                        unpaidList = unpaidList.OrderByDescending(u => u.RemainingAmount).ToList();
-                    else if (sortIndex == 1) // Alphabetical
-                        unpaidList = unpaidList.OrderBy(u => u.PatientName).ToList();
-                    else if (sortIndex == 2) // Oldest
-                        unpaidList = unpaidList.OrderBy(u => u.FirstDebtDate).ToList();
-                }
-
-                using var unpaidScroll = ScrollState.Updating(UnpaidItemsControl, CmbUnpaidSort?.SelectedIndex.ToString() ?? "");
-                ReplaceCollection(_unpaidAccounts, unpaidList);
-                EmptyUnpaidText.Visibility = _unpaidAccounts.Any() ? Visibility.Collapsed : Visibility.Visible;
-                TxtUnpaidTotal.Text = $"الإجمالي: {_unpaidAccounts.Sum(u => u.RemainingAmount).ToString("N0", CultureInfo.CurrentCulture)} ل.س";
-            }
-            catch (Exception)
-            {
-                if (loadVersion != _unpaidLoadVersion) return;
-                MessageBox.Show("حدث خطأ أثناء تحميل سجل الديون.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void CmbUnpaidSort_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (UnpaidAccountsOverlay != null && UnpaidAccountsOverlay.Visibility == Visibility.Visible)
-            {
-                await LoadUnpaidAccounts();
-            }
-        }
-
-
-        // --- Patient Financial Search Overlay Logic ---
-        
-        private void BtnOpenSearchOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            _selectedPatientSearchId = null;
-            PatientSearchOverlay.Visibility = Visibility.Visible;
-            TxtPatientSearchInput.Clear();
-            TxtAddPaymentAmount.Clear();
-            TxtAddForgivenessAmount.Clear();
-            
-            _patientSuggestions.Clear();
-            _patientHistory.Clear();
-            SuggestionsPopupBorder.Visibility = Visibility.Collapsed;
-            EmptyPatientHistoryText.Visibility = Visibility.Visible;
-            PatientHistoryFooter.Visibility = Visibility.Collapsed;
-            TxtPatientSearchInput.Focus();
-        }
-
-        private void BtnCloseSearchOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            PatientSearchOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private async void TxtPatientSearchInput_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            SearchAssist.SetNameQuery(this, TxtPatientSearchInput?.Text.Trim() ?? "");
-            string query = TxtPatientSearchInput.Text.Trim();
-            
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                _patientSuggestions.Clear();
-                SuggestionsPopupBorder.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            try
-            {
-                using var db = new AppDbContext();
-                var matchingPatients = await db.Patients
-                    .AsNoTracking()
-                    .Where(p => p.FullName.Contains(query) || (p.PhoneNumber != null && p.PhoneNumber.Contains(query)))
-                    .Take(10)
-                    .Select(p => new PatientSuggestionModel
-                    {
-                        Id = p.Id,
-                        DisplayName = p.FullName + (!string.IsNullOrWhiteSpace(p.PhoneNumber) ? $" ({p.PhoneNumber})" : "")
-                    })
-                    .ToListAsync();
-
-                ReplaceCollection(_patientSuggestions, matchingPatients);
-                SuggestionsPopupBorder.Visibility = _patientSuggestions.Any() ? Visibility.Visible : Visibility.Collapsed;
-            }
-            catch (Exception)
-            {
-                // Handle silent fail for live search
-            }
-        }
-
-        private async void LstPatientSuggestions_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (LstPatientSuggestions.SelectedItem is not PatientSuggestionModel selectedPatient)
-                return;
-
-            _selectedPatientSearchId = selectedPatient.Id;
-            SuggestionsPopupBorder.Visibility = Visibility.Collapsed;
-            TxtPatientSearchInput.Text = selectedPatient.DisplayName;
-            TxtPatientSearchInput.SelectionStart = TxtPatientSearchInput.Text.Length;
-
-            await LoadPatientFinancialHistory(selectedPatient.Id);
-        }
-
-        private async Task LoadPatientFinancialHistory(int patientId)
-        {
-            try
-            {
-                using var db = new AppDbContext();
-                
-                var dbVisits = await db.Visits
-                    .AsNoTracking()
-                    .Where(v => v.PatientId == patientId)
-                    .OrderByDescending(v => v.VisitDate)
-                    .ToListAsync();
-
-                var visitAdjustments = dbVisits.Select(v =>
-                {
-                    var automaticCost = CalculateAutomaticTreatmentCost(v.SelectedTreatmentsJson, v.UsdToSypRateSnapshot);
-                    return new
-                    {
-                        Visit = v,
-                        AutomaticCost = automaticCost,
-                        Forgiveness = automaticCost > 0
-                            ? Math.Max(0, automaticCost - v.CurrentCost)
-                            : Math.Max(0, -v.CurrentCost),
-                    };
-                }).ToList();
-
-                double totalCost = visitAdjustments.Sum(x => x.AutomaticCost > 0 ? Math.Max(x.AutomaticCost, x.Visit.CurrentCost) : Math.Max(0, x.Visit.CurrentCost));
-                double totalForgiven = visitAdjustments.Sum(x => x.Forgiveness);
-                double totalPaid = dbVisits.Sum(v => v.TodayPaid);
-                double totalRemaining = totalCost - totalPaid - totalForgiven;
-
-                TxtPatientTotalCost.Text = $"إجمالي التكلفة: {FormatMoneyCompact(totalCost)}";
-                TxtPatientTotalPaid.Text = $"إجمالي الدفعات: {FormatMoneyCompact(totalPaid)}";
-                TxtPatientTotalForgiven.Text = $"إجمالي المسامحة: {FormatMoneyCompact(totalForgiven)}";
-                TxtPatientTotalRemaining.Text = $"المتبقي: {FormatMoneyCompact(totalRemaining)}";
-
-                // Use the same FIFO payment allocation as the income list. The
-                // patient-history details must describe the amount paid by this
-                // visit, not the full cost of every treatment in the visit.
-                var patientVisitsForAllocation = dbVisits
-                    .OrderBy(v => v.VisitDate)
-                    .ToList();
-
-                var history = visitAdjustments.Select(x => new PatientHistoryModel
-                {
-                    VisitId = x.Visit.Id,
-                    DateText = x.Visit.VisitDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-                    TimeText = x.Visit.VisitDate.ToString("hh:mm tt", CultureInfo.InvariantCulture),
-                    CostText = FormatMoney(x.Visit.CurrentCost),
-                    CostColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444")),
-                    ForgivenessText = x.Forgiveness > 0.009 ? FormatMoneyCompact(x.Forgiveness) : string.Empty,
-                    ForgivenessColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B")),
-                    PaidText = FormatMoney(x.Visit.TodayPaid),
-                    AllocatedTreatments = BuildPaymentDetails(patientVisitsForAllocation, x.Visit, x.Forgiveness)
-                }).ToList();
-
-                ReplaceCollection(_patientHistory, history);
-                
-                bool hasHistory = _patientHistory.Any();
-                EmptyPatientHistoryText.Visibility = hasHistory ? Visibility.Collapsed : Visibility.Visible;
-                
-                PatientHistoryFooter.Visibility = Visibility.Visible;
-                
-                if(!hasHistory)
-                {
-                    EmptyPatientHistoryText.Text = "لا توجد سجلات مالية سابقة لهذا المريض. يمكنك إضافة دفعة أدناه.";
-                }
-            }
-            catch (Exception)
-            {
-                MessageBox.Show("تعذر تحميل السجل المالي للمريض.", "بحث مريض", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void BtnAddPatientPayment_Click(object sender, RoutedEventArgs e)
-        {
-            if (_selectedPatientSearchId == null) return;
-
-            bool isPaymentEntered = TryParseMoney(TxtAddPaymentAmount.Text, out decimal paymentAmount);
-            bool isForgivenessEntered = TryParseMoney(TxtAddForgivenessAmount.Text, out decimal forgivenessAmount);
-
-            if (!isPaymentEntered && !isForgivenessEntered)
-            {
-                ValidationAssist.Show(TxtAddPaymentAmount, "يرجى إدخال قيمة للدفعة أو للمسامحة.");
-                return;
-            }
-
-            if ((isPaymentEntered && paymentAmount < 0) || (isForgivenessEntered && forgivenessAmount < 0))
-            {
-                ValidationAssist.Show(paymentAmount < 0 ? TxtAddPaymentAmount : TxtAddForgivenessAmount, "لا يمكن إدخال قيم سالبة.");
-                return;
-            }
-
-            DateTime paymentDateTime = GetSyrianTime();
-            using var saveFeedback = SaveFeedback.Begin(this, sender);
-            if (!saveFeedback.CanStart) return;
-            await saveFeedback.ShowBusyAsync();
-
-
-            try
-            {
-                using var db = new AppDbContext();
-                
-                var newPaymentVisit = new Visit
-                {
-                    PatientId = _selectedPatientSearchId.Value,
-                    VisitDate = paymentDateTime,
-                    CurrentCost = isForgivenessEntered ? -(double)forgivenessAmount : 0, 
-                    TodayPaid = isPaymentEntered ? (double)paymentAmount : 0,
-                    RemainingAmount = 0 
-                };
-
-                db.Visits.Add(newPaymentVisit);
-                await db.SaveChangesAsync();
-
-                // Clear inputs
-                TxtAddPaymentAmount.Clear();
-                TxtAddForgivenessAmount.Clear();
-
-                // Refresh the overlay
-                await LoadPatientFinancialHistory(_selectedPatientSearchId.Value);
-
-                RequestRefresh();
-                await EnsureDataCurrentAsync();
-                if (_refreshTask != null) RequestRefresh();
-                saveFeedback.Success("تم الحفظ بنجاح.");
-            }
-            catch (Exception)
-            {
-                MessageBox.Show("حدث خطأ أثناء إضافة الدفعة. يرجى المحاولة لاحقاً.", "إضافة دفعة", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private static void ReplaceCollection<T>(BulkObservableCollection<T> target, IEnumerable<T> items)
-        {
-            target.ReplaceAll(items);
-        }
-
-        private static bool TryParseMoney(string? value, out decimal result)
-        {
-            result = 0;
-            if (string.IsNullOrWhiteSpace(value)) return false;
-
-            string trimmedValue = value!.Trim(); 
-            return decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
-                   decimal.TryParse(trimmedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
-        }
-
-        private void BtnIncomeDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { Tag: IncomeRowModel row })
-                return;
-
-            TxtIncomeTreatmentsPatient.Text = row.PatientName;
-            TxtIncomeTreatmentsDate.Text = $"{row.DateText}  {row.TimeText}";
-
-            if (row.HasAllocatedTreatments)
-            {
-                IncomeTreatmentsItemsControl.ItemsSource = row.AllocatedTreatments;
-                EmptyIncomeTreatmentsText.Visibility = Visibility.Collapsed;
-                IncomeTreatmentsItemsControl.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                IncomeTreatmentsItemsControl.ItemsSource = null;
-                IncomeTreatmentsItemsControl.Visibility = Visibility.Collapsed;
-                EmptyIncomeTreatmentsText.Visibility = Visibility.Visible;
-            }
-
-            IncomeTreatmentsOverlay.Visibility = Visibility.Visible;
-        }
-
-        private void BtnPatientHistoryDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { Tag: PatientHistoryModel row })
-                return;
-
-            TxtIncomeTreatmentsPatient.Text = TxtPatientSearchInput.Text;
-            TxtIncomeTreatmentsDate.Text = $"{row.DateText}  {row.TimeText}";
-
-            IncomeTreatmentsItemsControl.ItemsSource = row.AllocatedTreatments;
-            IncomeTreatmentsItemsControl.Visibility = row.HasAllocatedTreatments ? Visibility.Visible : Visibility.Collapsed;
-            EmptyIncomeTreatmentsText.Visibility = row.HasAllocatedTreatments ? Visibility.Collapsed : Visibility.Visible;
-            IncomeTreatmentsOverlay.Visibility = Visibility.Visible;
-        }
-
-        private void BtnCloseIncomeTreatmentsOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            IncomeTreatmentsOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private void IncomeTreatmentsDimmer_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            IncomeTreatmentsOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private void Border_MouseLeftButtonDown_StopPropagation(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            e.Handled = true;
-        }
-
-        private static IReadOnlyList<SelectedTreatment> ParseSelectedTreatments(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json))
-                return Array.Empty<SelectedTreatment>();
-            try
-            {
-                var items = JsonSerializer.Deserialize<List<SelectedTreatment>>(json);
-                return items?.Where(t => !string.IsNullOrWhiteSpace(t.TreatmentName)).ToList()
-                       ?? (IReadOnlyList<SelectedTreatment>)Array.Empty<SelectedTreatment>();
-            }
-            catch (JsonException)
-            {
-                return Array.Empty<SelectedTreatment>();
-            }
-        }
-
-        private static string FormatMoney(double amount)
-        {
-            return $"{amount.ToString("0.##", CultureInfo.CurrentCulture)} ل.س";
-        }
-
-        private static string FormatMoneyCompact(double amount)
-        {
-            return amount.ToString("0.##", CultureInfo.CurrentCulture);
-        }
-
-        private static IReadOnlyList<AllocatedTreatmentLine> BuildPaymentDetails(
-            IReadOnlyList<Visit> patientVisits,
-            Visit visit,
-            double forgiveness)
-        {
-            List<AllocatedTreatmentLine> lines;
-
-            if (visit.TodayPaid > 0.009)
-            {
-                var queue = new List<(string Name, double TotalCostSyp)>();
-                foreach (var patientVisit in patientVisits)
-                {
-                    foreach (var treatment in ParseSelectedTreatments(patientVisit.SelectedTreatmentsJson))
-                    {
-                        double cost = (double)treatment.Cost;
-                        if (treatment.Currency == "USD")
-                            cost *= patientVisit.UsdToSypRateSnapshot > 0 ? patientVisit.UsdToSypRateSnapshot : 15000;
-                        cost *= Math.Max(1, treatment.Quantity);
-                        if (cost > 0.009)
-                            queue.Add((treatment.TreatmentName, cost));
-                    }
-                }
-
-                double cumulativePaidBefore = patientVisits
-                    .Where(v => v.VisitDate < visit.VisitDate)
-                    .Sum(v => v.TodayPaid);
-                double cumulativePaidAfter = cumulativePaidBefore + visit.TodayPaid;
-                double runningCost = 0;
-                lines = new List<AllocatedTreatmentLine>();
-
-                foreach (var (name, totalCost) in queue)
-                {
-                    double treatmentStart = runningCost;
-                    double treatmentEnd = runningCost + totalCost;
-                    runningCost = treatmentEnd;
-
-                    if (treatmentEnd <= cumulativePaidBefore) continue;
-                    if (treatmentStart >= cumulativePaidAfter) break;
-
-                    double allocated = Math.Min(treatmentEnd, cumulativePaidAfter)
-                                     - Math.Max(treatmentStart, cumulativePaidBefore);
-                    if (allocated > 0.009)
-                    {
-                        lines.Add(new AllocatedTreatmentLine
-                        {
-                            TreatmentName = name,
-                            Currency = "ل.س",
-                            AllocatedAmount = allocated,
-                            TreatmentTotal = totalCost
-                        });
-                    }
-                }
-            }
-            else
-            {
-                // Keep the same billing-only behavior as the income details.
-                lines = ParseSelectedTreatments(visit.SelectedTreatmentsJson)
-                    .Select(t =>
-                    {
-                        double cost = (double)t.Cost;
-                        if (t.Currency == "USD")
-                            cost *= visit.UsdToSypRateSnapshot > 0 ? visit.UsdToSypRateSnapshot : 15000;
-                        cost *= Math.Max(1, t.Quantity);
-                        return new AllocatedTreatmentLine
-                        {
-                            TreatmentName = t.TreatmentName,
-                            Currency = "ل.س",
-                            AllocatedAmount = cost,
-                            TreatmentTotal = cost
-                        };
-                    })
-                    .Where(line => line.TreatmentTotal > 0.009)
-                    .ToList();
-            }
-
-            if (lines.Count > 0)
-                lines[0].SetAdjustment(forgiveness);
-            return lines;
-        }
-
-        private enum FinancialRangeMode { Day, Month, Year }
-
-        private static double CalculateAutomaticTreatmentCost(string? selectedTreatmentsJson, double usdToSypRate)
-        {
-            if (string.IsNullOrWhiteSpace(selectedTreatmentsJson)) return 0;
-
-            double total = 0;
-            foreach (var treatment in ParseSelectedTreatments(selectedTreatmentsJson))
-            {
-                double cost = (double)treatment.Cost;
-                if (treatment.Currency == "USD")
-                    cost *= usdToSypRate > 0 ? usdToSypRate : 15000;
-
-                total += cost * Math.Max(1, treatment.Quantity);
-            }
-
-            return Math.Round(total, 2);
-        }
-
-        private static string FormatCostAdjustment(double forgiveness)
-        {
-            if (forgiveness > 0.009)
-                return $"\nمسامحة: {FormatMoneyCompact(forgiveness)}";
-            return string.Empty;
-        }
-
-        private sealed class VisitFinanceSnapshot
-        {
-            public int VisitId { get; init; }
-            public int PatientId { get; init; }
-            public DateTime VisitDate { get; init; }
-            public string PatientName { get; init; } = string.Empty;
-            public string PhoneNumber { get; init; } = string.Empty;
-            public double CurrentCost { get; init; }
-            public double TodayPaid { get; init; }
-            public double RemainingAmount { get; init; }
-            public string? SelectedTreatmentsJson { get; init; }
-            /// <summary>
-            /// USD→SYP rate snapshotted at the moment the visit was saved.
-            /// Used so the details overlay always shows the historic converted cost,
-            /// not the current rate.
-            /// </summary>
-            public double UsdToSypRateSnapshot { get; init; } = 15000;
-            public double AutomaticCost { get; private set; }
-            public double ForgivenessAmount { get; private set; }
-
-            public void SetCostAdjustment(double automaticCost)
-            {
-                AutomaticCost = automaticCost;
-                ForgivenessAmount = automaticCost > 0
-                    ? Math.Max(0, automaticCost - CurrentCost)
-                    : Math.Max(0, -CurrentCost); // legacy standalone forgiveness entry
-            }
-        }
-
-        private sealed class ExpenseSnapshot
-        {
-            public DateTime ExpenseDate { get; init; }
-            public string Description { get; init; } = string.Empty;
-            public double Amount { get; init; }
-        }
-
-        /// <summary>
-        /// One line in the payment-details overlay showing how much of a treatment
-        /// was covered by a specific visit's payment.
-        /// </summary>
-        public sealed class AllocatedTreatmentLine
-        {
-            public string TreatmentName   { get; init; } = string.Empty;
-            public string Currency        { get; init; } = string.Empty;
-            public double AllocatedAmount { get; init; }   // amount this payment covers for this treatment
-            public double TreatmentTotal  { get; init; }   // full cost of the treatment
-            public string AdjustmentText { get; private set; } = string.Empty;
-            public Brush AdjustmentBrush { get; private set; } = Brushes.Transparent;
-
-            public void SetAdjustment(double forgiveness)
-            {
-                if (forgiveness > 0.009)
-                {
-                    AdjustmentText = $"مسامحة\n{FormatMoneyCompact(forgiveness)}";
-                    AdjustmentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B"));
-                }
-            }
-
-            /// <summary>
-            /// "50,000 / 200,000 ل.س" when partial; "200,000 ل.س" when fully covered.
-            /// </summary>
-            public string CostText =>
-                AllocatedAmount < TreatmentTotal - 0.009
-                    ? $"{AllocatedAmount:0.##} / {TreatmentTotal:0.##} {Currency}"
-                    : $"{TreatmentTotal:0.##} {Currency}";
-        }
-
-        public sealed class IncomeRowModel
-        {
-            public int VisitId { get; init; }
-            public string DateText { get; init; } = string.Empty;
-            public string TimeText { get; init; } = string.Empty;
-            public string PatientName { get; init; } = string.Empty;
-            public string PhoneNumber { get; init; } = string.Empty;
-            public string PaidAmountText { get; init; } = string.Empty;
-            public string AdjustmentText { get; init; } = string.Empty;
-            public Brush PaidAmountBrush { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
-            public double RawAmount { get; init; }
-            public IReadOnlyList<AllocatedTreatmentLine> AllocatedTreatments { get; init; } = Array.Empty<AllocatedTreatmentLine>();
-            public bool HasAllocatedTreatments => AllocatedTreatments.Count > 0;
-        }
-
-        public sealed class ExpenseRowModel
-        {
-            public string DateText { get; init; } = string.Empty;
-            public string TimeText { get; init; } = string.Empty;
-            public string Description { get; init; } = string.Empty;
-            public string AmountText { get; init; } = string.Empty;
-            public double RawAmount { get; init; }
-        }
-
-        public sealed class UpcomingPaymentRowModel
-        {
-            public int Id { get; init; }
-            public string Description { get; init; } = string.Empty;
-            public string AmountText { get; init; } = string.Empty;
-            public double RawAmount { get; init; }
-        }
-
-        public sealed class PatientSuggestionModel
-        {
-            public int Id { get; init; }
-            public string DisplayName { get; init; } = string.Empty;
-        }
-
-        public sealed class PatientHistoryModel
-        {
-            public int VisitId { get; init; }
-            public string DateText { get; init; } = string.Empty;
-            public string TimeText { get; init; } = string.Empty;
-            public string CostText { get; init; } = string.Empty;
-            public SolidColorBrush CostColor { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
-            public string ForgivenessText { get; init; } = string.Empty;
-            public SolidColorBrush ForgivenessColor { get; init; } = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F59E0B"));
-            public string PaidText { get; init; } = string.Empty;
-            public IReadOnlyList<AllocatedTreatmentLine> AllocatedTreatments { get; init; } = Array.Empty<AllocatedTreatmentLine>();
-            public bool HasAllocatedTreatments => AllocatedTreatments.Count > 0;
-        }
-
-        public sealed class UnpaidAccountModel
-        {
-            public string PatientName { get; init; } = string.Empty;
-            public string PhoneNumber { get; init; } = string.Empty;
-            public double TotalCost { get; init; }
-            public double TotalPaid { get; init; }
-            public double TotalForgiven { get; init; }
-            public double RemainingAmount { get; set; }
-            public DateTime FirstDebtDate { get; init; }
-
-            public string RemainingAmountText => $"{RemainingAmount.ToString("0.##", CultureInfo.CurrentCulture)} ل.س";
-            public string FirstDebtDateText => FirstDebtDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+            bool active = button.Tag?.ToString() == _period.ToString(); button.Background = Brushes.Transparent;
+            button.SetResourceReference(Control.ForegroundProperty, active ? "DashCalendarTodayNumFg" : "AppTextSecondary");
+            System.Windows.Automation.AutomationProperties.SetItemStatus(button, active ? "محدد" : "");
+            if (active && _rangeHost != null && _rangeIndicator != null) FinanceMotion.MoveSelector(_rangeIndicator, button, _rangeHost);
         }
     }
+    private void FinanceTabs_Changed(object sender, SelectionChangedEventArgs e)
+    { if (_initialized && ReferenceEquals(e.OriginalSource, FinanceTabs)) { UpdateResultsLabel(); FinanceMotion.Fade(ActiveGrid); } }
+    private void IncomeCard_Click(object sender, RoutedEventArgs e) => FinanceTabs.SelectedIndex = 0;
+    private void ExpenseCard_Click(object sender, RoutedEventArgs e) => FinanceTabs.SelectedIndex = 1;
+    private void AccountsCard_Click(object sender, RoutedEventArgs e) => FinanceTabs.SelectedIndex = 3;
+    private void ToggleDetails_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || Ancestor<DataGridRow>(button) is not DataGridRow row) return;
+        bool open = row.DetailsVisibility != Visibility.Visible; row.DetailsVisibility = open ? Visibility.Visible : Visibility.Collapsed;
+        var arrow = new TextBlock { Text = "⌄", RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(open ? 180 : 0), Margin = new Thickness(0, 0, 4, 0) };
+        var content = new StackPanel { Orientation = Orientation.Horizontal }; content.Children.Add(arrow); content.Children.Add(new TextBlock { Text = open ? "إخفاء" : "عرض" }); button.Content = content;
+        if (MotionPreferences.Enabled) ((RotateTransform)arrow.RenderTransform).BeginAnimation(RotateTransform.AngleProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(open ? 0 : 180, open ? 180 : 0, MotionPreferences.Duration(165)) { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
+        System.Windows.Automation.AutomationProperties.SetName(button, open ? "طي تفاصيل العلاجات" : "توسيع تفاصيل العلاجات");
+    }
+    private static T? Ancestor<T>(DependencyObject item) where T : DependencyObject
+    { for (DependencyObject? current = item; current != null; current = VisualTreeHelper.GetParent(current)) if (current is T found) return found; return null; }
 }

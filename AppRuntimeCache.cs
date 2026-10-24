@@ -69,6 +69,9 @@ namespace MyClinic
                 CurrentCost = source.CurrentCost,
                 TodayPaid = source.TodayPaid,
                 RemainingAmount = source.RemainingAmount,
+                IsFinancialOnly = source.IsFinancialOnly,
+                FinancialNote = source.FinancialNote,
+                SelectedTreatmentsJson = source.SelectedTreatmentsJson,
                 UsdToSypRateSnapshot = source.UsdToSypRateSnapshot,
                 ChartMode = source.ChartMode,
                 ToothRecords = source.ToothRecords?

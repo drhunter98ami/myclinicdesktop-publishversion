@@ -16,5 +16,6 @@ namespace MyClinic.Models
         [Required]
         [MaxLength(3)]
         public string Currency { get; set; } = "SYP";
+        public bool RequiresCanals { get; set; }
     }
 }

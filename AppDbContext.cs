@@ -15,6 +15,7 @@ namespace MyClinic
         public DbSet<Visit> Visits { get; set; }
         public DbSet<VisitEditHistory> VisitEditHistories { get; set; }
         public DbSet<ExpenseEntry> Expenses { get; set; }
+        public DbSet<FinancialAuditEntry> FinancialAuditEntries { get; set; }
         public DbSet<ToothRecord> ToothRecords { get; set; }
         
         // تمت إضافة الجدول الجديد هنا
@@ -24,6 +25,7 @@ namespace MyClinic
         public DbSet<AppSettings> AppSettings { get; set; }
         public DbSet<LabName> LabNames { get; set; }
         public DbSet<TreatmentCost> TreatmentCosts { get; set; }
+        public DbSet<ClinicOperation> ClinicOperations { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -78,6 +80,11 @@ namespace MyClinic
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<ClinicOperation>().HasIndex(o => o.RequestKey).IsUnique();
+            modelBuilder.Entity<ClinicOperation>().HasIndex(o => new { o.Kind, o.SourceId });
+
+            modelBuilder.Entity<FinancialAuditEntry>().HasIndex(entry => entry.OccurredAt);
+            modelBuilder.Entity<UpcomingPayment>().Property(payment => payment.Status).HasDefaultValue("Pending");
 
             // التعديل هنا: تم تغيير IsUnique إلى false 
             // هذا يسمح لأكثر من مريض (مثل أفراد العائلة) بمشاركة نفس رقم الهاتف

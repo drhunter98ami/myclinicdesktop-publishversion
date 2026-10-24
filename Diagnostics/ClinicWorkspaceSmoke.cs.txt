@@ -1,0 +1,301 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using MyClinic;
+using MyClinic.Models;
+using MyClinic.Services;
+using System.Reflection;
+using System.IO;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+
+static class Checks
+{
+    static int count;
+    static readonly string Output = Path.GetFullPath("obj/ClinicWorkspaceSmoke");
+    static void Check(bool value, string label) { if (!value) throw new Exception(label); count++; }
+    static async Task Rejected(Func<Task> action, string label) { bool failed = false; try { await action(); } catch { failed = true; } Check(failed, label); }
+    static T Field<T>(object instance, string name) => (T)instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.GetValue(instance)!;
+    static object? Call(object instance, string method, params object[] args) => instance.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.Invoke(instance, args);
+    static IEnumerable<T> Visuals<T>(DependencyObject root) where T : DependencyObject
+    {
+        if (root is T found) yield return found;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) foreach (var item in Visuals<T>(VisualTreeHelper.GetChild(root, i))) yield return item;
+    }
+    static void Pump(int milliseconds = 100)
+    {
+        var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static Window Host(UserControl view, double width, double height)
+    {
+        var window = new Window { Width = width, Height = height, Content = view, Left = -12000, Top = -12000, ShowActivated = false, ShowInTaskbar = false, Background = (Brush)Application.Current.Resources["AppWindowBg"] };
+        window.Show(); Pump(250); return window;
+    }
+    static void Capture(Window window, string name)
+    {
+        var element = (FrameworkElement)window; element.UpdateLayout();
+        var image = new RenderTargetBitmap((int)element.ActualWidth, (int)element.ActualHeight, 96, 96, PixelFormats.Pbgra32); image.Render(element);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image)); using var stream = File.Create(Path.Combine(Output, name + ".png")); encoder.Save(stream);
+    }
+    static void Palette(bool dark)
+    {
+        string source = File.ReadAllText("MainWindow.xaml.cs"); int start = source.IndexOf("private void SetTheme(bool isDark)"); int first = source.IndexOf("res[\"AppWindowBg\"]", start); int second = source.IndexOf("res[\"AppWindowBg\"]", first + 1);
+        string section = dark ? source[first..second] : source[second..];
+        foreach (Match match in Regex.Matches(section, "res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\"")) Application.Current.Resources[match.Groups[1].Value] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(match.Groups[2].Value));
+        foreach (var (key, color) in new[] { ("AppWindowBg", dark ? "#0B1120" : "#F3F6F9"), ("AppInputBg", dark ? "#172235" : "#F6F8FA"), ("AppCardBg", dark ? "#101B2C" : "#FFFFFF"), ("AppTextPrimary", dark ? "#E2E8F0" : "#182337"), ("AppTextSecondary", dark ? "#ABB9CC" : "#516079"), ("AppBorder", dark ? "#2C3B50" : "#D6DEE7"), ("AppSidebarHoverBg", dark ? "#243449" : "#E5F1EF") }) Application.Current.Resources[key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+    }
+    static async Task Transactions()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        using var db = new AppDbContext(options); await db.Database.EnsureCreatedAsync(); ClinicWorkspaceSchema.Ensure(db); ClinicWorkspaceSchema.Ensure(db);
+        db.Shortages.Add(new() { Id = 1, Item = "مادة اختبار", Price = 5, Quantity = 5, Currency = "USD" });
+        db.LabWorks.Add(new() { Id = 1, PatientName = "مريض تجريبي", LabName = "مخبر تجريبي", Cost = 100, Currency = "USD" });
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear(); var service = new ClinicTransactions(db);
+        var purchase = await service.PurchaseAsync(1, 5, 2, 6, "USD", 10000, AppClock.Today, "purchase-1");
+        Check(purchase.AmountSyp == 120000 && purchase.Quantity == 2 && purchase.ExpenseId.HasValue, "Purchase has original amount, converted expense and receipt");
+        Check(await db.Shortages.AsNoTracking().Where(s => s.Id == 1).Select(s => s.Quantity).SingleAsync() == 3, "Partial purchase retains remaining quantity");
+        var retry = await service.PurchaseAsync(1, 5, 2, 6, "USD", 10000, AppClock.Today, "purchase-1");
+        Check(retry.Id == purchase.Id && await db.Expenses.CountAsync() == 1, "Purchase request retry cannot duplicate expense");
+        await Rejected(() => service.PurchaseAsync(1, 5, 2, 6, "USD", 10000, AppClock.Today, "stale"), "Stale quantity rejected");
+        await Rejected(() => service.PurchaseAsync(1, 3, 4, 6, "USD", 10000, AppClock.Today, "too-many"), "Excess purchase quantity rejected");
+        await Rejected(() => service.PurchaseAsync(1, 3, 1, 0, "SYP", 10000, AppClock.Today, "zero"), "Zero actual price rejected");
+        await Rejected(() => service.PurchaseAsync(1, 3, 1, 5, "SYP", 10000, AppClock.Today.AddDays(1), "future"), "Future expense date rejected");
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_expense BEFORE INSERT ON Expenses BEGIN SELECT RAISE(ABORT,'test failure'); END");
+        await Rejected(() => service.PurchaseAsync(1, 3, 1, 5, "SYP", 10000, AppClock.Today, "rollback"), "Expense failure propagated");
+        db.ChangeTracker.Clear(); Check(await db.Shortages.Select(s => s.Quantity).SingleAsync() == 3 && await db.ClinicOperations.CountAsync() == 1, "Expense failure rolls back source and receipt");
+        await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_expense");
+        var paid = await service.PayLabAsync(1, 0, 30, "USD", 12000, AppClock.Today, "payment-1"); db.ChangeTracker.Clear();
+        Check(paid.AmountSyp == 360000, "Lab payment conversion snapshot");
+        var work = await db.LabWorks.AsNoTracking().SingleAsync(); Check(work.AmountPaid == 30 && work.WorkStatus == "تم الإرسال" && work.DateReceived == null, "Prepayment does not receive work");
+        Check(new LabRow { Work = work }.Balance == 70 && new LabRow { Work = work }.PaymentStatus == "مدفوع جزئياً", "Partial payment has positive remaining balance");
+        await service.PayLabAsync(1, 0, 30, "USD", 12000, AppClock.Today, "payment-1"); Check(await db.Expenses.CountAsync() == 2, "Lab payment request retry is idempotent");
+        await Rejected(() => service.PayLabAsync(1, 0, 30, "USD", 12000, AppClock.Today, "stale-payment"), "Stale payment rejected");
+        await Rejected(() => service.PayLabAsync(1, 1, 71, "USD", 12000, AppClock.Today, "overpay"), "Overpayment rejected");
+        Check(await service.SetWorkStatusAsync(1, 1, "تم الاستلام"), "Work can be received independently");
+        Check(!await service.SetWorkStatusAsync(1, 2, "تم الاستلام"), "Repeated receive is a no-op");
+        work = await db.LabWorks.AsNoTracking().SingleAsync(); DateTime? received = work.DateReceived; Check(work.AmountPaid == 30, "Receiving preserves payment");
+        await service.PayLabAsync(1, 2, 840000, "SYP", 12000, AppClock.Today, "payment-final"); db.ChangeTracker.Clear();
+        work = await db.LabWorks.AsNoTracking().SingleAsync(); Check(work.AmountPaid == 100 && work.DateReceived == received && new LabRow { Work = work }.PaymentStatus == "مدفوع", "Cross-currency final payment preserves receive date");
+        await Rejected(() => service.PayLabAsync(1, 3, 1, "USD", 12000, AppClock.Today, "already-paid"), "Paid work cannot create another expense");
+        Check(await db.Expenses.CountAsync() == 3 && await db.FinancialAuditEntries.CountAsync() == 3, "Every money operation has exactly one expense and audit");
+        await Rejected(() => new FinancialTransactions(db, "test").SaveExpenseAsync(paid.ExpenseId, "مخبر", "تعديل", 1, AppClock.Today, "سبب"), "Linked immutable receipt cannot diverge through expense editing");
+        Check(await db.ClinicOperations.Where(o => o.Kind == "LabPayment").CountAsync() == 2, "Payment history retains each partial payment");
+        await service.PurchaseAsync(1, 3, 3, 7, "SYP", 15000, AppClock.Today, "purchase-final");
+        Check(await db.Shortages.Select(s => s.Quantity).SingleAsync() == 0 && await db.ClinicOperations.CountAsync(o => o.Kind == "Purchase") == 2, "Full purchase remains traceable after leaving pending list");
+    }
+    static async Task CurrencyCorrections()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        using var db = new AppDbContext(options); await db.Database.EnsureCreatedAsync();
+        db.LabNames.Add(new() { Id = 1, Name = "مخبر عملة" });
+        db.LabWorks.Add(new() { Id = 1, PatientName = "اسم سابق", LabNameId = 1, LabName = "مخبر عملة", WorkType = "تاج", Cost = 100, Currency = "USD", AmountPaid = 20 });
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear(); var service = new ClinicTransactions(db);
+        var receipt = await service.PayLabAsync(1, 0, 30, "USD", 10000, AppClock.Today, "before-currency"); db.ChangeTracker.Clear();
+        LabWorkDetails Details(decimal cost, string currency, decimal rate) => new("اسم سابق", null, 1, "تاج", cost, currency, "15", "", null, "تصحيح العملة", rate);
+        await service.SaveLabDetailsAsync(1, 1, Details(1_000_000, "SYP", 10000)); db.ChangeTracker.Clear();
+        var work = await db.LabWorks.AsNoTracking().SingleAsync();
+        Check(work.Currency == "SYP" && work.AmountPaid == 500000 && work.Cost == 1000000 && work.Revision == 2, "Currency correction converts paid allocation with chosen rate");
+        var history = await db.ClinicOperations.AsNoTracking().ToListAsync();
+        Check(ClinicTransactions.LegacyLabPaid(work, history) == 200000, "Legacy and receipted paid amounts remain distinguishable after currency change");
+        var original = history.Single(o => o.Kind == "LabPayment");
+        Check(original.Id == receipt.Id && original.Currency == "USD" && original.Amount == 30 && original.RateSnapshot == 10000 && original.AmountSyp == 300000, "Currency correction leaves original payment receipt unchanged");
+        Check(await db.Expenses.CountAsync() == 1 && (await db.Expenses.SingleAsync()).Amount == 300000, "Currency correction does not create or rewrite expenses");
+        await Rejected(() => service.SaveLabDetailsAsync(1, 1, Details(1_000_000, "SYP", 10000)), "Stale correction rejected");
+        await Rejected(() => service.SaveLabDetailsAsync(1, 2, Details(400000, "SYP", 10000)), "Cost below converted paid allocation rejected");
+        await Rejected(() => service.SaveLabDetailsAsync(1, 2, Details(100, "USD", 0)), "Invalid correction rate rejected");
+        await service.PayLabAsync(1, 2, 500000, "SYP", 10000, AppClock.Today, "after-currency"); db.ChangeTracker.Clear();
+        await service.SaveLabDetailsAsync(1, 3, Details(100, "USD", 10000)); db.ChangeTracker.Clear();
+        work = await db.LabWorks.AsNoTracking().SingleAsync(); history = await db.ClinicOperations.AsNoTracking().ToListAsync();
+        Check(work.AmountPaid == 100 && new LabRow { Work = work }.Balance == 0 && work.Currency == "USD", "Fully paid work stays paid when currency is corrected back");
+        Check(ClinicTransactions.LegacyLabPaid(work, history) == 20 && await db.Expenses.CountAsync() == 2, "Payments before and after currency corrections retain correct history");
+        Check(await db.FinancialAuditEntries.CountAsync(a => a.Action == "تغيير عملة عمل مخبري") == 2, "Currency corrections retain before/after audit records");
+        int manual = await service.SaveLabDetailsAsync(null, 0, Details(25, "SYP", 10000) with { PatientName = "اسم مكتوب مباشرة", Reason = "" });
+        Check((await db.LabWorks.AsNoTracking().SingleAsync(w => w.Id == manual)).PatientId == null, "A typed patient name saves without an extra registration checkbox");
+    }
+    static async Task Legacy()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync(); var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        using var db = new AppDbContext(options); await db.Database.EnsureCreatedAsync();
+        db.LabWorks.Add(new() { PatientName = "قديم", Cost = 50, Status = "تم الدفع ولم يتم الاستلام", AmountPaid = 0 });
+        db.Shortages.Add(new() { Item = "بدون سعر", Price = 0, Quantity = 4 }); db.TreatmentCosts.Add(new() { TreatmentName = "سحب عصب", Cost = 20 }); await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        foreach (var (table, fields) in new[] { ("Shortages", new[] { "PriceKnown", "IsDeleted" }), ("LabWorks", new[] { "WorkStatus", "Currency", "RateSnapshot", "Revision", "PatientId", "LabNameId", "WorkType", "ExpectedDelivery" }), ("LabNames", new[] { "Phone", "IsArchived" }), ("TreatmentCosts", new[] { "RequiresCanals" }) }) foreach (string field in fields) await db.Database.ExecuteSqlRawAsync($"ALTER TABLE {table} DROP COLUMN {field}");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE ClinicOperations"); ClinicWorkspaceSchema.Ensure(db); ClinicWorkspaceSchema.Ensure(db); db.ChangeTracker.Clear();
+        var work = await db.LabWorks.SingleAsync(); Check(work.AmountPaid == 50 && work.WorkStatus == "تم الإرسال", "Legacy prepayment backfilled without receiving");
+        Check(!(await db.Shortages.SingleAsync()).PriceKnown && (await db.Shortages.SingleAsync()).Quantity == 4, "Legacy unknown price and quantity preserved");
+        Check((await db.TreatmentCosts.SingleAsync()).RequiresCanals, "Legacy root canal setting preserved");
+        var arbitrary = new TreatmentSelectionItem { TreatmentName = "اسم اختياري", RequiresCanals = true, Quantity = 1 }; Check(arbitrary.IsRootCanal && arbitrary.ToothDetails[0].IsRootCanal, "Arbitrary treatment name can require canals");
+        Check(!new TreatmentSelectionItem { TreatmentName = "سحب عصب", RequiresCanals = false }.IsRootCanal, "Explicit canal setting overrides name");
+        Check(JsonSerializer.Deserialize<SelectedTreatment>("{\"TreatmentName\":\"سحب عصب\"}")!.IsRootCanal, "Legacy visit JSON retains name fallback");
+        var saved = new SelectedTreatment { TreatmentName = "اسم اختياري", RequiresCanals = true }; Check(JsonSerializer.Deserialize<SelectedTreatment>(JsonSerializer.Serialize(saved))!.IsRootCanal, "Canal setting persists in visit JSON");
+        Check(WorkspaceUi.Number("١٢٣٫٥٠", out var arabic) && arabic == 123.5m && WorkspaceUi.Normalize("۱۲۳") == "123", "Arabic and Persian numeric inputs");
+    }
+    static async Task Snapshot()
+    {
+        string key = Guid.NewGuid().ToString("N");
+        string source = Path.Combine(Output, "snapshot-source-" + key + ".db"), target = Path.Combine(Output, "snapshot-target-" + key + ".db");
+        using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite($"Data Source={source};Pooling=False").Options))
+        {
+            await db.Database.EnsureCreatedAsync(); await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL"); db.Patients.Add(new() { FullName = "نسخة تجريبية", PhoneNumber = "000" }); await db.SaveChangesAsync();
+            GoogleDriveSyncService.CreateSnapshot(source, target); GoogleDriveSyncService.ValidateBackup(target);
+            using var copy = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite($"Data Source={target};Pooling=False").Options);
+            Check(await copy.Patients.CountAsync() == 1, "SQLite snapshot includes committed WAL data");
+        }
+        string bad = Path.Combine(Output, "invalid.db"); File.WriteAllText(bad, "not a database"); await Rejected(() => { GoogleDriveSyncService.ValidateBackup(bad); return Task.CompletedTask; }, "Invalid backup rejected");
+    }
+    static void Interface()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); connection.Open(); var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        AppDbContext Factory() => new(options);
+        using (var db = Factory())
+        {
+            db.Database.EnsureCreated(); db.AppSettings.Add(new() { UsdToSypRate = 10000 });
+            db.Patients.Add(new() { Id = 1, FullName = "مريض تجريبي", PhoneNumber = "0000000000" }); db.LabNames.Add(new() { Id = 1, Name = "مخبر تجريبي" });
+            db.LabWorks.Add(new() { Id = 1, PatientId = 1, PatientName = "مريض تجريبي", LabNameId = 1, LabName = "مخبر تجريبي", WorkType = "تاج زيركون", Cost = 100, ExpectedDelivery = AppClock.Today.AddDays(-2) });
+            db.Shortages.AddRange(new Shortage { Id = 1, Item = "قفازات طبية", Quantity = 4, Price = 3, Currency = "USD", IsUrgent = true }, new Shortage { Id = 2, Item = "مادة طبعة", Quantity = 2, PriceKnown = false });
+            db.TreatmentCosts.Add(new() { TreatmentName = "معالجة خاصة", Cost = 12.75m, Currency = "USD", RequiresCanals = true }); db.SaveChanges();
+        }
+        foreach (bool dark in new[] { false, true }) foreach (int width in new[] { 1060, 700 })
+        {
+            Palette(dark); string suffix = (dark ? "dark" : "light") + "-" + width;
+            var shortages = new ShortagesView(Factory); var host = Host(shortages, width, 800);
+            Check(Field<ListBox>(shortages, "UrgentList").Items.Count == 1 && Field<ListBox>(shortages, "NormalList").Items.Count == 1, "Priority lists load fixture");
+            Capture(host, "shortages-" + suffix);
+            Field<TextBox>(shortages, "Search").Text = "قفازات"; Check(Field<ListBox>(shortages, "NormalList").Items.Count == 0, "Shortage search filters both groups"); Field<TextBox>(shortages, "Search").Clear();
+            Call(shortages, "Edit_Click", new Button { DataContext = new ShortageRowModel { ItemData = new Shortage { Id = 1, Item = "قفازات طبية", Quantity = 4, Price = 3, Currency = "USD", IsUrgent = true } } }, new RoutedEventArgs());
+            Check(Field<ComboBox>(shortages, "Priority").SelectedIndex == 1 && Field<TextBox>(shortages, "ItemName").Text == "قفازات طبية", "Shortage editor exposes name and priority"); host.Close(); Pump();
+            var lab = new LabView(Factory); host = Host(lab, width, 800); Check(Field<DataGrid>(lab, "WorksGrid").Items.Count == 1, "Lab default period displays current work"); Capture(host, "lab-" + suffix);
+            var upper = Field<StackPanel>(lab, "UpperSection");
+            Check(!Visuals<ScrollViewer>(upper).Any(v => v.ComputedVerticalScrollBarVisibility == Visibility.Visible), "Upper lab section does not require a vertical scrollbar");
+            Check(Field<DataGrid>(lab, "WorksGrid").ActualHeight >= 150, "Compact upper controls leave usable space for lab rows");
+            if (width == 1060)
+            {
+                var picker = Field<DatePicker>(lab, "FromDate"); picker.IsDropDownOpen = true; Pump();
+                var popup = (System.Windows.Controls.Primitives.Popup)picker.Template.FindName("PART_Popup", picker);
+                Check(popup.IsOpen && popup.Child is Calendar, "Themed calendar opens through DatePicker template");
+                if (popup.Child is Calendar calendar)
+                {
+                    var item = (System.Windows.Controls.Primitives.CalendarItem)calendar.Template.FindName("PART_CalendarItem", calendar);
+                    var month = (Grid)item.Template.FindName("PART_MonthView", item);
+                    Check(month.Children.OfType<FrameworkElement>().Count(child => Grid.GetRow(child) == 0 && child.ActualHeight > 0) == 7, "All seven weekday labels are visible in themed calendar");
+                    var root = PresentationSource.FromVisual(calendar)?.RootVisual as FrameworkElement ?? calendar;
+                    var bitmap = new RenderTargetBitmap((int)root.ActualWidth, (int)root.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(root);
+                    var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var stream = File.Create(Path.Combine(Output, "calendar-" + suffix + ".png")); encoder.Save(stream);
+                }
+                picker.IsDropDownOpen = false;
+            }
+            Call(lab, "OpenDetails", 1); Pump(); Check(Field<StackPanel>(lab, "Details").Visibility == Visibility.Visible && Field<ItemsControl>(lab, "Timeline").Items.Count > 0, "Lab detail panel and timeline"); Capture(host, "lab-details-" + suffix);
+            Call(lab, "CloseSide"); Call(lab, "OpenEditor", new object?[] { null }!); Pump(); Check(Field<StackPanel>(lab, "Editor").Visibility == Visibility.Visible, "New work panel opens"); Capture(host, "lab-editor-" + suffix); host.Close(); Pump();
+            var settings = new SettingsView(Factory); host = Host(settings, width, 800);
+            foreach (string category in new[] { "المظهر", "الحسابات", "العلاجات", "النسخ الاحتياطي", "حول التطبيق" })
+            {
+                Field<ListBox>(settings, "Categories").SelectedItem = category; Pump(); Capture(host, "settings-" + Array.IndexOf(new[] { "المظهر", "الحسابات", "العلاجات", "النسخ الاحتياطي", "حول التطبيق" }, category) + "-" + suffix);
+            }
+            Field<TextBox>(settings, "SettingsSearch").Text = "سعر الصرف"; Check(Field<ListBox>(settings, "Categories").Items.Count == 1 && Field<ListBox>(settings, "Categories").SelectedItem?.ToString() == "الحسابات", "Settings search finds nested setting");
+            Field<TextBox>(settings, "SettingsSearch").Text = "zzzz"; Check(Field<TextBlock>(settings, "NoResults").Visibility == Visibility.Visible, "Settings search empty state"); host.Close(); Pump();
+        }
+        MotionPreferences.Set(MotionLevel.Off, false); var panel = new Border(); WorkspaceUi.Reveal(panel); Check(panel.Opacity == 1, "Motion off keeps exact final state");
+        Console.WriteLine("UI fixtures rendered without opening clinic data or saving preferences.");
+    }
+    static void Modal(Action<ClinicDialog> action)
+    {
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        { var dialog = Application.Current.Windows.OfType<ClinicDialog>().Last();
+            var timeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) }; timeout.Tick += (_, _) => { timeout.Stop(); if (dialog.IsVisible) { Console.Error.WriteLine("Dialog timeout: " + dialog.Error.Text); dialog.Close(); } }; timeout.Start();
+            dialog.Closed += (_, _) => timeout.Stop(); action(dialog);
+        }));
+    }
+    static void Workflow()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); connection.Open(); var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        AppDbContext Factory() => new(options);
+        using (var db = Factory()) { db.Database.EnsureCreated(); db.AppSettings.Add(new() { UsdToSypRate = 10000 }); db.Patients.Add(new() { Id = 1, FullName = "مريض اختبار", PhoneNumber = "000" }); db.LabNames.Add(new() { Id = 1, Name = "مخبر اختبار" }); db.SaveChanges(); }
+        Palette(true); var shortages = new ShortagesView(Factory); var window = Host(shortages, 1000, 780);
+        Field<TextBox>(shortages, "ItemName").Text = "مادة تجريبية"; Field<TextBox>(shortages, "Quantity").Text = "٣"; Field<CheckBox>(shortages, "UnknownPrice").IsChecked = true;
+        Field<Button>(shortages, "SaveItem").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(200);
+        using (var db = Factory()) Check(db.Shortages.Single().Quantity == 3 && !db.Shortages.Single().PriceKnown, "Unknown-price shortage saves from new form with Arabic quantity");
+        var row = (ShortageRowModel)Field<ListBox>(shortages, "NormalList").Items[0];
+        Call(shortages, "Delete_Click", new Button { DataContext = row }, new RoutedEventArgs()); Pump(); Check(Field<ListBox>(shortages, "NormalList").Items.Count == 0, "Delete removes pending row");
+        Call(shortages, "Undo_Click", new Button(), new RoutedEventArgs()); Pump(); Check(Field<ListBox>(shortages, "NormalList").Items.Count == 1, "Undo restores deleted row");
+        Modal(dialog => { var fields = dialog.Fields.Children.OfType<TextBox>().ToList(); fields[0].Text = "2.50"; fields[1].Text = "1"; Capture(dialog, "purchase-dialog-dark"); dialog.Submit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
+        Call(shortages, "Purchase_Click", new Button { DataContext = row }, new RoutedEventArgs()); Pump(200);
+        using (var db = Factory()) Check(db.Shortages.Single().Quantity == 2 && db.Expenses.Count() == 1 && db.ClinicOperations.Single().Amount == 2.5m, "Purchase dialog saves actual partial quantity and linked expense");
+        row = (ShortageRowModel)Field<ListBox>(shortages, "NormalList").Items[0]; Modal(dialog => dialog.Close()); Call(shortages, "Purchase_Click", new Button { DataContext = row }, new RoutedEventArgs());
+        using (var db = Factory()) Check(db.Expenses.Count() == 1, "Cancel purchase creates no expense"); window.Close(); Pump();
+        var lab = new LabView(Factory); window = Host(lab, 1000, 780); Call(lab, "OpenEditor", new object?[] { null }!);
+        Field<TextBox>(lab, "PatientName").Text = "مريض"; Field<ListBox>(lab, "PatientSuggestions").SelectedIndex = 0;
+        Field<ComboBox>(lab, "LabName").SelectedIndex = 0; Pump();
+        var visibleLabName = Visuals<TextBlock>(Field<ComboBox>(lab, "LabName")).Select(t => t.Text).ToList();
+        Check(visibleLabName.Contains("مخبر اختبار") && !visibleLabName.Any(t => t.Contains("MyClinic.Models.LabName")), "Selected lab renders its name rather than model type");
+        Check(lab.FindName("Unregistered") == null, "Unnecessary registration checkbox is removed");
+        Field<TextBox>(lab, "WorkType").Text = "تاج تجريبي"; Field<TextBox>(lab, "Cost").Text = "٣٠٫٥٠"; Field<TextBox>(lab, "Teeth").Text = "11, 65";
+        Field<Button>(lab, "SaveWork").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(200);
+        using (var db = Factory()) Check(db.LabWorks.Count() == 1 && db.LabWorks.Single().PatientId == 1 && db.LabWorks.Single().Cost == 30.5m, "New lab panel saves linked patient and Arabic decimal cost");
+        Call(lab, "OpenDetails", 1); Modal(dialog => { dialog.Fields.Children.OfType<TextBox>().First().Text = "10.50"; Capture(dialog, "lab-payment-dialog-dark"); dialog.Submit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
+        Call(lab, "Pay_Click", new Button(), new RoutedEventArgs()); Pump(200);
+        using (var db = Factory()) Check(db.LabWorks.Single().AmountPaid == 10.5m && db.ClinicOperations.Count(o => o.Kind == "LabPayment") == 1, "Lab payment dialog records partial amount");
+        Modal(dialog => { dialog.Fields.Children.OfType<ComboBox>().Single().SelectedItem = "تم الاستلام"; dialog.Submit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
+        Call(lab, "Advance_Click", new Button(), new RoutedEventArgs()); Pump(200);
+        using (var db = Factory()) Check(db.LabWorks.Single().DateReceived.HasValue && db.LabWorks.Single().AmountPaid == 10.5m, "Receive dialog preserves existing partial payment");
+        Call(lab, "EditWork_Click", new Button(), new RoutedEventArgs()); Pump();
+        Check(Field<ComboBox>(lab, "WorkCurrency").IsEnabled, "Currency remains editable after a partial payment");
+        Field<ComboBox>(lab, "WorkCurrency").SelectedItem = "SYP";
+        Check(Field<StackPanel>(lab, "CurrencyConversionHost").Visibility == Visibility.Visible && Field<TextBox>(lab, "Cost").Text == "305000", "Currency change shows conversion controls and converts cost");
+        Field<TextBox>(lab, "CurrencyConversionRate").Text = "20000";
+        Check(Field<TextBox>(lab, "Cost").Text == "610000" && Field<TextBlock>(lab, "CurrencyConversionPreview").Text.Contains("210,000"), "Conversion preview follows explicit rate");
+        Field<TextBox>(lab, "CorrectionReason").Text = "تصحيح عملة تجريبي"; Capture(window, "lab-currency-correction-dark");
+        Field<Button>(lab, "SaveWork").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(200);
+        using (var db = Factory()) Check(db.LabWorks.Single().Currency == "SYP" && db.LabWorks.Single().AmountPaid == 210000 && db.Expenses.Count() == 2, "Currency correction saves without adding an expense");
+        Call(lab, "OpenDetails", 1); Call(lab, "EditWork_Click", new Button(), new RoutedEventArgs());
+        Field<TextBox>(lab, "Teeth").Text = "15, 65";
+        Modal(dialog =>
+        {
+            var picker = dialog.Fields.Children.OfType<LabTeethPicker>().Single();
+            Check(picker.SelectedTeeth.Contains("15") && picker.SelectedTeeth.Contains("65"), "Anatomical picker restores both adult and primary selections");
+            Check(Visuals<ToothGlyph>(picker).Any(), "Lab picker uses Add Patient anatomical tooth glyphs");
+            Field<AdultDentalChart>(picker, "AdultChart").SelectTooth("21");
+            Call(picker, "Child_Click", new Button(), new RoutedEventArgs()); Pump();
+            Check(picker.SelectedTeeth.Contains("21") && picker.SelectedTeeth.Contains("65"), "Switching dentition retains selections in both charts");
+            Capture(dialog, "lab-tooth-picker-primary-dark");
+            Call(picker, "Adult_Click", new Button(), new RoutedEventArgs()); Pump(); Capture(dialog, "lab-tooth-picker-adult-dark");
+            dialog.Submit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        Call(lab, "PickTeeth_Click", new Button(), new RoutedEventArgs());
+        Check(Field<TextBox>(lab, "Teeth").Text.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToHashSet().SetEquals(new[] { "15", "21", "65" }), "Anatomical picker applies selected FDI numbers");
+        Call(lab, "CloseSide");
+        Modal(dialog =>
+        {
+            var archive = dialog.Fields.Children.OfType<CheckBox>().Single();
+            Check(archive.Foreground is SolidColorBrush foreground && foreground.Color.R > 180, "Archive checkbox text has dark-mode contrast");
+            Capture(dialog, "lab-archive-dialog-dark"); dialog.Close();
+        });
+        Call(lab, "EditLab", new object?[] { null }!); window.Close(); Pump();
+        var settings = new SettingsView(Factory); window = Host(settings, 1000, 780); Field<ListBox>(settings, "Categories").SelectedItem = "العلاجات";
+        Field<TextBox>(settings, "TreatmentName").Text = "علاج باسم اختياري"; Field<TextBox>(settings, "TreatmentPrice").Text = "12.75"; Field<CheckBox>(settings, "RequiresCanals").IsChecked = true;
+        Field<Button>(settings, "AddTreatment").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(200);
+        using (var db = Factory()) Check(db.TreatmentCosts.Single().RequiresCanals && db.TreatmentCosts.Single().Cost == 12.75m, "Treatment form saves explicit canals and decimal price"); window.Close(); Pump();
+        foreach (bool dark in new[] { false, true })
+        {
+            Palette(dark); string suffix = dark ? "dark" : "light";
+            var originalShortages = new MyClinic.OriginalTheme.ShortagesView(Factory); window = Host(originalShortages, 900, 760); Capture(window, "original-shortages-" + suffix); Check(((ShortagesView)originalShortages.Content).IsLoaded, "Original theme hosts shared shortages"); window.Close(); Pump();
+            var originalLab = new MyClinic.OriginalTheme.LabView(Factory); window = Host(originalLab, 900, 760); Capture(window, "original-lab-" + suffix); Check(((LabView)originalLab.Content).IsLoaded, "Original theme hosts shared lab"); window.Close(); Pump();
+            var originalSettings = new MyClinic.OriginalTheme.SettingsView(Factory); window = Host(originalSettings, 900, 760); Capture(window, "original-settings-" + suffix); Check(((SettingsView)originalSettings.Content).IsLoaded, "Original theme hosts shared settings"); window.Close(); Pump();
+        }
+    }
+    [STAThread] static int Main()
+    {
+        try
+        {
+            Directory.CreateDirectory(Output); var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }; MotionPreferences.Set(MotionLevel.Off, false);
+            Transactions().GetAwaiter().GetResult(); CurrencyCorrections().GetAwaiter().GetResult(); Legacy().GetAwaiter().GetResult(); Snapshot().GetAwaiter().GetResult(); Interface(); Workflow();
+            Console.WriteLine($"PASS: {count} clinic workspace checks. Previews: {Output}"); return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}

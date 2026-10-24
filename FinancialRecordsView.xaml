@@ -1,15 +1,4 @@
-<UserControl x:Class="MyClinic.FinancialRecordsView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:motion="clr-namespace:MyClinic"
-             FlowDirection="RightToLeft"
-             Background="Transparent"
-             Foreground="{DynamicResource AppTextPrimary}"
-             FontFamily="Segoe UI"
-             FontSize="14"
-             PreviewMouseMove="Financial_PreviewMouseMove"
-             MouseLeave="Financial_MouseLeave">
-
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:motion="clr-namespace:MyClinic" x:Class="MyClinic.FinancialRecordsView" FlowDirection="RightToLeft" Foreground="{DynamicResource AppTextPrimary}" Background="Transparent" FontFamily="Segoe UI" FontSize="14" PreviewKeyDown="Finance_KeyDown" SizeChanged="Finance_SizeChanged" Language="en-GB">
     <UserControl.Resources>
         <!-- ScrollBar Style -->
         <Style TargetType="ScrollBar">
@@ -38,9 +27,30 @@
                         </Setter.Value>
                     </Setter>
                 </Trigger>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent">
+                                    <Track x:Name="PART_Track" Orientation="Horizontal">
+                                        <Track.Thumb>
+                                            <Thumb MinWidth="20">
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border Background="{DynamicResource AppBorder}" CornerRadius="4" Margin="0,2"/>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
             </Style.Triggers>
         </Style>
-
         <!-- أنماط التقويم لـ DatePicker -->
         <Style TargetType="Calendar">
             <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
@@ -48,7 +58,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
-
         <Style TargetType="DatePickerTextBox">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="CaretBrush" Value="{DynamicResource AppTextPrimary}"/>
@@ -58,15 +67,11 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DatePickerTextBox">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Background="Transparent"
-                                      VerticalAlignment="Center"
-                                      HorizontalAlignment="Stretch"/>
+                        <ScrollViewer x:Name="PART_ContentHost" Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style TargetType="CalendarDayButton">
             <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
@@ -90,7 +95,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style TargetType="CalendarButton">
             <Setter Property="Background" Value="{DynamicResource AppCardBg}"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
@@ -101,14 +105,12 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <Style x:Key="PanelCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource SettingsCardBg}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource SettingsCardBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="18"/>
         </Style>
-
         <Style x:Key="ToolbarButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="42"/>
             <Setter Property="Padding" Value="18,0"/>
@@ -121,18 +123,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="11">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="RangeButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="36"/>
             <Setter Property="Width" Value="72"/>
@@ -146,18 +143,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="TableHeaderTextStyle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
@@ -165,7 +157,6 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-
         <Style x:Key="InputBoxStyle" TargetType="TextBox">
             <Setter Property="Height" Value="40"/>
             <Setter Property="Padding" Value="12,0"/>
@@ -178,17 +169,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
                             <Grid>
-                                <TextBlock Text="{TemplateBinding Tag}"
-                                           Margin="12,0"
-                                           Foreground="{DynamicResource AppTextSecondary}"
-                                           VerticalAlignment="Center"
-                                           IsHitTestVisible="False">
+                                <TextBlock Text="{TemplateBinding Tag}" Margin="12,0" Foreground="{DynamicResource AppTextSecondary}" VerticalAlignment="Center" IsHitTestVisible="False">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -215,7 +198,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="ExpenseCategoryItemStyle" TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -224,13 +206,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="ItemBd"
-                                CornerRadius="6"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}"
-                                Margin="2,1">
-                            <ContentPresenter HorizontalAlignment="Right"
-                                              VerticalAlignment="Center"/>
+                        <Border x:Name="ItemBd" CornerRadius="6" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" Margin="2,1">
+                            <ContentPresenter HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
@@ -246,7 +223,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style x:Key="ExpenseCategoryComboBoxStyle" TargetType="ComboBox">
             <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
             <Setter Property="Background" Value="{DynamicResource SettingsInputBg}"/>
@@ -258,59 +234,30 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton x:Name="ToggleButton"
-                                          Background="{TemplateBinding Background}"
-                                          BorderBrush="{TemplateBinding BorderBrush}"
-                                          BorderThickness="{TemplateBinding BorderThickness}"
-                                          Focusable="False"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press">
+                            <ToggleButton x:Name="ToggleButton" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Focusable="False" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="10">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="28"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="1" Text="&#xE70D;"
-                                                           FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                                           Foreground="{DynamicResource AppTextSecondary}"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1" Text="" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Grid>
                                         </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <ContentPresenter IsHitTestVisible="False"
-                                              Content="{TemplateBinding SelectionBoxItem}"
-                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="10,0,28,0"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Right"/>
-                            <Popup Placement="Bottom"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="Slide">
-                                <Grid MinWidth="{TemplateBinding ActualWidth}"
-                                      MaxHeight="{TemplateBinding MaxDropDownHeight}"
-                                      SnapsToDevicePixels="True">
-                                    <Border Background="{DynamicResource AppCardBg}"
-                                            BorderBrush="{DynamicResource SettingsCardBorder}"
-                                            BorderThickness="1"
-                                            CornerRadius="10"
-                                            Margin="0,4,0,8">
+                            <ContentPresenter IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="10,0,28,0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                            <Popup Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}" SnapsToDevicePixels="True">
+                                    <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource SettingsCardBorder}" BorderThickness="1" CornerRadius="10" Margin="0,4,0,8">
                                         <Border.Effect>
                                             <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="2" Opacity="0.22"/>
                                         </Border.Effect>
                                         <ScrollViewer Margin="4" SnapsToDevicePixels="True">
-                                            <StackPanel IsItemsHost="True"
-                                                        KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                         </ScrollViewer>
                                     </Border>
                                 </Grid>
@@ -320,1106 +267,727 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="Card" TargetType="Border" BasedOn="{StaticResource PanelCardStyle}">
+            <Setter Property="Padding" Value="14"/>
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource SettingsPrimaryBtnBg}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style x:Key="Link" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
+        </Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource InputBoxStyle}"/>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource ExpenseCategoryComboBoxStyle}">
+            <Setter Property="Height" Value="40"/>
+        </Style>
+        <Style TargetType="DatePicker">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource SettingsInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsInputBorder}"/>
+            <Setter Property="SelectedDateFormat" Value="Short"/>
+        </Style>
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,6"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </Style>
+        <Style x:Key="MoneyText" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
+            <Setter Property="FlowDirection" Value="LeftToRight"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="CanUserReorderColumns" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="MinRowHeight" Value="46"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource SettingsTableRowBorder}"/>
+            <Setter Property="Background" Value="{DynamicResource SettingsCardBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowBackground" Value="{DynamicResource SettingsCardBg}"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="EnableColumnVirtualization" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+            <Setter Property="motion:ScrollState.Enabled" Value="True"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource SettingsTableContainerBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+            <Setter Property="Padding" Value="10,12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource DashCalendarTodayBorder}"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="motion:FinanceMotion.HighlightId" Value="{Binding Id}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Tab" Padding="{TemplateBinding Padding}" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="Transparent">
+                            <ContentPresenter ContentSource="Header"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource DashCalendarTodayNumFg}"/>
+                                <Setter TargetName="Tab" Property="BorderBrush" Value="{DynamicResource DashCalendarTodayNumFg}"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Tab" Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TabPanel IsItemsHost="True" Background="{DynamicResource SettingsCardBg}"/>
+                            <ContentPresenter Grid.Row="1" x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <DataTemplate x:Key="TreatmentDetails">
+            <Border Padding="16,12" Background="{DynamicResource AppInputBg}" motion:FinanceMotion.Reveal="True">
+                <StackPanel>
+                    <TextBlock Text="تفاصيل العملية · القيم بالليرة السورية" Style="{StaticResource Label}"/>
+                    <ItemsControl ItemsSource="{Binding Treatments}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <WrapPanel Margin="0,4">
+                                    <TextBlock Text="{Binding TreatmentName}" Width="160" TextWrapping="Wrap"/>
+                                    <StackPanel Width="145">
+                                        <TextBlock Text="قيمة العلاج" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="{Binding CostText}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="145">
+                                        <TextBlock Text="المسامحة هنا" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="{Binding ForgivenText}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="145">
+                                        <TextBlock Text="المخصص للعلاج" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="{Binding PaidText}"/>
+                                        <TextBlock Text="{Binding CreditAppliedText, StringFormat=من رصيد سابق: {0}}" FontSize="11" Foreground="{DynamicResource AppTextSecondary}"/>
+                                    </StackPanel>
+                                    <StackPanel Width="145">
+                                        <TextBlock Text="المتبقي وقت العملية" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="{Binding RemainingText}"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding Note}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
-
     <Grid x:Name="FinancialRootGrid" ClipToBounds="True">
-        <!-- طبقة الإضاءة الخلفية التفاعلية للوضع الداكن -->
-        <Canvas x:Name="FinancialSpotlightCanvas"
-                Panel.ZIndex="0"
-                IsHitTestVisible="False"
-                Visibility="Collapsed">
-            <Ellipse x:Name="FinancialSpotlightEllipse" CacheMode="BitmapCache"
-                     Width="620"
-                     Height="620"
-                     IsHitTestVisible="False">
-                <Ellipse.Fill>
-                    <RadialGradientBrush GradientOrigin="0.5,0.5" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
-                        <GradientStop Color="#4514B8A6" Offset="0.0"/>
-                        <GradientStop Color="#220EA5E9" Offset="0.42"/>
-                        <GradientStop Color="#0C2DD4BF" Offset="0.72"/>
-                        <GradientStop Color="#00000000" Offset="1.0"/>
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-                <Ellipse.RenderTransform>
-                    <TranslateTransform x:Name="FinancialSpotlightTransform" X="-1200" Y="-1200"/>
-                </Ellipse.RenderTransform>
-            </Ellipse>
-        </Canvas>
-
-        <ScrollViewer motion:ScrollState.Enabled="True" Panel.ZIndex="1"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="4,2,4,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="PatientColumn" Width="0"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid x:Name="MainShell" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="الشؤون المالية" FontSize="25" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="PeriodLabel" Style="{StaticResource Label}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight" HorizontalAlignment="Left"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="12,0,0,0">
+                    <Button Content="تصدير CSV" Click="ExportPeriod_Click" Margin="0,0,8,0"/>
+                    <Button Content="طباعة التقرير" Click="PrintPeriod_Click"/>
+                </StackPanel>
+            </Grid>
+            <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,12">
+                <Button Click="IncomeCard_Click" Height="Auto" Padding="14" Margin="0,0,6,0" HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <TextBlock Text="المبالغ المحصلة" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TxtTotalIncome" Text="0 ل.س" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Foreground="{DynamicResource FinancePositive}"/>
+                        <TextBlock x:Name="IncomeComparison" Style="{StaticResource Label}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Button>
+                <Button Click="ExpenseCard_Click" Height="Auto" Padding="14" Margin="0,0,6,0" HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <TextBlock Text="المصاريف" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TxtTotalExpenses" Text="0 ل.س" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Foreground="{DynamicResource FinanceNegative}"/>
+                        <TextBlock x:Name="ExpenseComparison" Style="{StaticResource Label}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Button>
+                <Button Click="IncomeCard_Click" Height="Auto" Padding="14" Margin="0,0,6,0" HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <TextBlock Text="صافي التحصيل" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TxtNetAmount" Text="0 ل.س" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Foreground="{DynamicResource DashCalendarTodayNumFg}"/>
+                        <TextBlock x:Name="NetComparison" Style="{StaticResource Label}" Margin="0,7,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Button>
+                <Button Click="AccountsCard_Click" Height="Auto" Padding="14" Margin="0,0,6,0" HorizontalContentAlignment="Stretch">
+                    <StackPanel>
+                        <TextBlock Text="أرصدة المرضى المستحقة" Style="{StaticResource Label}"/>
+                        <TextBlock x:Name="TxtOutstanding" Text="0 ل.س" FontSize="22" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Foreground="{DynamicResource FinanceNegative}"/>
+                        <TextBlock Text="حتى اليوم · جميع المرضى" Style="{StaticResource Label}"/>
+                    </StackPanel>
+                </Button>
+            </UniformGrid>
+            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="10" Margin="0,0,0,10">
+                <WrapPanel>
+                    <StackPanel Width="190" Margin="0,0,10,6">
+                        <TextBlock Text="بحث: المريض / الهاتف / التفاصيل" Style="{StaticResource Label}"/>
+                        <TextBox x:Name="WorkspaceSearch" AutomationProperties.Name="بحث: المريض / الهاتف / التفاصيل" TextChanged="WorkspaceFilter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,10,6">
+                        <TextBlock Text="الفترة" Style="{StaticResource Label}"/>
+                        <StackPanel Orientation="Horizontal" x:Name="RangeButtons">
+                            <Button Content="يومي" Click="Range_Click" x:Name="BtnDayRange" Tag="Day" Margin="0,0,3,0"/>
+                            <Button Content="شهري" Click="Range_Click" x:Name="BtnMonthRange" Tag="Month" Margin="0,0,3,0"/>
+                            <Button Content="سنوي" Click="Range_Click" x:Name="BtnYearRange" Tag="Year" Margin="0,0,3,0"/>
+                            <Button Content="مخصصة" Click="Range_Click" x:Name="BtnCustomRange" Tag="Custom" Margin="0,0,3,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Width="135" Margin="0,0,10,6">
+                        <TextBlock Text="التاريخ / من" Style="{StaticResource Label}"/>
+                        <DatePicker x:Name="DpFilterDate" AutomationProperties.Name="التاريخ / من" SelectedDateChanged="DateFilter_Changed"/>
+                    </StackPanel>
+                    <StackPanel x:Name="EndDateHost" Visibility="Collapsed">
+                        <StackPanel Width="135" Margin="0,0,10,6">
+                            <TextBlock Text="إلى" Style="{StaticResource Label}"/>
+                            <DatePicker x:Name="DpFilterEnd" AutomationProperties.Name="إلى" SelectedDateChanged="DateFilter_Changed"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,10,6">
+                        <TextBlock Text="التنقل" Style="{StaticResource Label}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="السابق" Click="PreviousPeriod_Click"/>
+                            <Button Content="التالي" Click="NextPeriod_Click" Margin="4,0"/>
+                            <Button Content="هذا الشهر" Click="CurrentPeriod_Click" x:Name="BtnCurrentDate"/>
+                        </StackPanel>
+                    </StackPanel>
+                </WrapPanel>
+            </Border>
+            <WrapPanel Grid.Row="3" Margin="4,0,0,10" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtVisitCount" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,18,0"/>
+                <TextBlock x:Name="TxtPendingCount" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,18,0"/>
+                <TextBlock x:Name="ResultsLabel" Foreground="{DynamicResource AppTextSecondary}" Margin="0,0,18,0"/>
+                <ComboBox x:Name="CategoryFilter" AutomationProperties.Name="فئة المصروف أو المستحق" SelectionChanged="WorkspaceFilter_Changed" Width="135" ToolTip="فئة المصروف / المستحق؛ لا تؤثر على الدخل أو أرصدة المرضى" Margin="12,0,8,0"/>
+                <Button Content="مسح الفلاتر" Click="ClearFilters_Click" VerticalAlignment="Center" Margin="0,0,0,0"/>
+            </WrapPanel>
+            <Border Grid.Row="4" Style="{StaticResource Card}" Padding="0" ClipToBounds="True">
+                <TabControl x:Name="FinanceTabs" SelectionChanged="FinanceTabs_Changed">
+                    <TabItem Header="سجل الدخل">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid x:Name="IncomeItemsControl" RowDetailsTemplate="{StaticResource TreatmentDetails}" RowDetailsVisibilityMode="Collapsed" AutomationProperties.Name="سجل الدخل">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="التاريخ" Binding="{Binding DateText}" SortMemberPath="Date" Width="112" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTextColumn Header="الوقت" Binding="{Binding TimeText}" SortMemberPath="Date" Width="70" ElementStyle="{StaticResource CellText}"/>
+                                    <DataGridTemplateColumn Header="المريض" Width="*" SortMemberPath="PatientName" MinWidth="180">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="{Binding PatientName}" Click="OpenPatient_Click" HorizontalContentAlignment="Right" Style="{StaticResource Link}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="الهاتف" Binding="{Binding Phone}" SortMemberPath="Phone" Width="125" ElementStyle="{StaticResource MoneyText}"/>
+                                    <DataGridTemplateColumn Header="النوع" Width="105" SortMemberPath="Kind">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{DynamicResource AppInputBg}" CornerRadius="6" Padding="8,4" Margin="4,6" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Kind}" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="المحصّل" Binding="{Binding PaidText}" SortMemberPath="Paid" Width="145" ElementStyle="{StaticResource MoneyText}"/>
+                                    <DataGridTemplateColumn Header="التفاصيل" Width="90">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="⌄ عرض" Click="ToggleDetails_Click" Style="{StaticResource Link}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel x:Name="EmptyIncomeText" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                <TextBlock Text="لا توجد سجلات دخل مطابقة."/>
+                                <Button Content="مسح الفلاتر" Click="ClearFilters_Click" Style="{StaticResource Link}"/>
+                            </StackPanel>
+                            <DockPanel Grid.Row="1" Margin="16,10">
+                                <TextBlock Text="المحصّل من السجلات المعروضة" Foreground="{DynamicResource AppTextSecondary}"/>
+                                <TextBlock x:Name="TxtIncomeFooterTotal" FontWeight="Bold" HorizontalAlignment="Left" Margin="14,0,0,0"/>
+                            </DockPanel>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="المصاريف">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <motion:AnimatedSection x:Name="ExpenseEntrySection" Header="إضافة مصروف / تصحيح سجل" Style="{StaticResource AnimatedSectionStyle}" IsExpanded="False" Margin="14,8">
+                                <WrapPanel Margin="0,8,0,0">
+                                    <StackPanel Width="125" Margin="0,0,10,6">
+                                        <TextBlock Text="الفئة" Style="{StaticResource Label}"/>
+                                        <ComboBox x:Name="CmbExpenseCategory" AutomationProperties.Name="الفئة"/>
+                                    </StackPanel>
+                                    <StackPanel Width="180" Margin="0,0,10,6">
+                                        <TextBlock Text="تفاصيل المصروف" Style="{StaticResource Label}"/>
+                                        <TextBox x:Name="TxtExpenseDetails" AutomationProperties.Name="تفاصيل المصروف"/>
+                                    </StackPanel>
+                                    <StackPanel Width="140" Margin="0,0,10,6">
+                                        <TextBlock Text="المبلغ (ل.س)" Style="{StaticResource Label}"/>
+                                        <TextBox x:Name="TxtExpenseAmount" AutomationProperties.Name="المبلغ (ل.س)" FlowDirection="LeftToRight"/>
+                                    </StackPanel>
+                                    <StackPanel Width="135" Margin="0,0,10,6">
+                                        <TextBlock Text="تاريخ المصروف" Style="{StaticResource Label}"/>
+                                        <DatePicker x:Name="DpExpenseDate" AutomationProperties.Name="تاريخ المصروف"/>
+                                    </StackPanel>
+                                    <StackPanel x:Name="ExpenseReasonHost" Visibility="Collapsed">
+                                        <StackPanel Width="180" Margin="0,0,10,6">
+                                            <TextBlock Text="سبب التصحيح (مطلوب)" Style="{StaticResource Label}"/>
+                                            <TextBox x:Name="TxtExpenseReason" AutomationProperties.Name="سبب التصحيح (مطلوب)"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Content="إضافة مصروف" Click="SaveExpense_Click" x:Name="BtnSaveExpense" VerticalAlignment="Bottom" Margin="0,0,8,6" Style="{StaticResource Primary}"/>
+                                    <Button Content="إلغاء التعديل" Click="CancelExpenseEdit_Click" x:Name="BtnCancelExpenseEdit" VerticalAlignment="Bottom" Margin="0,0,0,6" Visibility="Collapsed"/>
+                                </WrapPanel>
+                            </motion:AnimatedSection>
+                            <Grid Grid.Row="1">
+                                <DataGrid x:Name="ExpenseItemsControl">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="التاريخ" Binding="{Binding DateText}" SortMemberPath="Date" Width="115" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTemplateColumn Header="الفئة" Width="110" SortMemberPath="Category">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource AppInputBg}" CornerRadius="6" Padding="8,4" Margin="4,6" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Category}" Foreground="{DynamicResource AppTextSecondary}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="التفاصيل" Binding="{Binding Description}" SortMemberPath="Description" Width="*" ElementStyle="{StaticResource CellText}" MinWidth="160"/>
+                                        <DataGridTextColumn Header="القيمة" Binding="{Binding AmountText}" SortMemberPath="Amount" Width="160" ElementStyle="{StaticResource MoneyText}"/>
+                                        <DataGridTemplateColumn Header="الإجراء" Width="95">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="تصحيح" Click="EditExpense_Click" Style="{StaticResource Link}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel x:Name="EmptyExpenseText" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                    <TextBlock Text="لا توجد مصاريف مطابقة."/>
+                                    <Button Content="إضافة مصروف" Click="FocusExpense_Click" Style="{StaticResource Link}"/>
+                                </StackPanel>
+                            </Grid>
+                            <DockPanel Grid.Row="2" Margin="16,10">
+                                <TextBlock Text="مجموع المصاريف المعروضة"/>
+                                <TextBlock x:Name="TxtExpenseFooterTotal" FontWeight="Bold" HorizontalAlignment="Left" Margin="14,0,0,0"/>
+                            </DockPanel>
+                            <Expander x:Name="ExpenseBreakdownSection" Grid.Row="3" Header="تحليل المصاريف حسب الفئة" Foreground="{DynamicResource AppTextPrimary}" Margin="16,0,16,12">
+                                <ScrollViewer MaxHeight="135">
+                                    <ItemsControl x:Name="ExpenseBreakdown">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="110"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="150"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Category}"/>
+                                                    <ProgressBar Grid.Column="1" Height="6" Value="{Binding Percent, Mode=OneWay}" Maximum="100" Margin="10,0" Foreground="{Binding Color}" Background="{DynamicResource AppBorder}"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding AmountText}" TextAlignment="Left"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Expander>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="المستحقات">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid Margin="14,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <motion:AnimatedSection x:Name="UpcomingEntrySection" Header="إضافة مستحق / تعديل سجل" Style="{StaticResource AnimatedSectionStyle}" IsExpanded="False" Margin="0">
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <StackPanel Width="120" Margin="0,0,10,6">
+                                            <TextBlock Text="الفئة" Style="{StaticResource Label}"/>
+                                            <ComboBox x:Name="CmbUpcomingCategory" AutomationProperties.Name="الفئة"/>
+                                        </StackPanel>
+                                        <StackPanel Width="160" Margin="0,0,10,6">
+                                            <TextBlock Text="التفاصيل" Style="{StaticResource Label}"/>
+                                            <TextBox x:Name="TxtUpcomingDescription" AutomationProperties.Name="التفاصيل"/>
+                                        </StackPanel>
+                                        <StackPanel Width="130" Margin="0,0,10,6">
+                                            <TextBlock Text="المبلغ (ل.س)" Style="{StaticResource Label}"/>
+                                            <TextBox x:Name="TxtUpcomingAmount" AutomationProperties.Name="المبلغ (ل.س)" FlowDirection="LeftToRight"/>
+                                        </StackPanel>
+                                        <StackPanel Width="135" Margin="0,0,10,6">
+                                            <TextBlock Text="تاريخ الاستحقاق" Style="{StaticResource Label}"/>
+                                            <DatePicker x:Name="DpUpcomingDue" AutomationProperties.Name="تاريخ الاستحقاق"/>
+                                        </StackPanel>
+                                        <Button Content="إضافة مستحق" Click="SaveUpcoming_Click" x:Name="BtnSaveUpcoming" VerticalAlignment="Bottom" Margin="0,0,8,6" Style="{StaticResource Primary}"/>
+                                        <Button Content="إلغاء التعديل" Click="CancelUpcomingEdit_Click" x:Name="BtnCancelUpcomingEdit" VerticalAlignment="Bottom" Margin="0,0,0,6" Visibility="Collapsed"/>
+                                    </WrapPanel>
+                                </motion:AnimatedSection>
+                                <ComboBox x:Name="UpcomingStatusFilter" Width="170" Grid.Column="1" VerticalAlignment="Top" Margin="12,0,0,0" ToolTip="حتى اليوم · مستقلة عن فلتر الفترة" SelectionChanged="WorkspaceFilter_Changed" AutomationProperties.Name="المعلقة">
+                                    <ComboBoxItem Content="المعلقة"/>
+                                    <ComboBoxItem Content="المسددة"/>
+                                    <ComboBoxItem Content="الملغاة"/>
+                                    <ComboBoxItem Content="جميع الحالات"/>
+                                </ComboBox>
+                            </Grid>
+                            <Grid Grid.Row="1">
+                                <DataGrid x:Name="UpcomingItemsControl" ColumnHeaderHeight="36">
+                                    <DataGrid.ColumnHeaderStyle>
+                                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                                            <Setter Property="Padding" Value="10,6"/>
+                                        </Style>
+                                    </DataGrid.ColumnHeaderStyle>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="الاستحقاق" Binding="{Binding DueText}" SortMemberPath="DueSort" Width="115" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTemplateColumn Header="الحالة" Width="100" SortMemberPath="StatusOrder">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource AppInputBg}" CornerRadius="6" Padding="8,4" Margin="4,6" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding StatusText}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource FinanceWarning}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding StatusOrder}" Value="0">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource FinanceNegative}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding StatusOrder}" Value="4">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource FinancePositive}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding StatusOrder}" Value="5">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="التفاصيل" Binding="{Binding Description}" SortMemberPath="Description" Width="*" ElementStyle="{StaticResource CellText}" MinWidth="160"/>
+                                        <DataGridTextColumn Header="القيمة" Binding="{Binding AmountText}" SortMemberPath="Amount" Width="140" ElementStyle="{StaticResource MoneyText}"/>
+                                        <DataGridTemplateColumn Header="الإجراءات" Width="245">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" IsEnabled="{Binding Pending}">
+                                                        <Button Content="تسجيل السداد" Click="PayUpcoming_Click" Style="{StaticResource Link}"/>
+                                                        <Button Content="تعديل" Click="EditUpcoming_Click" Style="{StaticResource Link}"/>
+                                                        <Button Content="إلغاء" Click="CancelUpcoming_Click" Style="{StaticResource Link}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel x:Name="EmptyUpcomingText" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                    <TextBlock Text="لا توجد مستحقات مطابقة."/>
+                                    <Button Content="إضافة مستحق" Click="FocusUpcoming_Click" Style="{StaticResource Link}"/>
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="14,4" HorizontalAlignment="Center">
+                                <Button x:Name="BtnUpcomingPrevious" Content="السابق" Click="PreviousUpcomingPage_Click"/>
+                                <TextBlock x:Name="UpcomingPageLabel" VerticalAlignment="Center" Margin="14,0" Foreground="{DynamicResource AppTextSecondary}"/>
+                                <Button x:Name="BtnUpcomingNext" Content="التالي" Click="NextUpcomingPage_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="حسابات المرضى">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <WrapPanel Margin="14,12">
+                                <StackPanel Margin="0,0,16,6">
+                                    <TextBlock Text="أرصدة المرضى المستحقة حتى اليوم" FontWeight="Bold"/>
+                                    <TextBlock x:Name="TxtUnpaidTotal" Style="{StaticResource Label}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <ComboBox x:Name="AccountAgeFilter" Width="155" Margin="0,0,8,6" SelectionChanged="WorkspaceFilter_Changed" AutomationProperties.Name="جميع الأعمار">
+                                    <ComboBoxItem Content="جميع الأعمار"/>
+                                    <ComboBoxItem Content="حتى 30 يوماً"/>
+                                    <ComboBoxItem Content="31–60 يوماً"/>
+                                    <ComboBoxItem Content="61–90 يوماً"/>
+                                    <ComboBoxItem Content="أكثر من 90 يوماً"/>
+                                </ComboBox>
+                                <ComboBox x:Name="CmbUnpaidSort" Width="155" Margin="0,0,8,6" SelectionChanged="WorkspaceFilter_Changed" AutomationProperties.Name="الأعلى مديونية">
+                                    <ComboBoxItem Content="الأعلى مديونية"/>
+                                    <ComboBoxItem Content="الاسم"/>
+                                    <ComboBoxItem Content="الأقدم"/>
+                                </ComboBox>
+                                <Button Content="بحث عن حساب مريض" Click="SearchPatient_Click" Margin="0,0,0,6"/>
+                            </WrapPanel>
+                            <Grid Grid.Row="1">
+                                <DataGrid x:Name="UnpaidItemsControl">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="المريض" Width="*" SortMemberPath="PatientName" MinWidth="180">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="{Binding PatientName}" Click="OpenPatient_Click" HorizontalContentAlignment="Right" Style="{StaticResource Link}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="الهاتف" Binding="{Binding Phone}" SortMemberPath="Phone" Width="135" ElementStyle="{StaticResource MoneyText}"/>
+                                        <DataGridTextColumn Header="بداية الرصيد" Binding="{Binding FirstDebtDateText}" SortMemberPath="FirstDebtDate" Width="120" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTextColumn Header="العمر" Binding="{Binding AgeText}" SortMemberPath="AgeDays" Width="95" ElementStyle="{StaticResource CellText}"/>
+                                        <DataGridTextColumn Header="المستحق" Binding="{Binding BalanceText}" SortMemberPath="Balance" Width="155" ElementStyle="{StaticResource MoneyText}"/>
+                                        <DataGridTemplateColumn Header="الإجراء" Width="120">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="تسجيل دفعة" Click="OpenPayment_Click" Style="{StaticResource Link}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel x:Name="EmptyUnpaidText" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                    <TextBlock Text="لا توجد أرصدة مستحقة تطابق البحث."/>
+                                    <Button Content="مسح الفلاتر" Click="ClearFilters_Click" Style="{StaticResource Link}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+        <Border x:Name="PatientPanel" Grid.Column="0" Style="{StaticResource Card}" Padding="16" Margin="0,0,12,0" Visibility="Collapsed" Panel.ZIndex="20">
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-
-                <!-- ═══ Header Banner ═══ -->
-                <Border motion:NavigationTransition.Motion="Header" motion:NavigationTransition.Order="0" Grid.Row="0"
-                        Background="{DynamicResource SettingsBannerBg}"
-                        BorderBrush="{DynamicResource SettingsBannerBorder}"
-                        BorderThickness="1.2"
-                        CornerRadius="18"
-                        Padding="28,18"
-                        Margin="0,0,0,14"
-                        ClipToBounds="True">
-                    <Border.Effect>
-                        <DropShadowEffect Color="#2DD4BF"
-                                          BlurRadius="20"
-                                          ShadowDepth="0"
-                                          Opacity="{DynamicResource SettingsBannerGlowOpacity}"/>
-                    </Border.Effect>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="الإدارة المالية"
-                                       FontSize="30"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource SettingsBannerTitleFg}"
-                                       Margin="0,0,0,4"/>
-                            <TextBlock Text="تتبع الدخل والمصاريف والدفع المالي للمرضى"
-                                       FontSize="14.5"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource SettingsBannerSubFg}"/>
+                <DockPanel>
+                    <Button Content="×" Click="ClosePatient_Click" DockPanel.Dock="Left" AutomationProperties.Name="إغلاق حساب المريض"/>
+                    <StackPanel>
+                        <TextBlock Text="السجل المالي للمريض" FontSize="20" FontWeight="Bold"/>
+                        <TextBlock x:Name="PatientIdentity" Foreground="{DynamicResource AppTextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Grid.Row="1" Margin="0,12,0,8">
+                    <TextBlock Text="البحث بالاسم أو الهاتف" Style="{StaticResource Label}"/>
+                    <TextBox x:Name="TxtPatientSearchInput" TextChanged="PatientSearch_Changed" AutomationProperties.Name="البحث عن حساب مريض"/>
+                    <ListBox x:Name="LstPatientSuggestions" DisplayMemberPath="Label" SelectionChanged="PatientSuggestion_Selected" MaxHeight="135" Visibility="Collapsed" Background="{DynamicResource SettingsInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderThickness="0"/>
+                    <TextBlock x:Name="PatientSearchHint" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2">
+                    <UniformGrid Columns="2" Margin="0,0,0,10" x:Name="PatientSummary">
+                        <StackPanel Margin="0,4">
+                            <TextBlock Text="إجمالي التكلفة" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtPatientTotalCost" FontWeight="Bold"/>
                         </StackPanel>
-
-                        <Border Grid.Column="1"
-                                Background="{DynamicResource SettingsBannerPillBg}"
-                                BorderBrush="{DynamicResource SettingsBannerPillBorder}"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="16,9"
-                                VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE8C7;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="17"
-                                           Foreground="{DynamicResource SettingsBannerPillFg}"
-                                           VerticalAlignment="Center"
-                                           Margin="0,0,8,0"/>
-                                <TextBlock Text="السجل المالي"
-                                           FontSize="14.5"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource SettingsBannerPillFg}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Border>
-
-                <!-- ═══ Summary Cards ═══ -->
-                <Grid motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="1" Grid.Row="1" Margin="0,0,0,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0"
-                            Style="{StaticResource PanelCardStyle}"
-                            Padding="20,16">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#2DD4BF"
-                                              BlurRadius="16"
-                                              ShadowDepth="0"
-                                              Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                        </Border.Effect>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0"
-                                    Width="46"
-                                    Height="46"
-                                    CornerRadius="13"
-                                    Background="#1810B981"
-                                    BorderBrush="#4010B981"
-                                    BorderThickness="1">
-                                <TextBlock Text="&#xE8FB;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="#10B981"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="إجمالي الدخل" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}"/>
-                                <TextBlock x:Name="TxtTotalIncome" Text="0" Margin="0,4,0,0" FontSize="24" FontWeight="Bold" Foreground="#10B981">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect Color="#2DD4BF"
-                                                          BlurRadius="12"
-                                                          ShadowDepth="0"
-                                                          Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Column="2"
-                            Style="{StaticResource PanelCardStyle}"
-                            Padding="20,16">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#2DD4BF"
-                                              BlurRadius="16"
-                                              ShadowDepth="0"
-                                              Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                        </Border.Effect>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0"
-                                    Width="46"
-                                    Height="46"
-                                    CornerRadius="13"
-                                    Background="#18EF4444"
-                                    BorderBrush="#40EF4444"
-                                    BorderThickness="1">
-                                <TextBlock Text="&#xE7C1;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="20"
-                                           Foreground="#EF4444"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="إجمالي المصاريف" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}"/>
-                                <TextBlock x:Name="TxtTotalExpenses" Text="0" Margin="0,4,0,0" FontSize="24" FontWeight="Bold" Foreground="#EF4444">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect Color="#2DD4BF"
-                                                          BlurRadius="12"
-                                                          ShadowDepth="0"
-                                                          Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Column="4"
-                            Style="{StaticResource PanelCardStyle}"
-                            Padding="20,16">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#2DD4BF"
-                                              BlurRadius="16"
-                                              ShadowDepth="0"
-                                              Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                        </Border.Effect>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0"
-                                    Width="46"
-                                    Height="46"
-                                    CornerRadius="13"
-                                    Background="{DynamicResource PatientAvatarBg}"
-                                    BorderBrush="{DynamicResource PatientAvatarBorder}"
-                                    BorderThickness="1">
-                                <TextBlock Text="ل.س"
-                                           FontSize="16"
-                                           Foreground="{DynamicResource PatientAvatarFg}"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="الصافي" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}"/>
-                                <TextBlock x:Name="TxtNetAmount" Text="0" Margin="0,4,0,0" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource DashCalendarTodayNumFg}">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect Color="#2DD4BF"
-                                                          BlurRadius="12"
-                                                          ShadowDepth="0"
-                                                          Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Column="6"
-                            Style="{StaticResource PanelCardStyle}"
-                            Padding="20,16">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#2DD4BF"
-                                              BlurRadius="16"
-                                              ShadowDepth="0"
-                                              Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                        </Border.Effect>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0"
-                                    Width="46"
-                                    Height="46"
-                                    CornerRadius="13"
-                                    Background="{DynamicResource PatientChipBg}"
-                                    BorderBrush="{DynamicResource PatientChipBorder}"
-                                    BorderThickness="1">
-                                <TextBlock Text="&#xE787;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="19"
-                                           Foreground="{DynamicResource PatientAvatarFg}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="عدد الزيارات (الحالات)" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}"/>
-                                <TextBlock x:Name="TxtVisitCount" Text="0" Margin="0,4,0,0" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect Color="#2DD4BF"
-                                                          BlurRadius="12"
-                                                          ShadowDepth="0"
-                                                          Opacity="{DynamicResource DashCanalBoxGlowOpacity}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- ═══ Action Bar ═══ -->
-                <Border motion:NavigationTransition.Motion="Toolbar" motion:NavigationTransition.Order="3" Grid.Row="2"
-                        Style="{StaticResource PanelCardStyle}"
-                        Padding="18,14"
-                        Margin="0,0,0,14">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Search & Unpaid Buttons -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="BtnOpenSearchOverlay"
-                                    Height="42"
-                                    Padding="18,0"
-                                    Background="{DynamicResource SettingsPrimaryBtnBg}"
-                                    BorderBrush="{DynamicResource SettingsPrimaryBtnBorder}"
-                                    BorderThickness="1"
-                                    Foreground="White"
-                                    Cursor="Hand"
-                                    Click="BtnOpenSearchOverlay_Click">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                Padding="{TemplateBinding Padding}"
-                                                CornerRadius="11">
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,10,0" Foreground="White" VerticalAlignment="Center"/>
-                                                <TextBlock Text="بحث عن سجل لمريض" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-
-                            <Button x:Name="BtnOpenUnpaidOverlay"
-                                    Height="42"
-                                    Padding="18,0"
-                                    Margin="10,0,0,0"
-                                    Background="#F59E0B"
-                                    BorderBrush="#FBBF24"
-                                    BorderThickness="1"
-                                    Foreground="White"
-                                    Cursor="Hand"
-                                    Click="BtnOpenUnpaidOverlay_Click">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                Padding="{TemplateBinding Padding}"
-                                                CornerRadius="11">
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="&#xE8C7;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,10,0" Foreground="White" VerticalAlignment="Center"/>
-                                                <TextBlock Text="حسابات لم تسدد" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
+                        <StackPanel Margin="0,4">
+                            <TextBlock Text="إجمالي الدفعات" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtPatientTotalPaid" FontWeight="Bold"/>
                         </StackPanel>
-
-                        <!-- Date Filters -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource DashFilterGroupBg}"
-                                    BorderBrush="{DynamicResource DashFilterGroupBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Padding="10,4"
-                                    Height="42">
-                                <DatePicker x:Name="DpFilterDate"
-                                            Width="150"
-                                            VerticalContentAlignment="Center"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Foreground="{DynamicResource AppTextPrimary}"
-                                            CalendarOpened="DpFilterDate_CalendarOpened"
-                                            SelectedDateChanged="DpFilterDate_SelectedDateChanged"/>
-                            </Border>
-
-                            <Button x:Name="BtnCurrentDate"
-                                    Margin="10,0,0,0"
-                                    Height="42"
-                                    Padding="14,0"
-                                    Content="اليوم الحالي"
-                                    Background="{DynamicResource DashCalendarTodayBg}"
-                                    BorderBrush="{DynamicResource DashCalendarTodayBorder}"
-                                    BorderThickness="1"
-                                    Foreground="{DynamicResource DashCalendarTodayNumFg}"
-                                    FontWeight="Bold"
-                                    Cursor="Hand"
-                                    Visibility="Collapsed"
-                                    Click="BtnCurrentDate_Click">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                Padding="{TemplateBinding Padding}"
-                                                CornerRadius="11">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
+                        <StackPanel Margin="0,4">
+                            <TextBlock Text="إجمالي المسامحة" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtPatientTotalForgiven" FontWeight="Bold"/>
                         </StackPanel>
-
-                        <!-- Range Pills (يومي / شهري / سنوي) -->
-                        <Border Grid.Column="4"
-                                Background="{DynamicResource DashFilterGroupBg}"
-                                BorderBrush="{DynamicResource DashFilterGroupBorder}"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="4"
-                                VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnDayRange" Content="يومي" Style="{StaticResource RangeButtonStyle}" Click="BtnDayRange_Click"/>
-                                <Button x:Name="BtnMonthRange" Content="شهري" Style="{StaticResource RangeButtonStyle}" Click="BtnMonthRange_Click"/>
-                                <Button x:Name="BtnYearRange" Content="سنوي" Style="{StaticResource RangeButtonStyle}" Click="BtnYearRange_Click"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Border>
-
-                <!-- ═══ Income and Expenses Grid ═══ -->
-                <Grid motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="4" Grid.Row="3" Margin="0,0,0,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.22*"/>
-                        <ColumnDefinition Width="14"/>
-                        <ColumnDefinition Width="0.88*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Income Section -->
-                    <Border Grid.Column="0" Style="{StaticResource PanelCardStyle}" ClipToBounds="True">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1" Padding="20,16">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="32" Height="32" CornerRadius="9" Background="#1810B981" Margin="0,0,10,0">
-                                            <TextBlock Text="&#xE8FB;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#10B981" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <TextBlock Text="سجل الدخل" FontSize="20" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <Border Grid.Row="1" Padding="18,12" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="85"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="85"/>
-                                        <ColumnDefinition Width="85"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="5" Text="التاريخ" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="4" Text="الوقت" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="3" Text="اسم المريض/المصدر" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="2" Text="الهاتف" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="1" Text="المبلغ المدفوع" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="0" Text="التفاصيل" Style="{StaticResource TableHeaderTextStyle}"/>
-                                </Grid>
-                            </Border>
-
-                            <Grid Grid.Row="2" MaxHeight="350">
-                                    <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="IncomeItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Padding="18,11" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="85"/>
-                                                            <ColumnDefinition Width="110"/>
-                                                            <ColumnDefinition Width="110"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="85"/>
-                                                            <ColumnDefinition Width="85"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="5" Text="{Binding DateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <TextBlock Grid.Column="4" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <TextBlock Grid.Column="3" Text="{Binding PatientName}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Grid.Column="2" Text="{Binding PhoneNumber}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding PaidAmountText}" HorizontalAlignment="Center" Foreground="{Binding PaidAmountBrush}" FontWeight="Bold" FontSize="15.5"/>
-                                                        </StackPanel>
-                                                        <Button Grid.Column="0" Tag="{Binding}" Click="BtnIncomeDetails_Click"
-                                                                HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                Width="34" Height="34" Cursor="Hand"
-                                                                Background="{DynamicResource SettingsPrimaryBtnBg}"
-                                                                BorderBrush="{DynamicResource SettingsPrimaryBtnBorder}"
-                                                                BorderThickness="1"
-                                                                ToolTip="عرض تفاصيل العلاجات">
-                                                            <Button.Template>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border Background="{TemplateBinding Background}"
-                                                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                                                            CornerRadius="9">
-                                                                        <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="White"
-                                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                    </Border>
-                                                                </ControlTemplate>
-                                                            </Button.Template>
-                                                        </Button>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <TextBlock x:Name="EmptyIncomeText" Text="لا توجد سجلات دخل للفترة المحددة." Margin="0,36,0,36" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" Visibility="Collapsed"/>
-                                </Grid>
-
-                            <Border Grid.Row="3" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,1,0,0" Padding="20,14">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="المجموع الكلي للفترة المحددة" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" x:Name="TxtIncomeFooterTotal" Text="0" FontSize="20" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <!-- Expenses Section -->
-                    <Border Grid.Column="2" Style="{StaticResource PanelCardStyle}" ClipToBounds="True">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1" Padding="20,16">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="32" Height="32" CornerRadius="9" Background="#18EF4444" Margin="0,0,10,0">
-                                        <TextBlock Text="&#xE7C1;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#EF4444" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="المصاريف" FontSize="20" FontWeight="Bold" Foreground="#EF4444" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Row="1" Padding="16,12" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="95"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="125"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Button Grid.Column="0" Content="+" Background="#EF4444" Foreground="White" BorderThickness="0" FontSize="22" FontWeight="Bold" Cursor="Hand" Height="40" Click="BtnAddExpense_Click">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border Background="{TemplateBinding Background}" CornerRadius="10">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-
-                                    <TextBox x:Name="TxtExpenseAmount" Grid.Column="2" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="القيمة"/>
-                                    <ComboBox x:Name="CmbExpenseCategory" Grid.Column="4" Height="40" Padding="8,0"
-                                              VerticalContentAlignment="Center" Style="{StaticResource ExpenseCategoryComboBoxStyle}"
-                                              FlowDirection="RightToLeft">
-                                        <ComboBoxItem Content="اختر الفئة" IsEnabled="False" IsSelected="True"/>
-                                    </ComboBox>
-                                    <TextBox x:Name="TxtExpenseDetails" Grid.Column="6" Style="{StaticResource InputBoxStyle}"
-                                             TextAlignment="Right" Tag="تفاصيل إضافية (اختياري)..."/>
-                                </Grid>
-                            </Border>
-
-                            <Border Grid.Row="2" Padding="18,12" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="95"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="85"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="3" Text="التاريخ" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="2" Text="الوقت" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="1" Text="التفاصيل" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="0" Text="القيمة" Style="{StaticResource TableHeaderTextStyle}"/>
-                                </Grid>
-                            </Border>
-
-                            <Grid Grid.Row="3" MaxHeight="290">
-                                    <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="ExpenseItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Padding="18,12" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="95"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="80"/>
-                                                            <ColumnDefinition Width="85"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="3" Text="{Binding DateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <TextBlock Grid.Column="2" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding Description}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Grid.Column="0" Text="{Binding AmountText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#EF4444" FontWeight="Bold" FontSize="15.5"/>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <TextBlock x:Name="EmptyExpenseText" Text="لا توجد مصاريف للفترة المحددة." Margin="0,36,0,36" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" Visibility="Collapsed"/>
-                                </Grid>
-
-                            <Border Grid.Row="4" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,1,0,0" Padding="20,14">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="مجموع المصاريف" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource AppTextSecondary}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" x:Name="TxtExpenseFooterTotal" Text="0" FontSize="20" FontWeight="Bold" Foreground="#EF4444" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- ═══ Upcoming Payments Section (دفعات قادمة) ═══ -->
-                <Border motion:NavigationTransition.Motion="Content" motion:NavigationTransition.Order="5" Grid.Row="4" Style="{StaticResource PanelCardStyle}" ClipToBounds="True">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Header -->
-                        <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1" Padding="20,16">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="32" Height="32" CornerRadius="9" Background="#18F59E0B" Margin="0,0,10,0">
-                                    <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#F59E0B" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock Text="دفعات قادمة (مستحقات)" FontSize="20" FontWeight="Bold" Foreground="#F59E0B" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Inputs -->
-                        <Border Grid.Row="1" Padding="20,12" Background="{DynamicResource VisitSubCardBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="44"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="95"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="140"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Button Grid.Column="0"
-                                        Content="+"
-                                        Height="40"
-                                        Background="{DynamicResource SettingsPrimaryBtnBg}"
-                                        BorderBrush="{DynamicResource SettingsPrimaryBtnBorder}"
-                                        BorderThickness="1"
-                                        Foreground="White"
-                                        FontSize="22"
-                                        FontWeight="Bold"
-                                        Cursor="Hand"
-                                        Click="BtnAddUpcoming_Click">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}"
-                                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                                    CornerRadius="10">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-
-                                <TextBox x:Name="TxtUpcomingAmount" Grid.Column="2" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="القيمة"/>
-                                <ComboBox x:Name="CmbUpcomingCategory" Grid.Column="4" Height="40" Padding="8,0"
-                                          VerticalContentAlignment="Center" Style="{StaticResource ExpenseCategoryComboBoxStyle}"
-                                          FlowDirection="RightToLeft">
-                                    <ComboBoxItem Content="اختر الفئة" IsEnabled="False" IsSelected="True"/>
-                                </ComboBox>
-                                <TextBox x:Name="TxtUpcomingDescription" Grid.Column="6" Style="{StaticResource InputBoxStyle}" TextAlignment="Right" Tag="تفاصيل الدفعة..."/>
-                            </Grid>
-                        </Border>
-
-                        <!-- List Headers -->
-                        <Border Grid.Row="2" Padding="20,12" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="140"/>
-                                    <ColumnDefinition Width="180"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="2" Text="التفاصيل" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Left"/>
-                                <TextBlock Grid.Column="1" Text="القيمة" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="0" Text="الإجراءات" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- Items -->
-                        <Grid Grid.Row="3" MaxHeight="320">
-                                <ItemsControl motion:NavigationTransition.Motion="Items" motion:NavigationTransition.Order="4" x:Name="UpcomingItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Padding="20,12" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="140"/>
-                                                        <ColumnDefinition Width="180"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="2" Text="{Binding Description}" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding AmountText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#F59E0B" FontWeight="Bold" FontSize="15.5"/>
-
-                                                    <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                                                        <Button Content="&#xE73E;" FontFamily="Segoe MDL2 Assets" Foreground="White" Background="{DynamicResource SettingsGreenBtnBg}" BorderBrush="{DynamicResource SettingsGreenBtnBorder}" BorderThickness="1" Width="36" Height="36" Margin="0,0,8,0" ToolTip="تم الدفع (تحويل للمصاريف)" Cursor="Hand" Click="BtnPayUpcoming_Click">
-                                                            <Button.Template>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                    </Border>
-                                                                </ControlTemplate>
-                                                            </Button.Template>
-                                                        </Button>
-                                                        <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource SettingsDeleteBtnFg}" Background="{DynamicResource SettingsDeleteBtnBg}" BorderBrush="{DynamicResource SettingsDeleteBtnBorder}" BorderThickness="1" Width="36" Height="36" ToolTip="إلغاء الدفعة" Cursor="Hand" Click="BtnCancelUpcoming_Click">
-                                                            <Button.Template>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                    </Border>
-                                                                </ControlTemplate>
-                                                            </Button.Template>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <TextBlock x:Name="EmptyUpcomingText" Text="لا توجد دفعات قادمة مسجلة حالياً." Margin="0,32,0,32" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" Visibility="Collapsed"/>
-                            </Grid>
-                    </Grid>
-                </Border>
-            </Grid>
-        </ScrollViewer>
-
-        <!-- Income Treatments Overlay -->
-        <Border motion:OverlayMotion.Enabled="True" x:Name="IncomeTreatmentsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="50"
-                MouseLeftButtonDown="IncomeTreatmentsDimmer_MouseLeftButtonDown">
-            <Border Width="620" MaxHeight="540" Background="{DynamicResource VisitModalOuterBg}" CornerRadius="22"
-                    BorderBrush="{DynamicResource VisitModalOuterBorder}" BorderThickness="1.2" Padding="0"
-                    ClipToBounds="True"
-                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                    MouseLeftButtonDown="Border_MouseLeftButtonDown_StopPropagation">
-                <Grid FlowDirection="RightToLeft">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Header -->
-                    <Border Grid.Row="0" Background="{DynamicResource SettingsBannerBg}" BorderBrush="{DynamicResource SettingsBannerBorder}" BorderThickness="0,0,0,1" Padding="24,18">
-                        <Grid FlowDirection="LeftToRight">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Width="34" Height="34" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                    Background="{DynamicResource VisitModalChipBg}" BorderBrush="{DynamicResource VisitModalChipBorder}" BorderThickness="1"
-                                    Cursor="Hand" Click="BtnCloseIncomeTreatmentsOverlay_Click">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
-                                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource SettingsBannerTitleFg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-                                <TextBlock x:Name="TxtIncomeTreatmentsPatient" Text="العلاجات المحددة"
-                                           FontSize="22" FontWeight="Bold"
-                                           Foreground="{DynamicResource SettingsBannerTitleFg}"/>
-                                <TextBlock x:Name="TxtIncomeTreatmentsDate" FontSize="13" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SettingsBannerSubFg}" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Table header -->
-                    <Border Grid.Row="1" Background="{DynamicResource SettingsTableContainerBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1" Padding="24,12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="170"/>
-                                <ColumnDefinition Width="200"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="2" Text="العلاج" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Left"/>
-                            <TextBlock Grid.Column="1" Text="المسامحة" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="0" Text="المبلغ المدفوع" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Center"/>
-                        </Grid>
-                    </Border>
-
-                    <!-- Items -->
-                    <Grid Grid.Row="2" MaxHeight="340">
-                            <ItemsControl x:Name="IncomeTreatmentsItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                <ItemsControl.ItemTemplate>
+                        <StackPanel Margin="0,4">
+                            <TextBlock Text="الرصيد حتى اليوم" Style="{StaticResource Label}"/>
+                            <TextBlock x:Name="TxtPatientTotalRemaining" FontWeight="Bold"/>
+                        </StackPanel>
+                    </UniformGrid>
+                    <WrapPanel Margin="0,0,0,8">
+                        <Button Content="تصدير كشف CSV" Click="ExportPatient_Click" Margin="0,0,8,0"/>
+                        <Button Content="طباعة الكشف" Click="PrintPatient_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+                <Grid Grid.Row="3">
+                    <DataGrid x:Name="PatientHistoryItemsControl" RowDetailsTemplate="{StaticResource TreatmentDetails}" RowDetailsVisibilityMode="Collapsed" AutomationProperties.Name="كشف حساب المريض">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="التاريخ" Binding="{Binding DateText}" SortMemberPath="Date" Width="110" ElementStyle="{StaticResource CellText}"/>
+                            <DataGridTextColumn Header="النوع" Binding="{Binding Kind}" SortMemberPath="Kind" Width="100" ElementStyle="{StaticResource CellText}"/>
+                            <DataGridTextColumn Header="التكلفة" Binding="{Binding CostText}" SortMemberPath="Cost" Width="125" ElementStyle="{StaticResource MoneyText}"/>
+                            <DataGridTextColumn Header="المسامحة" Binding="{Binding ForgivenText}" SortMemberPath="Forgiven" Width="120" ElementStyle="{StaticResource MoneyText}"/>
+                            <DataGridTextColumn Header="المدفوع" Binding="{Binding PaidText}" SortMemberPath="Paid" Width="125" ElementStyle="{StaticResource MoneyText}"/>
+                            <DataGridTextColumn Header="الرصيد بعد العملية" Binding="{Binding BalanceText}" SortMemberPath="Balance" Width="170" ElementStyle="{StaticResource MoneyText}"/>
+                            <DataGridTemplateColumn Header="التفاصيل" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border Padding="24,14" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="170"/>
-                                                    <ColumnDefinition Width="200"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="2" Text="{Binding TreatmentName}" FontSize="15.5" FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource AppTextPrimary}" VerticalAlignment="Center" HorizontalAlignment="Left" TextWrapping="Wrap"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding AdjustmentText}" FontSize="14" Foreground="{Binding AdjustmentBrush}" FontWeight="Bold"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
-                                                <TextBlock Grid.Column="0" Text="{Binding CostText}" FontSize="15" Foreground="#10B981" FontWeight="Bold"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
-                                            </Grid>
-                                        </Border>
+                                        <Button Content="⌄ عرض" Click="ToggleDetails_Click" Style="{StaticResource Link}"/>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock x:Name="EmptyIncomeTreatmentsText"
-                                       Text="لا توجد علاجات محددة لهذه الزيارة."
-                                       Margin="0,32,0,32" FontSize="15"
-                                       Foreground="{DynamicResource AppTextSecondary}"
-                                       HorizontalAlignment="Center" Visibility="Collapsed"/>
-                        </Grid>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="إيصال" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="طباعة" Click="PrintReceipt_Click" Style="{StaticResource Link}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock x:Name="EmptyPatientHistoryText" Text="اختر مريضاً لعرض حسابه." HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
-            </Border>
+                <StackPanel Grid.Row="4" Margin="0,10,0,0" x:Name="PatientEntryForm" IsEnabled="False">
+                    <TextBlock Text="عملية جديدة" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <WrapPanel>
+                        <StackPanel Width="145" Margin="0,0,10,6">
+                            <TextBlock Text="المبلغ (ل.س)" Style="{StaticResource Label}"/>
+                            <TextBox x:Name="TxtAddPaymentAmount" AutomationProperties.Name="المبلغ (ل.س)" FlowDirection="LeftToRight" TextChanged="PaymentPreview_Changed"/>
+                        </StackPanel>
+                        <StackPanel Width="135" Margin="0,0,10,6">
+                            <TextBlock Text="تاريخ العملية" Style="{StaticResource Label}"/>
+                            <DatePicker x:Name="DpPaymentDate" AutomationProperties.Name="تاريخ العملية"/>
+                        </StackPanel>
+                        <StackPanel Width="220" Margin="0,0,10,6">
+                            <TextBlock Text="ملاحظة / سبب المسامحة" Style="{StaticResource Label}"/>
+                            <TextBox x:Name="TxtPaymentReason" AutomationProperties.Name="ملاحظة الدفعة أو سبب المسامحة"/>
+                        </StackPanel>
+                    </WrapPanel>
+                    <TextBlock x:Name="PaymentPreview" TextWrapping="Wrap" Margin="0,8" Foreground="{DynamicResource AppTextSecondary}"/>
+                    <WrapPanel>
+                        <Button Content="تسجيل دفعة" Click="RecordPayment_Click" Margin="0,0,8,0" Style="{StaticResource Primary}"/>
+                        <Button Content="تسجيل مسامحة" Click="RecordForgiveness_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Grid>
         </Border>
-
-        <!-- Loading Overlay -->
-        <Border x:Name="LoadingOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="30">
-            <Border Width="280" Padding="24" Background="{DynamicResource SettingsCardBg}" BorderBrush="{DynamicResource SettingsCardBorder}" BorderThickness="1" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Border x:Name="LoadingOverlay" Grid.ColumnSpan="2" Background="#70000000" Visibility="Collapsed" Panel.ZIndex="25" Grid.RowSpan="2">
+            <Border Style="{StaticResource Card}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="280">
                 <StackPanel>
-                    <TextBlock Text="جارٍ تحميل السجل المالي" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" TextAlignment="Center"/>
-                    <TextBlock Text="يتم تجهيز الدخل والمصاريف والملخصات." Margin="0,8,0,18" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" TextAlignment="Center"/>
-                    <ProgressBar Height="8" IsIndeterminate="True" Foreground="#14B8A6" Background="{DynamicResource AppInputBg}"/>
+                    <TextBlock Text="جارٍ تحميل السجل المالي…" HorizontalAlignment="Center"/>
+                    <ProgressBar x:Name="LoadingProgress" Height="4" Margin="0,16,0,0" IsIndeterminate="True"/>
                 </StackPanel>
             </Border>
         </Border>
-
-        <!-- Unpaid Accounts Overlay -->
-        <Border motion:OverlayMotion.Enabled="True" x:Name="UnpaidAccountsOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
-            <Border Width="860" MaxHeight="650" Background="{DynamicResource VisitModalOuterBg}" CornerRadius="22" BorderBrush="{DynamicResource VisitModalOuterBorder}" BorderThickness="1.2" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,18">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="حسابات لم تسدد (الديون)" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
-                            <Border Background="#18EF4444" BorderBrush="#40EF4444" BorderThickness="1" CornerRadius="9" Padding="12,4" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtUnpaidTotal" Text="الإجمالي: 0 ل.س" FontSize="14.5" FontWeight="Bold" Foreground="#EF4444"/>
-                            </Border>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,16,0" VerticalAlignment="Center">
-                            <TextBlock Text="ترتيب حسب:" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}" FontWeight="SemiBold"/>
-                            <ComboBox x:Name="CmbUnpaidSort" Width="155" Height="38" Style="{StaticResource ExpenseCategoryComboBoxStyle}" SelectionChanged="CmbUnpaidSort_SelectionChanged" FlowDirection="RightToLeft">
-                                <ComboBoxItem Content="الأعلى مديونية" IsSelected="True"/>
-                                <ComboBoxItem Content="الأبجدية (أ-ي)"/>
-                                <ComboBoxItem Content="الأقدم تاريخاً"/>
-                            </ComboBox>
-                        </StackPanel>
-                        <Button Grid.Column="2" Width="34" Height="34" VerticalAlignment="Center" Background="{DynamicResource SettingsOutlineBtnBg}" BorderBrush="{DynamicResource SettingsOutlineBtnBorder}" BorderThickness="1" Cursor="Hand" Click="BtnCloseUnpaidOverlay_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
-
-                    <Border Grid.Row="1" Background="{DynamicResource SettingsCardBg}" BorderBrush="{DynamicResource SettingsCardBorder}" BorderThickness="1" CornerRadius="14" ClipToBounds="True">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Border Grid.Row="0" Background="{DynamicResource SettingsTableContainerBg}" Padding="18,12" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="130"/>
-                                        <ColumnDefinition Width="140"/>
-                                        <ColumnDefinition Width="130"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="3" Text="اسم المريض" Style="{StaticResource TableHeaderTextStyle}" HorizontalAlignment="Right"/>
-                                    <TextBlock Grid.Column="2" Text="رقم الهاتف" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="1" Text="تاريخ أول دين" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="0" Text="المبلغ المتبقي" Style="{StaticResource TableHeaderTextStyle}"/>
-                                </Grid>
-                            </Border>
-
-                            <Grid Grid.Row="1">
-                                <ItemsControl x:Name="UnpaidItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Padding="18,12" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="140"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="3" Text="{Binding PatientName}" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource AppTextPrimary}" FontWeight="SemiBold"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding PhoneNumber}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding FirstDebtDateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="0" Text="{Binding RemainingAmountText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#EF4444" FontWeight="Bold"/>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
-
-                            <TextBlock x:Name="EmptyUnpaidText" Grid.Row="1" Text="لا توجد حسابات غير مسددة." Margin="0,40" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-                        </Grid>
-                    </Border>
-                </Grid>
+        <Border x:Name="ConfirmationOverlay" Grid.ColumnSpan="2" Background="#80000000" Visibility="Collapsed" Panel.ZIndex="50" KeyboardNavigation.TabNavigation="Cycle" Grid.RowSpan="2">
+            <Border Style="{StaticResource Card}" MaxWidth="480" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center" motion:FinanceMotion.Reveal="True">
+                <StackPanel>
+                    <TextBlock x:Name="ConfirmationTitle" FontSize="21" FontWeight="Bold" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ConfirmationText" TextWrapping="Wrap" Margin="0,14,0,20"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="تأكيد" Click="ConfirmAccept_Click" x:Name="ConfirmButton" Margin="0,0,10,0" Style="{StaticResource Primary}"/>
+                        <Button Content="رجوع" Click="ConfirmCancel_Click" x:Name="ConfirmCancelButton"/>
+                    </StackPanel>
+                </StackPanel>
             </Border>
         </Border>
-
-        <!-- Patient Search History Overlay -->
-        <Border motion:OverlayMotion.Enabled="True" x:Name="PatientSearchOverlay" Background="#99000000" Visibility="Collapsed" Panel.ZIndex="40">
-            <Border Width="1050" MaxHeight="650" Background="{DynamicResource VisitModalOuterBg}" CornerRadius="22" BorderBrush="{DynamicResource VisitModalOuterBorder}" BorderThickness="1.2" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <TextBlock Text="السجل المالي للمريض" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Width="34" Height="34" Background="{DynamicResource SettingsOutlineBtnBg}" BorderBrush="{DynamicResource SettingsOutlineBtnBorder}" BorderThickness="1" Cursor="Hand" Click="BtnCloseSearchOverlay_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
-
-                    <Grid Grid.Row="1" Margin="0,0,0,16" Panel.ZIndex="5">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBox x:Name="TxtPatientSearchInput" Grid.Row="0" Style="{StaticResource InputBoxStyle}" Tag="أدخل اسم المريض أو رقم الهاتف..." TextChanged="TxtPatientSearchInput_TextChanged" Height="44" FontSize="15"/>
-
-                        <Border x:Name="SuggestionsPopupBorder" Grid.Row="1" Background="{DynamicResource SettingsCardBg}" BorderBrush="{DynamicResource SettingsCardBorder}" BorderThickness="1" CornerRadius="10" Margin="0,4,0,0" MaxHeight="180" Visibility="Collapsed">
-                            <ListBox x:Name="LstPatientSuggestions" BorderThickness="0" Background="Transparent" SelectionChanged="LstPatientSuggestions_SelectionChanged" DisplayMemberPath="DisplayName">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="Padding" Value="12,10"/>
-                                        <Setter Property="Cursor" Value="Hand"/>
-                                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
-                            </ListBox>
-                        </Border>
-                    </Grid>
-
-                    <Border Grid.Row="2" Background="{DynamicResource SettingsCardBg}" BorderBrush="{DynamicResource SettingsCardBorder}" BorderThickness="1" CornerRadius="14" ClipToBounds="True" Panel.ZIndex="1">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Background="{DynamicResource SettingsTableContainerBg}" Padding="16,12" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="80"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="130"/>
-                                        <ColumnDefinition Width="130"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="5" Text="التاريخ" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="4" Text="الوقت" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="3" Text="التكلفة" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="2" Text="المسامحة" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="1" Text="المدفوع" Style="{StaticResource TableHeaderTextStyle}"/>
-                                    <TextBlock Grid.Column="0" Text="التفاصيل" Style="{StaticResource TableHeaderTextStyle}"/>
-                                </Grid>
-                            </Border>
-
-                            <Grid Grid.Row="1">
-                                <ItemsControl x:Name="PatientHistoryItemsControl" Style="{StaticResource VirtualizedRecordsStyle}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Padding="16,12" Background="{DynamicResource SettingsTableRowBg}" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,0,0,1">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="80"/>
-                                                        <ColumnDefinition Width="110"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="5" Text="{Binding DateText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="4" Text="{Binding TimeText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AppTextSecondary}"/>
-                                                    <TextBlock Grid.Column="3" Text="{Binding CostText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding CostColor}" FontWeight="SemiBold"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding ForgivenessText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding ForgivenessColor}" FontWeight="Bold"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding PaidText}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#10B981" FontWeight="Bold"/>
-                                                    <Button Grid.Column="0" Tag="{Binding}" Click="BtnPatientHistoryDetails_Click"
-                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                            Width="34" Height="34" Cursor="Hand"
-                                                            Background="{DynamicResource SettingsPrimaryBtnBg}"
-                                                            BorderBrush="{DynamicResource SettingsPrimaryBtnBorder}"
-                                                            BorderThickness="1"
-                                                            ToolTip="عرض تفاصيل العلاجات">
-                                                        <Button.Template>
-                                                            <ControlTemplate TargetType="Button">
-                                                                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                                                                    <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="White"
-                                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                            </ControlTemplate>
-                                                        </Button.Template>
-                                                    </Button>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </Grid>
-
-                            <TextBlock x:Name="EmptyPatientHistoryText" Grid.Row="1" Text="يرجى البحث واختيار مريض لعرض السجل." Margin="0,40" FontSize="15" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-
-                            <Border x:Name="PatientHistoryFooter" Grid.Row="2" Background="{DynamicResource SettingsTableContainerBg}" Padding="16,12" BorderBrush="{DynamicResource SettingsTableRowBorder}" BorderThickness="0,1,0,0" Visibility="Collapsed">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Add Payment Form -->
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                        <Button x:Name="BtnAddPatientPayment" Content="+" Background="{DynamicResource SettingsGreenBtnBg}" BorderBrush="{DynamicResource SettingsGreenBtnBorder}" BorderThickness="1" Foreground="White" FontSize="22" FontWeight="Bold" Cursor="Hand" Width="40" Height="40" Click="BtnAddPatientPayment_Click">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
-
-                                        <TextBox x:Name="TxtAddPaymentAmount" Width="105" Height="40" Margin="10,0,0,0" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="الدفعة"/>
-                                        <TextBox x:Name="TxtAddForgivenessAmount" Width="145" Height="40" Margin="10,0,0,0" Style="{StaticResource InputBoxStyle}" TextAlignment="Center" Tag="مسامحة"/>
-                                    </StackPanel>
-
-                                    <!-- Summary Values -->
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtPatientTotalCost" Text="إجمالي التكلفة: 0" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}" Margin="0,0,0,0"/>
-                                        <TextBlock x:Name="TxtPatientTotalPaid" Text="إجمالي الدفعات: 0" FontSize="14" FontWeight="Bold" Foreground="#10B981" Margin="16,0,0,0"/>
-                                        <TextBlock x:Name="TxtPatientTotalForgiven" Text="إجمالي المسامحة: 0" FontSize="14" FontWeight="Bold" Foreground="#F59E0B" Margin="16,0,0,0"/>
-                                        <TextBlock x:Name="TxtPatientTotalRemaining" Text="المتبقي: 0" FontSize="14" FontWeight="Bold" Foreground="#EF4444" Margin="16,0,0,0"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                        </Grid>
-                    </Border>
-                </Grid>
-            </Border>
+        <Border x:Name="StatusHost" Grid.Row="1" Style="{StaticResource Card}" Padding="12,8" Margin="0,8,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" Grid.ColumnSpan="2">
+            <DockPanel>
+                <Button Content="إعادة المحاولة" Click="Retry_Click" x:Name="RetryButton" DockPanel.Dock="Left" Visibility="Collapsed"/>
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </DockPanel>
         </Border>
     </Grid>
 </UserControl>

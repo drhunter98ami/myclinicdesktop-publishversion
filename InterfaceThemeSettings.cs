@@ -35,6 +35,8 @@ public static class InterfaceThemeSettings
         File.WriteAllText(SettingsPath, useOriginalTheme ? "Original" : "Modern");
         Application.Current.MainWindow = nextWindow;
         nextWindow.Show();
+        if (nextWindow is MainWindow modern) modern.ShowSettings();
+        else if (nextWindow is OriginalTheme.MainWindow original) original.ShowSettings();
         currentWindow.Close();
     }
 }

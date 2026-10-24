@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -63,6 +63,7 @@ namespace MyClinic
 
             // تحميل الثيم المحفوظ
             LoadThemeSettings();
+            ThemePreference.Attach(this, SetDarkTheme);
 
             // تهيئة إعدادات المزامنة التلقائية والساعة
             LoadSyncSettings();
@@ -85,6 +86,8 @@ namespace MyClinic
 
         private void Window_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (MainContent.Content is ShortagesView or LabView or SettingsView)
+            { Window_MouseLeave(sender, e); return; }
             if (!MotionPreferences.Enabled)
             {
                 Window_MouseLeave(sender, e);
@@ -381,46 +384,7 @@ namespace MyClinic
             SaveSyncSettings(TxtLastSync.Text.Replace("آخر مزامنة: ", ""));
         }
 
-        private void ApplyPendingRestore()
-        {
-            string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string clinicFolder = System.IO.Path.Combine(appDataFolder, "MyClinicApp");
-
-            string dbPath = System.IO.Path.Combine(clinicFolder, "ClinicData.db");
-            string tempDbPath = System.IO.Path.Combine(clinicFolder, "ClinicData_Temp.db");
-
-            if (File.Exists(tempDbPath))
-            {
-                try
-                {
-                    long fileSize = new FileInfo(tempDbPath).Length;
-                    if (fileSize < 1024)
-                    {
-                        MessageBox.Show($"ملف الاستعادة صغير جداً ({fileSize} bytes). قد يكون تالفاً أو فارغاً.", "تحذير", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        File.Delete(tempDbPath);
-                        return;
-                    }
-
-                    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-                    System.Threading.Thread.Sleep(500);
-
-                    if (File.Exists(dbPath))
-                    {
-                        string backupPath = System.IO.Path.Combine(clinicFolder, $"ClinicData_Backup_{AppClock.Now:yyyyMMdd_HHmmss}.db");
-                        File.Copy(dbPath, backupPath, true);
-                        File.Delete(dbPath);
-                    }
-
-                    File.Move(tempDbPath, dbPath);
-
-                    MessageBox.Show("تم تطبيق النسخة المستعادة بنجاح.", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("حدث خطأ أثناء تطبيق النسخة المستعادة: " + ex.Message, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
+        private void ApplyPendingRestore() => MyClinic.Services.GoogleDriveSyncService.ApplyPendingRestore();
 
         private void LoadThemeSettings()
         {
@@ -981,6 +945,12 @@ namespace MyClinic
             _patientRecordsView.RequestRefresh();
             _ = _patientRecordsView.EnsureDataCurrentAsync();
             SetActiveNavigation(BtnPatients);
+        }
+
+        public async void OpenExpense(int id)
+        {
+            ShowFinancialRecords();
+            if (_financialRecordsView != null) await _financialRecordsView.FocusExpenseAsync(id);
         }
 
         public void ShowFinancialRecords()

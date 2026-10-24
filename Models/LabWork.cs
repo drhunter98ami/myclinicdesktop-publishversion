@@ -30,5 +30,13 @@ namespace MyClinic.Models
         public decimal AmountPaid { get; set; } = 0;
 
         public string? Notes { get; set; }
+        public int? PatientId { get; set; }
+        public int? LabNameId { get; set; }
+        public string WorkType { get; set; } = "";
+        public string WorkStatus { get; set; } = "تم الإرسال";
+        public string Currency { get; set; } = "USD";
+        public DateTime? ExpectedDelivery { get; set; }
+        public decimal RateSnapshot { get; set; } = 15000;
+        public int Revision { get; set; }
     }
 }

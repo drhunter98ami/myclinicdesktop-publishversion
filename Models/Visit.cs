@@ -50,6 +50,8 @@ namespace MyClinic.Models
         public double CurrentCost { get; set; }
         public double TodayPaid { get; set; }
         public double RemainingAmount { get; set; }
+        public bool IsFinancialOnly { get; set; }
+        public string? FinancialNote { get; set; }
 
         /// <summary>
         /// The USD→SYP exchange rate in effect when this visit was saved.

@@ -1,0 +1,260 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using MyClinic;
+using MyClinic.Models;
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Input;
+using System.Windows.Threading;
+
+static class FinancialChecks
+{
+    static int checks;
+    static string output = Path.GetFullPath("obj/FinancialSmoke/previews");
+    static void Assert(bool value,string message) { if(!value)throw new Exception(message); checks++; }
+    static object? Call(object target,string method,params object?[] args) => target.GetType().GetMethod(method,BindingFlags.NonPublic|BindingFlags.Instance)!.Invoke(target,args);
+    static void Set(object target,string field,object value) => target.GetType().GetField(field,BindingFlags.NonPublic|BindingFlags.Instance)!.SetValue(target,value);
+    static T Named<T>(FrameworkElement view,string name) => (T)view.FindName(name);
+    static IEnumerable<T> Descendants<T>(DependencyObject root) where T:DependencyObject
+    {
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++)
+        {
+            var child=VisualTreeHelper.GetChild(root,i);
+            if(child is T match)yield return match;
+            foreach(var descendant in Descendants<T>(child))yield return descendant;
+        }
+    }
+    static void Pump(int ms=90) { var frame=new DispatcherFrame();var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(ms)};timer.Tick+=(_,_)=>{timer.Stop();frame.Continue=false;};timer.Start();Dispatcher.PushFrame(frame); }
+    static void Theme(bool original,bool dark)
+    {
+        string code=File.ReadAllText("MainWindow.xaml.cs");
+        int start=code.IndexOf("private void SetTheme(bool isDark)");int first=code.IndexOf("res[\"AppWindowBg\"]",start),second=code.IndexOf("res[\"AppWindowBg\"]",first+1);
+        string section=dark?code[first..second]:code[second..];
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateBrush\\(\"([^\"]+)\""))Application.Current.Resources[m.Groups[1].Value]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value));
+        foreach(Match m in Regex.Matches(section,"res\\[\"([^\"]+)\"\\]\\s*=\\s*CreateGradient\\(\"([^\"]+)\",\\s*\"([^\"]+)\""))Application.Current.Resources[m.Groups[1].Value]=new LinearGradientBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value),(Color)ColorConverter.ConvertFromString(m.Groups[3].Value),45);
+        if(original)
+        {
+            code=File.ReadAllText("OriginalTheme/MainWindow.xaml.cs");start=code.IndexOf("private void SetTheme(bool isDark)");first=code.IndexOf("Application.Current.Resources[\"AppWindowBg\"]",start);second=code.IndexOf("Application.Current.Resources[\"AppWindowBg\"]",first+1);section=dark?code[first..second]:code[second..];
+            foreach(Match m in Regex.Matches(section,"Application.Current.Resources\\[\"([^\"]+)\"\\]\\s*=\\s*new SolidColorBrush\\(\\(Color\\)ColorConverter.ConvertFromString\\(\"([^\"]+)\""))Application.Current.Resources[m.Groups[1].Value]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(m.Groups[2].Value));
+            if(!dark)Application.Current.Resources["AppCardBg"]=Brushes.White;
+        }
+    }
+    static readonly Patient patient = new(){Id=1,FullName="أحمد محمود عبد الرحمن",PhoneNumber="+963 944 123 456"};
+    static Visit Visit(int id,int day,double cost,double paid,string? treatments=null) => new(){Id=id,PatientId=1,VisitDate=AppClock.Today.AddDays(day).AddHours(8),CurrentCost=cost,TodayPaid=paid,SelectedTreatmentsJson=treatments};
+    static string Treatments(params (string Name,decimal Cost,string Currency)[] items) => JsonSerializer.Serialize(items.Select(t=>new SelectedTreatment{TreatmentName=t.Name,Cost=t.Cost,Currency=t.Currency,Quantity=1}));
+    static void Ledger()
+    {
+        Assert(FinanceMoney.TryParse("١٬٢٣٤٫٥٠",out var arabic)&&arabic==1234.50m,"Arabic digits and separators");
+        Assert(FinanceMoney.TryParse("۱۲۳۴.۵۰",out var persian)&&persian==1234.50m,"Persian digits");
+        Assert(!FinanceMoney.TryParse("1.234",out _)&&!FinanceMoney.TryParse("NaN",out _),"Invalid precision and non-finite values rejected");
+        var rows=new[]{Visit(1,-6,150000,40000,Treatments(("تنظيف",100000,"SYP"),("حشوة",50000,"SYP"))),Visit(2,-5,-20000,0),Visit(3,-4,0,60000)};
+        var account=FinancialLedger.BuildAccount(patient,rows);
+        Assert(account.Cost==150000 && account.Forgiven==20000 && account.Paid==100000 && account.Balance==30000,"Discount and standalone forgiveness preserve balance");
+        var payment=account.Rows.Single(r=>r.Id==3);
+        Assert(payment.Treatments.Sum(t=>t.Paid)==60000 && payment.Treatments.Sum(t=>t.Remaining)==30000,"FIFO respects prior forgiveness and exact payment amount");
+        Assert(account.Rows.Count(r=>!r.FinancialOnly)==1,"Payment and forgiveness entries are not treatment visits");
+        var foreign=FinancialLedger.BuildAccount(patient,new[]{new Visit{Id=1,PatientId=1,VisitDate=AppClock.Today,CurrentCost=200000,TodayPaid=0,UsdToSypRateSnapshot=10000,SelectedTreatmentsJson=Treatments(("تاج",20,"USD"))}});
+        Assert(foreign.Cost==200000,"Historic USD exchange rate preserved");
+        var credit=FinancialLedger.BuildAccount(patient,new[]{Visit(1,-3,0,200000),Visit(2,-2,150000,0,Treatments(("علاج",150000,"SYP")))});
+        Assert(credit.Balance==-50000 && credit.Rows.First().Treatments.Sum(t=>t.CreditApplied)==150000 && credit.Rows.First().Treatments.Sum(t=>t.Paid)==0,"Advance credit is distinct from cash collected in a later visit");
+        var sameTime=FinancialLedger.BuildAccount(patient,new[]{Visit(2,-3,0,50000),Visit(1,-3,100000,0,Treatments(("علاج",100000,"SYP")))});
+        Assert(sameTime.Rows.Single(r=>r.Id==2).Treatments.Sum(t=>t.Paid)==50000,"Same-time entries use ID order");
+        Assert(FinanceDateRange.For(FinancePeriod.Month,new(2024,2,20)).End==new DateTime(2024,2,29),"Leap month period");
+        Assert(FinanceDateRange.For(FinancePeriod.Custom,new(2026,1,2),new(2026,1,7)).Previous==new FinanceDateRange(new(2025,12,27),new(2026,1,1)),"Custom comparison range");
+    }
+    static async Task Database()
+    {
+        using var connection=new SqliteConnection("Data Source=:memory:");await connection.OpenAsync();
+        var options=new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        using var db=new AppDbContext(options);await db.Database.EnsureCreatedAsync();
+        FinancialSchema.Ensure(db);FinancialSchema.Ensure(db);
+        db.Patients.Add(new(){Id=1,FullName="مريض تجريبي",PhoneNumber="0900000000"});
+        db.Visits.Add(new(){PatientId=1,VisitDate=AppClock.Today.AddDays(-5),CurrentCost=100000});await db.SaveChangesAsync();
+        var service=new FinancialTransactions(db,"اختبار");
+        int upcoming=await service.SaveUpcomingAsync(null,"أخرى","فاتورة",25000,AppClock.Today.AddDays(-1));
+        Assert((await db.UpcomingPayments.AsNoTracking().SingleAsync()).Recipient=="","New obligation needs only its details, not a recipient");
+        Assert(await service.CompleteUpcomingAsync(upcoming,true,""),"First payment completes");
+        Assert(!await service.CompleteUpcomingAsync(upcoming,true,"")&&!await service.CompleteUpcomingAsync(upcoming,false,""),"Repeated payment and stale cancellation do not duplicate expense");
+        Assert(await db.Expenses.CountAsync()==1 && (await db.UpcomingPayments.AsNoTracking().SingleAsync()).Status=="Paid","Paid entry retained and linked to one expense");
+        try{await service.SaveUpcomingAsync(upcoming,"أخرى","محاولة تعديل مسدد",2000,null);throw new Exception("Expected rejection");}catch(InvalidOperationException){}
+        checks++;
+        int cancelled=await service.SaveUpcomingAsync(null,"أخرى","ملغاة",5000,null);
+        var legacyRecipient=await db.UpcomingPayments.FindAsync(cancelled);legacyRecipient!.Recipient="اسم سابق";await db.SaveChangesAsync();
+        await service.SaveUpcomingAsync(cancelled,"أخرى","تعديل التفاصيل",5000,null);
+        Assert((await db.UpcomingPayments.AsNoTracking().SingleAsync(p=>p.Id==cancelled)).Recipient=="اسم سابق","Editing details preserves previously saved recipient data");
+        Assert(await service.CompleteUpcomingAsync(cancelled,false,"إلغاء"),"Cancel upcoming");
+        Assert(await db.Expenses.CountAsync()==1 && await db.UpcomingPayments.CountAsync()==2,"Cancellation retains history without cash expense");
+        int expense=await service.SaveExpenseAsync(null,"أخرى","أصلي",7000,AppClock.Today,"");
+        await service.SaveExpenseAsync(expense,"أخرى","مصحح",8000,AppClock.Today,"تصحيح الفاتورة");
+        var audit=await db.FinancialAuditEntries.AsNoTracking().SingleAsync(a=>a.Action=="تصحيح مصروف");
+        Assert(audit.BeforeJson.Contains("7000")&&audit.AfterJson.Contains("8000")&&audit.Reason=="تصحيح الفاتورة","Correction records before/after/reason");
+        int linkedExpense=(await db.UpcomingPayments.AsNoTracking().SingleAsync(p=>p.Id==upcoming)).ExpenseId!.Value;
+        await service.SaveExpenseAsync(linkedExpense,"أخرى","تصحيح فاتورة المستحق",26000,AppClock.Today,"تصحيح");
+        Assert((await db.UpcomingPayments.AsNoTracking().SingleAsync(p=>p.Id==upcoming)).Amount==26000,"Paid history stays aligned with corrected linked expense");
+        await service.AddPatientEntryAsync(1,40000,false,AppClock.Today,"دفعة",100000);
+        await service.AddPatientEntryAsync(1,10000,true,AppClock.Today,"خصم",60000);
+        Assert(FinancialLedger.BuildAccount(await db.Patients.FindAsync(1)??throw new Exception(),await db.Visits.AsNoTracking().ToListAsync()).Balance==50000,"Persisted payment and forgiveness balance");
+        int count=await db.Visits.CountAsync();
+        try{await service.AddPatientEntryAsync(1,60000,true,AppClock.Today,"زائد");throw new Exception("Expected rejection");}catch(ArgumentException){}
+        Assert(await db.Visits.CountAsync()==count,"Excess forgiveness creates no visit");
+        try{await service.AddPatientEntryAsync(1,5000,false,AppClock.Today,"",9999);throw new Exception("Expected stale balance rejection");}catch(InvalidOperationException){}
+        Assert(await db.Visits.CountAsync()==count,"Stale balance rejected");
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER RejectFinanceAudit BEFORE INSERT ON FinancialAuditEntries BEGIN SELECT RAISE(ABORT,'test'); END;");
+        int prior=await db.Expenses.CountAsync();
+        try{await service.SaveExpenseAsync(null,"أخرى","rollback",2000,AppClock.Today,"");throw new Exception("Expected audit failure");}catch(DbUpdateException){}
+        Assert(await db.Expenses.CountAsync()==prior,"Expense and audit roll back together");
+        using var legacyConnection=new SqliteConnection("Data Source=:memory:");await legacyConnection.OpenAsync();
+        var legacyOptions=new DbContextOptionsBuilder<AppDbContext>().UseSqlite(legacyConnection).Options;using var legacy=new AppDbContext(legacyOptions);
+        await legacy.Database.ExecuteSqlRawAsync("CREATE TABLE Visits (Id INTEGER PRIMARY KEY,CurrentCost REAL); CREATE TABLE UpcomingPayments (Id INTEGER PRIMARY KEY,Description TEXT NOT NULL,Amount REAL NOT NULL); INSERT INTO UpcomingPayments VALUES(1,'legacy',5000);");
+        FinancialSchema.Ensure(legacy);FinancialSchema.Ensure(legacy);
+        var old=await legacy.UpcomingPayments.AsNoTracking().SingleAsync();
+        Assert(old.Status=="Pending"&&old.DueDate==null&&old.Amount==5000,"Old pending payment retained without invented due date");
+    }
+    static void Export()
+    {
+        var report=new FinanceReport("كشف","اسم تجريبي",new[]{"المريض","المبلغ"},new[]{new[]{"=HYPERLINK(\"bad\")","1,000"},new[]{"أحمد\nمحمود","1500"}},"الإجمالي 2500");
+        var csv=FinanceExport.Csv(report);Assert(csv.Contains("'=")&&csv.Contains("\"1,000\"")&&csv.Contains("أحمد\nمحمود"),"CSV formulas, quotes, commas and multiline Arabic handled");
+        var document=FinanceExport.Document(report);var paginator=((IDocumentPaginatorSource)document).DocumentPaginator;paginator.ComputePageCount();
+        Assert(paginator.PageCount>0 && document.FlowDirection==FlowDirection.RightToLeft,"Printable Arabic statement paginates");
+    }
+    static FinancialRecordsView Fixture()
+    {
+        var view=new FinancialRecordsView();var type=typeof(FinancialRecordsView);
+        view.Loaded-=(RoutedEventHandler)Delegate.CreateDelegate(typeof(RoutedEventHandler),view,type.GetMethod("FinancialRecordsView_Loaded",BindingFlags.NonPublic|BindingFlags.Instance)!);
+        view.IsVisibleChanged-=(DependencyPropertyChangedEventHandler)Delegate.CreateDelegate(typeof(DependencyPropertyChangedEventHandler),view,type.GetMethod("FinancialRecordsView_IsVisibleChanged",BindingFlags.NonPublic|BindingFlags.Instance)!);
+        Set(view,"_hasLoadedData",true);Set(view,"_refreshRequested",false);
+        Set(view,"_patients",new List<Patient>{patient,new(){Id=2,FullName="ليلى محمد",PhoneNumber="0933000000"}});
+        Set(view,"_visits",new List<Visit>{Visit(1,-6,250000,50000,Treatments(("تنظيف الأسنان",100000,"SYP"),("حشوة تجميلية",150000,"SYP"))),Visit(2,-3,0,75000),Visit(3,-1,-25000,0)});
+        Set(view,"_expenses",new List<ExpenseEntry>{new(){Id=1,ExpenseDate=AppClock.Today,Description="مخبر - تاج خزفي",Amount=45000},new(){Id=2,ExpenseDate=AppClock.Today,Description="كهربا - فاتورة شهرية",Amount=15000}});
+        Set(view,"_upcoming",new List<UpcomingPayment>{new(){Id=1,Recipient="مخبر الأسنان",Description="مخبر - تعويضات",Amount=125000,DueDate=AppClock.Today.AddDays(-2)},new(){Id=2,Recipient="شركة الصيانة",Description="صيانة - كرسي الأسنان",Amount=75000,DueDate=AppClock.Today},new(){Id=3,Recipient="المورد",Description="نواقص - مستلزمات",Amount=50000},new(){Id=4,Recipient="شركة الكهرباء",Description="كهربا - فاتورة",Amount=20000,Status="Paid",CompletedAt=AppClock.Today}});
+        Call(view,"RebuildLedger");Call(view,"ApplyFilters");Call(view,"InstallRangeIndicator");return view;
+    }
+    static void Capture(Window window,string name)
+    {
+        var root=(FrameworkElement)window.Content;var bitmap=new RenderTargetBitmap((int)root.ActualWidth,(int)root.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(root);
+        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,name+".png"));encoder.Save(file);
+    }
+    static void Ui(bool original,bool dark,double width,double height)
+    {
+        MotionPreferences.Set(MotionLevel.Off,false);Theme(original,dark);var view=Fixture();Call(view,"ConfigureFinancePalette",original,dark);var root=new Grid{Background=(Brush)Application.Current.FindResource("AppWindowBg")};root.Children.Add(new AdornerDecorator{Child=view,Margin=new Thickness(16)});
+        var window=new Window{Content=root,Width=width,Height=height,Left=-12000,Top=-12000,ShowActivated=false,ShowInTaskbar=false};window.Show();Pump();
+        string prefix=$"{(original?"original":"modern")}-{(dark?"dark":"light")}-{width}";
+        var indicator=(Border)typeof(FinancialRecordsView).GetField("_rangeIndicator",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(view)!;
+        var month=Named<Button>(view,"BtnMonthRange");var selectorHost=(Grid)indicator.Parent;
+        Assert(Math.Abs(indicator.TranslatePoint(new Point(indicator.ActualWidth/2,0),selectorHost).X-month.TranslatePoint(new Point(month.ActualWidth/2,0),selectorHost).X)<2,"RTL selection background aligns with the selected period");
+        Assert(Named<DataGrid>(view,"IncomeItemsControl").Items.Count==3,"Income rows render");
+        Assert(Named<TextBlock>(view,"TxtOutstanding").Text==FinanceMoney.Format(100000),"Outstanding summary independent from period");
+        Capture(window,prefix+"-income");
+        var tabs=Named<TabControl>(view,"FinanceTabs");
+        Assert(tabs.Items.Count==4,"Workspace has four tabs without the operations log");
+        tabs.SelectedIndex=1;Pump();
+        var breakdown=Named<Expander>(view,"ExpenseBreakdownSection");
+        Assert(breakdown.IsVisible,"Category breakdown belongs to the expenses tab");
+        breakdown.IsExpanded=true;Pump();
+        Assert(Named<ItemsControl>(view,"ExpenseBreakdown").Items.Count==2,"Expense breakdown opens with category rows");
+        var percentages=Descendants<ProgressBar>(breakdown).Select(bar=>bar.Value).OrderBy(value=>value).ToArray();
+        Assert(percentages.SequenceEqual(new[]{25d,75d}),"Expense breakdown renders the calculated category percentages");
+        var categoryColors=Descendants<ProgressBar>(breakdown).Select(bar=>bar.Foreground.ToString()).ToArray();
+        Assert(categoryColors.Distinct().Count()==2,"Expense categories render different green shades");
+        var categoryFilter=Named<ComboBox>(view,"CategoryFilter");categoryFilter.SelectedItem="مخبر";Pump();
+        Assert(Descendants<ProgressBar>(breakdown).Single().Foreground.ToString()==categoryColors[0],"Category color stays stable when filtered");
+        Call(view,"ClearFilters_Click",view,new RoutedEventArgs());Pump();
+        Capture(window,prefix+"-expense-breakdown");
+        Named<TextBox>(view,"WorkspaceSearch").Text="no-match";Pump();
+        Assert(!Descendants<ProgressBar>(breakdown).Any(),"Expanded breakdown handles empty search results");
+        Call(view,"ClearFilters_Click",view,new RoutedEventArgs());Pump();
+        Assert(Descendants<ProgressBar>(breakdown).Count()==2,"Expanded breakdown refreshes after clearing filters");
+        breakdown.IsExpanded=false;Pump();
+        breakdown.IsExpanded=true;Pump();
+        Assert(Descendants<ProgressBar>(breakdown).Count()==2,"Expense breakdown can be reopened");
+        breakdown.IsExpanded=false;Pump();
+        for(int i=0;i<4;i++)
+        {
+            tabs.SelectedIndex=i;Pump();Capture(window,prefix+"-tab"+i);
+            var table=Named<DataGrid>(view,new[]{"IncomeItemsControl","ExpenseItemsControl","UpcomingItemsControl","UnpaidItemsControl"}[i]);
+            Assert(table.ActualHeight>80,"Table keeps usable viewport");
+            if(i!=1)Assert(!breakdown.IsVisible,"Category breakdown is hidden outside expenses");
+            if(i==2)
+            {
+                Assert(table.Columns.All(c=>c.ActualWidth>40),"Upcoming columns retain usable widths");
+                Assert(!table.Columns.Any(c=>c.Header?.ToString()=="المستفيد"),"Upcoming table keeps details without recipient column");
+                var visible=Descendants<DataGridRow>(table).Count(row=>row.TranslatePoint(new Point(),table).Y>=0 && row.TranslatePoint(new Point(0,row.ActualHeight),table).Y<=table.ActualHeight);
+                Assert(visible>=3,"At least three obligations fit in the default viewport");
+                Assert(!((FinanceReport)Call(view,"PeriodReport")!).Headers.Contains("المستفيد"),"Upcoming export excludes recipient column");
+            }
+        }
+        var search=Named<TextBox>(view,"WorkspaceSearch");search.Text="no-match";Pump();Assert(Named<DataGrid>(view,"IncomeItemsControl").Items.Count==0,"Combined search filters records");Call(view,"ClearFilters_Click",view,new RoutedEventArgs());
+        if(width==1600)
+        {
+            Set(view,"_upcoming",Enumerable.Range(1,125).Select(i=>new UpcomingPayment{Id=i,Recipient="مستفيد",Description="أخرى - مستحق "+i,Amount=i,DueDate=AppClock.Today.AddDays(i%3-1)}).ToList());
+            tabs.SelectedIndex=2;Call(view,"ApplyFilters");Pump();
+            Assert(Named<DataGrid>(view,"UpcomingItemsControl").Items.Count==50,"Obligations render a bounded page");
+            Call(view,"NextUpcomingPage_Click",view,new RoutedEventArgs());Pump();
+            Assert(Named<TextBlock>(view,"UpcomingPageLabel").Text.Contains("2 من 3"),"Next payment page accessible");
+            var report=(FinanceReport)Call(view,"PeriodReport")!;Assert(report.Rows.Count==125,"Payment export includes all matching pages");
+        }
+        Call(view,"OpenPatient",1);Pump();Capture(window,prefix+"-patient");
+        Named<TextBox>(view,"TxtAddPaymentAmount").Text="125000";
+        Assert(Named<TextBlock>(view,"PaymentPreview").Text.Contains("رصيد دائن"),"Overpayment preview identifies patient credit");
+        Assert(Named<DataGrid>(view,"PatientHistoryItemsControl").ActualHeight>70,"Patient history usable");
+        var pending=(Task<bool>)Call(view,"ConfirmAsync","تسجيل دفعة","المبلغ: 125,000 ل.س\nرصيد دائن: 25,000 ل.س")!;Pump();Capture(window,prefix+"-confirmation");Call(view,"ConfirmCancel_Click",view,new RoutedEventArgs());Assert(!pending.GetAwaiter().GetResult(),"Confirmation cancellation performs no mutation");
+        foreach(var level in new[]{MotionLevel.Off,MotionLevel.Subtle,MotionLevel.Full}){MotionPreferences.Set(level,false);FinanceMotion.Slide(Named<Border>(view,"PatientPanel"));Pump(280);Assert(Math.Abs(Named<Border>(view,"PatientPanel").Opacity-1)<.001,"Motion settles at full opacity");}
+        window.Close();
+    }
+    static void IncomeScrolling()
+    {
+        Theme(false,false);MotionPreferences.Set(MotionLevel.Off,false);
+        var view=Fixture();
+        var treatments=Enumerable.Range(1,40).Select(i=>("علاج "+i,2500m,"SYP")).ToArray();
+        Set(view,"_visits",new List<Visit>{Visit(500,0,100000,50000,Treatments(treatments)),Visit(501,-1,10000,10000)});
+        Call(view,"RebuildLedger");Call(view,"ApplyFilters");
+        var window=new Window{Content=view,Width=980,Height=720,Left=-12000,Top=-12000,ShowActivated=false,ShowInTaskbar=false};window.Show();Pump();
+        try
+        {
+            var table=Named<DataGrid>(view,"IncomeItemsControl");
+            var row=(DataGridRow)table.ItemContainerGenerator.ContainerFromIndex(0);
+            var toggle=Descendants<Button>(row).Single(b=>b.Content as string=="⌄ عرض");
+            toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+            var details=Descendants<DataGridDetailsPresenter>(row).Single();
+            var scroll=Descendants<ScrollViewer>(table).First();
+            Assert(details.ActualHeight>scroll.ViewportHeight,"Expanded income details exceed the viewport");
+            double prior=scroll.VerticalOffset;
+            for(int i=0;i<4;i++)
+            {
+                details.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,-120){RoutedEvent=Mouse.MouseWheelEvent});Pump();
+                double offset=scroll.VerticalOffset;
+                Assert(offset>prior && offset-prior<scroll.ViewportHeight,"Wheel advances through tall income details in small pixel steps");prior=offset;
+            }
+            details.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,120){RoutedEvent=Mouse.MouseWheelEvent});Pump();
+            Assert(scroll.VerticalOffset<prior,"Wheel scrolls back inside expanded income details");
+            Capture(window,"income-expanded-pixel-scroll");
+            toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+            Assert(row.DetailsVisibility==Visibility.Collapsed,"Income details collapse after wheel scrolling");
+        }
+        finally{window.Close();}
+    }
+    [STAThread]static int Main()
+    {
+        var prior=MotionPreferences.Current;
+        try
+        {
+            Directory.CreateDirectory(output);Ledger();Database().GetAwaiter().GetResult();
+            var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};app.Resources.MergedDictionaries.Add(new ResourceDictionary{Source=new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml")});
+            MotionPreferences.Set(MotionLevel.Off,false);Export();
+            foreach(bool original in new[]{false,true})foreach(bool dark in new[]{false,true})Ui(original,dark,1360,900);
+            Ui(false,false,980,720);Ui(false,true,1600,1000);
+            IncomeScrolling();
+            MotionPreferences.Set(prior,false);app.Shutdown();Console.WriteLine($"PASS: {checks} financial workspace checks. Synthetic previews: {output}");return 0;
+        }
+        catch(Exception ex){Console.Error.WriteLine(ex);MotionPreferences.Set(prior,false);return 1;}
+    }
+}

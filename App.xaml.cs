@@ -15,6 +15,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        MyClinic.Services.GoogleDriveSyncService.ApplyPendingRestore();
+
         using var context = new AppDbContext();
 
         // Creates the database if it does not already exist.
@@ -208,6 +210,9 @@ public partial class App : Application
                 Description TEXT NOT NULL,
                 Amount REAL NOT NULL
             );");
+
+        FinancialSchema.Ensure(context);
+        ClinicWorkspaceSchema.Ensure(context);
 
         // Ensure Currency column exists in TreatmentCosts (for databases created before currency support)
         EnsureColumnExists(context, "TreatmentCosts", "Currency", "TEXT NOT NULL DEFAULT 'SYP'");

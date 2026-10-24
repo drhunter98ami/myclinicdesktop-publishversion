@@ -16,6 +16,7 @@ namespace MyClinic
         public static DateTime Now => GetComputerTime().Add(GetOffset());
 
         public static DateTime Today => Now.Date;
+        public static bool IsAdjusted => GetOffset() != TimeSpan.Zero;
 
         public static void SetCurrentTime(DateTime appTime)
         {

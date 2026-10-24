@@ -1,0 +1,12 @@
+<UserControl x:Class="MyClinic.LabTeethPicker" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:MyClinic" FlowDirection="RightToLeft" FontFamily="Segoe UI">
+ <UserControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="WorkspaceStyles.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary></UserControl.Resources>
+ <StackPanel>
+  <WrapPanel Margin="0,0,0,12">
+   <Button x:Name="AdultButton" Content="الأسنان الدائمة" Style="{StaticResource WorkspaceButton}" Click="Adult_Click"/>
+   <Button x:Name="ChildButton" Content="الأسنان اللبنية" Style="{StaticResource WorkspaceButton}" Click="Child_Click" Margin="8,0,0,0"/>
+   <Button Content="مسح الاختيار" Style="{StaticResource WorkspaceButton}" Click="Clear_Click" Margin="8,0,0,0"/>
+  </WrapPanel>
+  <Grid><local:AdultDentalChart x:Name="AdultChart"/><local:ChildrenDentalChart x:Name="ChildChart" Visibility="Collapsed"/></Grid>
+  <TextBlock x:Name="SelectionSummary" Style="{StaticResource WorkspaceHint}" Margin="0,10,0,0"/>
+ </StackPanel>
+</UserControl>

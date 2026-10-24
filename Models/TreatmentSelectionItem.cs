@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Linq;
 
@@ -23,7 +23,8 @@ namespace MyClinic.Models
             set { _toothId = value; OnPropertyChanged(nameof(ToothId)); }
         }
 
-        public bool IsRootCanal => TreatmentNameMatcher.IsRootCanal(TreatmentName);
+        public bool? RequiresCanals { get; set; }
+        public bool IsRootCanal => RequiresCanals ?? TreatmentNameMatcher.IsRootCanal(TreatmentName);
 
         public int CanalCount
         {
@@ -113,7 +114,8 @@ namespace MyClinic.Models
         public int Quantity { get; set; }
         public string? ToothId { get; set; }
         public int CanalCount { get; set; }
-        public bool IsRootCanal => TreatmentNameMatcher.IsRootCanal(TreatmentName);
+        public bool? RequiresCanals { get; set; }
+        public bool IsRootCanal => RequiresCanals ?? TreatmentNameMatcher.IsRootCanal(TreatmentName);
         public List<CanalMeasurement> Canals
         {
             get => _canals;

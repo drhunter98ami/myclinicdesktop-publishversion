@@ -14,6 +14,8 @@ namespace MyClinic.Models
         public bool IsUrgent { get; set; }
 
         public decimal Price { get; set; }
+        public bool PriceKnown { get; set; } = true;
+        public bool IsDeleted { get; set; }
 
         /// <summary>Number of units needed. Existing records default to one.</summary>
         public int Quantity { get; set; } = 1;

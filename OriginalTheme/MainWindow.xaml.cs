@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -19,7 +19,7 @@ namespace MyClinic.OriginalTheme
     {
         private DashboardView? _dashboardView;
         private PatientRecordsView? _patientRecordsView;
-        private FinancialRecordsView? _financialRecordsView;
+        private MyClinic.FinancialRecordsView? _financialRecordsView;
         private ShortagesView? _shortagesView;
         private LabView? _labView;
         private SettingsView? _settingsView;
@@ -59,6 +59,7 @@ namespace MyClinic.OriginalTheme
 
             // تحميل الثيم المحفوظ
             LoadThemeSettings();
+            ThemePreference.Attach(this, SetDarkTheme);
             
             // تهيئة إعدادات المزامنة التلقائية والساعة
             LoadSyncSettings();
@@ -345,49 +346,7 @@ namespace MyClinic.OriginalTheme
             SaveSyncSettings(TxtLastSync.Text.Replace("آخر مزامنة: ", ""));
         }
 
-        private void ApplyPendingRestore()
-        {
-            string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string clinicFolder = Path.Combine(appDataFolder, "MyClinicApp");
-
-            string dbPath = Path.Combine(clinicFolder, "ClinicData.db");
-            string tempDbPath = Path.Combine(clinicFolder, "ClinicData_Temp.db");
-
-            if (File.Exists(tempDbPath))
-            {
-                try
-                {
-                    // Check file size to ensure it's not empty
-                    long fileSize = new FileInfo(tempDbPath).Length;
-                    if (fileSize < 1024) // Less than 1KB is suspicious
-                    {
-                        MessageBox.Show($"ملف الاستعادة صغير جداً ({fileSize} bytes). قد يكون تالفاً أو فارغاً.", "تحذير", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        File.Delete(tempDbPath);
-                        return;
-                    }
-
-                    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-                    
-                    // Close any open connections
-                    System.Threading.Thread.Sleep(500); // Give time for connections to close
-                    
-                    if (File.Exists(dbPath))
-                    {
-                        string backupPath = Path.Combine(clinicFolder, $"ClinicData_Backup_{AppClock.Now:yyyyMMdd_HHmmss}.db");
-                        File.Copy(dbPath, backupPath, true);
-                        File.Delete(dbPath); 
-                    }
-                    
-                    File.Move(tempDbPath, dbPath); 
-                    
-                    MessageBox.Show("تم تطبيق النسخة المستعادة بنجاح.", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("حدث خطأ أثناء تطبيق النسخة المستعادة: " + ex.Message, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
+        private void ApplyPendingRestore() => MyClinic.Services.GoogleDriveSyncService.ApplyPendingRestore();
 
         private void LoadThemeSettings()
         {
@@ -447,6 +406,7 @@ namespace MyClinic.OriginalTheme
                 Application.Current.Resources["AppTextPrimary"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#13284A"));
                 Application.Current.Resources["AppTextSecondary"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C8A9A"));
             }
+            GlobalEvents.NotifyThemeChanged(isDark);
         }
 
         private void BtnDashboard_Click(object sender, RoutedEventArgs e) => ShowDashboard();
@@ -555,9 +515,15 @@ namespace MyClinic.OriginalTheme
             SetActiveNavigation(BtnPatients);
         }
 
+        public async void OpenExpense(int id)
+        {
+            ShowFinancialRecords();
+            if (_financialRecordsView != null) await _financialRecordsView.FocusExpenseAsync(id);
+        }
+
         public void ShowFinancialRecords()
         {
-            _financialRecordsView ??= new FinancialRecordsView();
+            _financialRecordsView ??= new MyClinic.FinancialRecordsView();
             if (!NavigationTransition.Show(MainContent, _financialRecordsView)) return;
             _financialRecordsView.RequestRefresh();
             _ = _financialRecordsView.EnsureDataCurrentAsync();

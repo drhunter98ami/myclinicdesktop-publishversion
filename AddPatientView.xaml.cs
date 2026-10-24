@@ -1,4 +1,4 @@
-// AddPatientView.xaml.cs
+﻿// AddPatientView.xaml.cs
 using MyClinic.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
@@ -405,6 +405,7 @@ namespace MyClinic
                         TreatmentName = treatment.TreatmentName,
                         Cost = treatment.Cost,
                         Currency = treatment.Currency,
+                        RequiresCanals = treatment.RequiresCanals,
                         IsSelected = false,
                         Quantity = 1
                     };
@@ -621,6 +622,7 @@ namespace MyClinic
                         TreatmentName = item.TreatmentName,
                         Cost = item.Cost,
                         Currency = item.Currency,
+                        RequiresCanals = item.RequiresCanals,
                         Quantity = item.Quantity > 0 ? item.Quantity : 1,
                         ToothId = item.ToothDetails.FirstOrDefault()?.ToothId ?? item.ToothId,
                         CanalCount = item.ToothDetails.FirstOrDefault()?.CanalCount ?? (item.IsRootCanal ? item.CanalCount : 0),
@@ -1309,7 +1311,7 @@ namespace MyClinic
                 }
 
                 int completedCanals = selectedTreatments
-                    .Where(t => IsRootCanalTreatment(t.TreatmentName))
+                    .Where(t => t.IsRootCanal)
                     .Sum(t => t.ToothDetails.Count > 0
                         ? t.ToothDetails.Where(d => int.TryParse(d.ToothId, out _)).Sum(d => d.CanalCount > 0 ? d.CanalCount : GetDefaultCanalNames(int.Parse(d.ToothId!)).Count)
                         : (!string.IsNullOrWhiteSpace(t.ToothId) ? Math.Max(1, t.CanalCount) : 0));

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System.ComponentModel;
 using System.Globalization;
@@ -236,7 +236,7 @@ public partial class AddPatientView : IRecoverableClinicForm
                 var t = _treatmentSelectionItems.FirstOrDefault(t => t.TreatmentId == saved.TreatmentId);
                 if (t == null)
                 {
-                    t = new TreatmentSelectionItem { TreatmentId = saved.TreatmentId, TreatmentName = saved.TreatmentName, Cost = saved.Cost, Currency = saved.Currency };
+                    t = new TreatmentSelectionItem { TreatmentId = saved.TreatmentId, TreatmentName = saved.TreatmentName, Cost = saved.Cost, Currency = saved.Currency, RequiresCanals = saved.RequiresCanals };
                     _treatmentSelectionItems.Add(t); SubscribeTreatment(t);
                 }
                 t.IsSelected = true; t.Quantity = Math.Max(1, saved.Quantity); t.ToothDetails.Clear();
