@@ -18,6 +18,12 @@ namespace MyClinic
         public static DateTime Today => Now.Date;
         public static bool IsAdjusted => GetOffset() != TimeSpan.Zero;
 
+        public static DateTime FromComputerTime(DateTime computerTime) =>
+            computerTime.AddHours(7).Add(GetOffset());
+
+        public static DateTime FromInstant(DateTimeOffset instant) =>
+            FromComputerTime(instant.LocalDateTime);
+
         public static void SetCurrentTime(DateTime appTime)
         {
             lock (SyncRoot)

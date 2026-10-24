@@ -208,7 +208,7 @@ public partial class SettingsView : UserControl
     }
     void ShowBackupInfo()
     {
-        var state = GoogleDriveSyncService.ReadState(); BackupInfo.Text = $"الحساب: {(state.Account.Length > 0 ? state.Account : "لم يُتحقق من الاتصال بعد")}\nآخر نسخ ناجح: {(state.LastSuccess.HasValue ? state.LastSuccess.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "غير متوفر")}\nتاريخ نسخة Drive: {FormatRemoteDate(state.DriveModified)}";
+        var state = GoogleDriveSyncService.ReadState(); BackupInfo.Text = $"الحساب: {(state.Account.Length > 0 ? state.Account : "لم يُتحقق من الاتصال بعد")}\nآخر نسخ ناجح: {(state.LastSuccess.HasValue ? AppClock.FromInstant(state.LastSuccess.Value).ToString("dd/MM/yyyy hh:mm tt", new CultureInfo("ar-SY")) : "غير متوفر")}\nتاريخ نسخة Drive: {FormatRemoteDate(state.DriveModified)}";
         if (state.RecoveryPath.Length > 0) BackupInfo.Text += "\nنسخة الاسترداد المحلية: " + state.RecoveryPath;
         if (state.LastError.Length > 0) BackupStatus.Text = "آخر محاولة: " + state.LastError;
         if (System.IO.File.Exists(GoogleDriveSyncService.ActiveDatabasePath + ".restore-pending.db")) BackupStatus.Text = "استعادة جاهزة للتطبيق عند إعادة التشغيل التالية.";
