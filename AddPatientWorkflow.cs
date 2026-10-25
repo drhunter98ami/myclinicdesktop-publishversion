@@ -392,7 +392,9 @@ public partial class AddPatientView : IRecoverableClinicForm
     private bool ValidatePatientFields()
     {
         bool valid = ValidationAssist.Check(TxtFullName, !string.IsNullOrWhiteSpace(TxtFullName.Text), "اسم المريض مطلوب.");
-        valid &= ValidationAssist.Check(TxtPhoneNumber, ClinicInput.NormalizeDigits(TxtPhoneNumber.Text).Count(char.IsDigit) >= 7, "أدخل رقم هاتف صالحاً (7 أرقام على الأقل).");
+        string phoneNumber = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
+        valid &= ValidationAssist.Check(TxtPhoneNumber, phoneNumber.Length == 0 || string.Equals(phoneNumber, "N/A", StringComparison.OrdinalIgnoreCase) || phoneNumber.Count(char.IsDigit) >= 7,
+            "أدخل رقم هاتف صالحاً (7 أرقام على الأقل) أو اتركه فارغاً.");
         valid &= ValidationAssist.Check(TxtAge, TryParseNullableInt(TxtAge.Text, out var age) && (age == null || age is >= 0 and <= 130), "أدخل عمراً من 0 إلى 130 أو اتركه فارغاً.");
         int? birthYear = ReadBirthYear();
         valid &= ValidationAssist.Check(TxtBirthYear, string.IsNullOrWhiteSpace(TxtBirthYear.Text) || birthYear >= AppClock.Today.Year - 130 && birthYear <= AppClock.Today.Year,
@@ -404,7 +406,8 @@ public partial class AddPatientView : IRecoverableClinicForm
     }
     private void WritePatientFields(Patient patient)
     {
-        patient.PhoneNumber = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
+        string phoneNumber = ClinicInput.NormalizeDigits(TxtPhoneNumber.Text);
+        patient.PhoneNumber = phoneNumber.Length == 0 || string.Equals(phoneNumber, "N/A", StringComparison.OrdinalIgnoreCase) ? "N/A" : phoneNumber;
         patient.FullName = NullIfWhiteSpace(TxtFullName.Text);
         TryParseNullableInt(TxtAge.Text, out var age); patient.Age = age;
         patient.BirthYear = ReadBirthYear();

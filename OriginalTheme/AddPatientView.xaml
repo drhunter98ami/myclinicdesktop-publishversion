@@ -311,7 +311,7 @@
                                         <TextBox x:Name="TxtFullName" Style="{StaticResource ModernTextBox}" Margin="0,0,0,15" TextChanged="PatientLookup_TextChanged" Tag="اسم المريض الكامل" TabIndex="0" />
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="رقم الهاتف *" Style="{StaticResource FormLabel}" />
+                                        <TextBlock Text="رقم الهاتف (اختياري)" Style="{StaticResource FormLabel}" />
                                         <TextBox x:Name="TxtPhoneNumber" Style="{StaticResource ModernTextBox}" Margin="0,0,0,15" TextChanged="PatientLookup_TextChanged" TabIndex="1" FlowDirection="LeftToRight" TextAlignment="Right" Tag="09xxxxxxxx" />
                                     </StackPanel>
                                 </local:AdaptiveFormPanel>

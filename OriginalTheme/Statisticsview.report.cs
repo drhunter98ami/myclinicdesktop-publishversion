@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 using MyClinic.Models;
 using System;
@@ -21,8 +21,7 @@ namespace MyClinic.OriginalTheme
     /// <summary>
     /// One combined PDF report for the selected day / month / year:
     ///   1) الدخل والمصاريف   2) المصاريف   3) العلاجات
-    /// Every page is drawn on a WPF Canvas (A4 portrait, 1240x1754 px), rendered to JPEG and
-    /// wrapped into a PDF by BuildImagePdf (no third-party libraries).
+    /// A4 pages retain selectable Arabic text, embedded fonts and vector charts.
     /// </summary>
     public partial class StatisticsView
     {
@@ -40,6 +39,18 @@ namespace MyClinic.OriginalTheme
         };
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        private static BitmapImage? _reportLogo;
+        private static BitmapImage ReportLogo()
+        {
+            if (_reportLogo != null) return _reportLogo;
+            var logo = new BitmapImage();
+            logo.BeginInit();
+            logo.UriSource = new Uri("pack://application:,,,/MyClinic;component/Assets/logo.png");
+            logo.DecodePixelWidth = 160;
+            logo.CacheOption = BitmapCacheOption.OnLoad;
+            logo.EndInit(); logo.Freeze();
+            return _reportLogo = logo;
+        }
 
         private enum Anchor { Left, Center, Right }
 
@@ -54,6 +65,8 @@ namespace MyClinic.OriginalTheme
             public List<Visit> Visits = new();         // "registered" visits (cost != 0 or paid > 0)
             public List<ExpenseEntry> Expenses = new();
             public List<string> KnownTreatments = new();
+            public List<ExpenseEntry> ComparisonExpenses = new();
+            public DateTime CreatedAt = AppClock.Now;
         }
 
         private sealed class ReportDoc
@@ -62,13 +75,20 @@ namespace MyClinic.OriginalTheme
             public Canvas C = null!;
             public double Y;
             public string Footer = "";
+            public string Section = "";
+            public DateTime CreatedAt;
 
             public void NewPage(string? footer = null)
             {
                 if (footer != null) Footer = footer;
                 C = new Canvas { Width = PgW, Height = PgH, Background = Brushes.White, FlowDirection = FlowDirection.LeftToRight };
                 Pages.Add((C, Footer));
-                Y = 70;
+                Y = 100;
+                if (footer == null)
+                {
+                    Txt(C, Footer, PgR, 36, 20, CNavy, true);
+                    HLine(C, PgM, PgR, 76, CBorder);
+                }
             }
 
             public void Ensure(double h)
@@ -83,6 +103,8 @@ namespace MyClinic.OriginalTheme
 
         private async void BtnExportPdf_Click(object sender, RoutedEventArgs e)
         {
+            if (!IsEnabled) return;
+            IsEnabled = false; // Keep period selection stable while loading the export snapshot.
             try
             {
                 ReportData data = await LoadReportDataAsync();
@@ -114,6 +136,7 @@ namespace MyClinic.OriginalTheme
             {
                 MessageBox.Show($"تعذر تصدير التقرير حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally { IsEnabled = true; }
         }
 
         private async Task<ReportData> LoadReportDataAsync()
@@ -121,8 +144,11 @@ namespace MyClinic.OriginalTheme
             var data = new ReportData();
             using (var ctx = new AppDbContext())
             {
+                DateTime previousStart = StatisticsAnalytics.PreviousPeriodStart(SelectedPeriodStart(), ReportPeriod());
+                DateTime exclusiveEnd = SelectedPeriodEnd().AddDays(1);
                 data.AllVisits = await ctx.Visits.AsNoTracking().ToListAsync();
-                data.Expenses = await ApplyDateFilterExpenses(ctx.Expenses.AsNoTracking().AsQueryable())
+                data.ComparisonExpenses = await ctx.Expenses.AsNoTracking()
+                    .Where(x => x.ExpenseDate >= previousStart && x.ExpenseDate < exclusiveEnd)
                     .OrderBy(x => x.ExpenseDate)
                     .ToListAsync();
                 data.KnownTreatments = (await ctx.TreatmentCosts
@@ -134,42 +160,94 @@ namespace MyClinic.OriginalTheme
                     .ToList();
             }
 
-            data.PeriodVisits = data.AllVisits.Where(IsInSelectedPeriod).OrderBy(v => v.VisitDate).ThenBy(v => v.Id).ToList();
-            data.Visits = data.PeriodVisits.Where(v => v.CurrentCost != 0 || v.TodayPaid > 0).ToList();
+            SelectReportPeriod(data);
             return data;
+        }
+
+        private void SelectReportPeriod(ReportData data)
+        {
+            data.Expenses = data.ComparisonExpenses.Where(x => x.ExpenseDate.Date >= SelectedPeriodStart()
+                && x.ExpenseDate.Date <= SelectedPeriodEnd() && x.ExpenseDate.Date <= data.CreatedAt.Date).ToList();
+            data.PeriodVisits = data.AllVisits.Where(v => IsInSelectedPeriod(v) && v.VisitDate.Date <= data.CreatedAt.Date)
+                .OrderBy(v => v.VisitDate).ThenBy(v => v.Id).ToList();
+            data.Visits = data.PeriodVisits.Where(v => v.CurrentCost != 0 || v.TodayPaid > 0).ToList();
         }
 
         private byte[] BuildReportPdf(ReportData data)
         {
-            var doc = new ReportDoc();
+            var doc = new ReportDoc { CreatedAt = data.CreatedAt };
+            BuildOverview(doc, data);
             BuildIncomeSection(doc, data);
             BuildExpensesSection(doc, data);
             BuildTreatmentsSection(doc, data);
 
-            List<byte[]> images = new();
             int total = doc.Pages.Count;
             for (int i = 0; i < total; i++)
             {
                 Canvas page = doc.Pages[i].Canvas;
-                Txt(page, $"{doc.Pages[i].Footer} — صفحة {i + 1} من {total}", PgW / 2, PgH - 72, 15, CMuted, false, Anchor.Center);
-                images.Add(RenderPageJpeg(page));
+                HLine(page, PgM, PgR, PgH - 92, CBorder);
+                Txt(page, $"{doc.Pages[i].Footer} · صفحة {i + 1} من {total}", PgW / 2, PgH - 72, 18, CMuted, false, Anchor.Center);
             }
-            return BuildImagePdf(images);
+            return StatisticsPdfWriter.Build(doc.Pages.Select(p => p.Canvas).ToList(), $"عيادتي - التقرير الإحصائي - {CurrentPeriodLabel()}");
         }
 
-        private static byte[] RenderPageJpeg(Canvas page)
+        private StatisticsPeriod ReportPeriod() => _subTab switch
         {
-            page.Measure(new Size(PgW, PgH));
-            page.Arrange(new Rect(0, 0, PgW, PgH));
-            page.UpdateLayout();
+            SubTab.Daily => StatisticsPeriod.Day,
+            SubTab.Yearly => StatisticsPeriod.Year,
+            _ => StatisticsPeriod.Month
+        };
 
-            RenderTargetBitmap bitmap = new((int)PgW, (int)PgH, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(page);
-            JpegBitmapEncoder encoder = new() { QualityLevel = 92 };
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using MemoryStream stream = new();
-            encoder.Save(stream);
-            return stream.ToArray();
+        private void BuildOverview(ReportDoc d, ReportData r)
+        {
+            ReportBanner(d, "نظرة عامة على أداء العيادة", PeriodHeaderLine(), $"نظرة عامة · {CurrentPeriodLabel()}");
+            double income = r.Visits.Sum(v => v.TodayPaid), expense = r.Expenses.Sum(x => x.Amount), net = income - expense;
+            int count = r.PeriodVisits.Sum(v => ParseTreatments(v.SelectedTreatmentsJson).Sum(t => Math.Max(1, t.Quantity)));
+            KpiRow(d,
+                new Kpi("المبالغ المحصلة (ل.س)", Num(income), "الدفعات المستلمة خلال الفترة", CTeal, CTeal),
+                new Kpi("المصاريف (ل.س)", Num(expense), $"{r.Expenses.Count} عملية", CRed, CRed),
+                new Kpi("صافي التحصيل (ل.س)", Num(net), "المحصّل ناقص المصاريف", net < 0 ? CRed : CNavy, CNavy),
+                new Kpi("العلاجات المنفذة", Num(count), "الكمية المسجلة خلال الفترة", CNavy, CBlue));
+            string chartTitle = _subTab switch
+            {
+                SubTab.Daily => "المبالغ المحصلة والمصاريف حسب الساعة",
+                SubTab.Yearly => "المبالغ المحصلة والمصاريف الشهرية",
+                _ => "المبالغ المحصلة والمصاريف اليومية"
+            };
+            ChartPanel(d, chartTitle, 260, (c, x, y, w, h) => DrawGroupedBars(c, x, y, w, h, BuildBuckets(r)));
+
+            StatisticsAnalytics Analyze(IEnumerable<StatisticsObservation> observations) => StatisticsAnalytics.Build(
+                observations, SelectedPeriodStart(), ReportPeriod(), r.CreatedAt.Date, "", true);
+            var collected = Analyze(r.AllVisits.Select(v => new StatisticsObservation(v.VisitDate, v.TodayPaid)));
+            var spent = Analyze(r.ComparisonExpenses.Select(e => new StatisticsObservation(e.ExpenseDate, e.Amount)));
+            var treatments = Analyze(r.AllVisits.Select(v => new StatisticsObservation(v.VisitDate,
+                ParseTreatments(v.SelectedTreatmentsJson).Sum(t => Math.Max(1, t.Quantity)))));
+            SectionTitle(d, "المقارنة مع الفترة السابقة");
+            string Change(double current, double previous) => previous == 0 ? current == 0 ? "لا تغيير" : "لا توجد قاعدة"
+                : $"{(current > previous ? "زيادة" : current < previous ? "انخفاض" : "لا تغيير")} {Pct(Math.Abs(current - previous) / Math.Abs(previous) * 100)}";
+            var comparisons = new List<string[]>
+            {
+                new[] { "المبالغ المحصلة (ل.س)", Num(income), Num(collected.PreviousTotal), Change(income, collected.PreviousTotal) },
+                new[] { "المصاريف (ل.س)", Num(expense), Num(spent.PreviousTotal), Change(expense, spent.PreviousTotal) },
+                new[] { "صافي التحصيل (ل.س)", Num(net), Num(collected.PreviousTotal - spent.PreviousTotal), Change(net, collected.PreviousTotal - spent.PreviousTotal) },
+                new[] { "العلاجات المنفذة", Num(count), Num(treatments.PreviousTotal), Change(count, treatments.PreviousTotal) }
+            };
+            Table(d, new[] { "المؤشر", "الحالي", "السابق", "التغير" }, new[] { .36, .20, .20, .24 }, "RCCC",
+                new[] { CNavy, CNavy, CMuted, CNavy }, comparisons, false);
+            string Range(DateTime start, DateTime end) => $"{start:dd/MM/yyyy} - {end:dd/MM/yyyy}";
+            string cutoff = r.CreatedAt.Date < SelectedPeriodStart() ? "الفترة المختارة مستقبلية؛ لا توجد نتائج فعلية للمقارنة."
+                : $"الحالي: {Range(SelectedPeriodStart(), r.CreatedAt.Date < SelectedPeriodEnd() ? r.CreatedAt.Date : SelectedPeriodEnd())}؛ السابق: {Range(collected.PreviousStart, collected.PreviousEnd)}.";
+            d.Y += Para(d.C, cutoff, PgR, d.Y, PgCW, 19, CMuted) + 16;
+            SectionTitle(d, "أبرز النتائج");
+            var notes = new List<string>
+            {
+                $"المحصّل {Money(income)}، والمصاريف {Money(expense)}، وصافي التحصيل {Money(net)}."
+            };
+            CatInfo? topExpense = BuildExpenseCategories(r.Expenses).FirstOrDefault(c => c.Rows.Count > 0);
+            if (topExpense != null) notes.Add($"أكبر فئة مصاريف: {topExpense.Label} بقيمة {Money(topExpense.Total)}.");
+            notes.Add($"نُفذ {count} علاجاً؛ ويتضمن التقرير التالي جميع الرسوم والتفاصيل والجداول.");
+            Bullets(d, notes);
+            d.Y += Para(d.C, "أساس التقرير: الدفعات المحصلة والمصاريف المسجلة، وليس الربح المحاسبي. قد تسدد الدفعات علاجات من فترات سابقة. جميع المبالغ بالليرة السورية.", PgR, d.Y, PgCW, 19, CMuted);
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -178,8 +256,8 @@ namespace MyClinic.OriginalTheme
 
         private void BuildIncomeSection(ReportDoc d, ReportData r)
         {
-            string footer = $"تقرير الدخل والمصاريف · {CurrentPeriodLabel()}";
-            ReportBanner(d, "ملخص الدخل والمصاريف", PeriodHeaderLine(), footer);
+            string footer = $"تقرير التحصيل والمصاريف · {CurrentPeriodLabel()}";
+            ReportBanner(d, "تفاصيل التحصيل والمصاريف", PeriodHeaderLine(), footer);
 
             double income = r.Visits.Sum(v => v.TodayPaid);
             double expenses = r.Expenses.Sum(x => x.Amount);
@@ -191,19 +269,11 @@ namespace MyClinic.OriginalTheme
             List<CatInfo> cats = BuildExpenseCategories(r.Expenses);
 
             KpiRow(d,
-                new Kpi("إجمالي الدخل", Num(income), $"{paidCount} زيارة مدفوعة", CTeal, CTeal),
-                new Kpi("إجمالي المصاريف", Num(expenses), $"{r.Expenses.Count} بند مصروف", CRed, CRed),
-                new Kpi("صافي الربح", Num(net), $"هامش الربح {Pct(margin)}", net < 0 ? CRed : CNavy, CNavy),
-                new Kpi("متوسط الزيارة", Num(avgVisit), $"من {r.Visits.Count} زيارة مسجلة", CNavy, CAmber));
-
-            string chartTitle = _subTab switch
-            {
-                SubTab.Daily => "الدخل والمصاريف حسب الساعة",
-                SubTab.Yearly => "الدخل والمصاريف الشهرية",
-                _ => "الدخل والمصاريف اليومية"
-            };
-            ChartPanel(d, chartTitle, 340, (c, x, y, w, h) => DrawGroupedBars(c, x, y, w, h, buckets));
-            ChartPanel(d, "صافي الربح التراكمي", 340, (c, x, y, w, h) => DrawCumulative(c, x, y, w, h, buckets));
+                new Kpi("المبالغ المحصلة (ل.س)", Num(income), $"{paidCount} زيارة مدفوعة", CTeal, CTeal),
+                new Kpi("المصاريف (ل.س)", Num(expenses), $"{r.Expenses.Count} بند مصروف", CRed, CRed),
+                new Kpi("صافي التحصيل (ل.س)", Num(net), income > 0 ? $"نسبته من المحصّل {Pct(margin)}" : "النسبة غير متاحة", net < 0 ? CRed : CNavy, CNavy),
+                new Kpi("متوسط الدفعة (ل.س)", Num(avgVisit), $"المحصّل ÷ {paidCount} زيارة مدفوعة", CNavy, CAmber));
+            ChartPanel(d, "صافي التحصيل التراكمي", 340, (c, x, y, w, h) => DrawCumulative(c, x, y, w, h, buckets));
 
             // Expense distribution (donut) + visit-amount distribution (bars)
             var donutItems = cats.Where(ct => ct.Rows.Count > 0)
@@ -219,7 +289,7 @@ namespace MyClinic.OriginalTheme
             // Key findings
             var findings = new List<string>
             {
-                $"بلغ إجمالي الدخل {Num(income)} مقابل مصاريف {Num(expenses)}، وبذلك حقق {PeriodWord()} {(net >= 0 ? "صافي ربح" : "صافي خسارة")} قدره {Num(Math.Abs(net))} (هامش {Pct(margin)})."
+                $"بلغ المحصّل {Money(income)} مقابل مصاريف {Money(expenses)}؛ صافي التحصيل {Money(net)}."
             };
             if (_subTab != SubTab.Daily && buckets.Any(b => b.Income > 0))
             {
@@ -262,7 +332,7 @@ namespace MyClinic.OriginalTheme
                 weekRows.Add(new[] { "الإجمالي", Num(income), Num(expenses), Num(net) });
                 d.Ensure(220);
                 SectionTitle(d, "الملخص الأسبوعي");
-                Table(d, new[] { "الأيام", "الدخل", "المصاريف", "الصافي" }, new[] { .28, .24, .24, .24 }, "RCCC",
+                Table(d, new[] { "الأيام", "المحصّل", "المصاريف", "الصافي" }, new[] { .28, .24, .24, .24 }, "RCCC",
                       new[] { CNavy, CTeal, CRed, "sign" }, weekRows, true);
             }
 
@@ -279,7 +349,7 @@ namespace MyClinic.OriginalTheme
                 rows.Add(new[] { "الإجمالي", "", Num(income), Num(expenses), Num(net) });
                 d.Ensure(220);
                 SectionTitle(d, "الملخص اليومي");
-                Table(d, new[] { "التاريخ", "اليوم", "الدخل", "المصاريف", "الصافي" }, new[] { .22, .18, .20, .20, .20 }, "RCCCC",
+                Table(d, new[] { "التاريخ", "اليوم", "المحصّل", "المصاريف", "الصافي" }, new[] { .22, .18, .20, .20, .20 }, "RCCCC",
                       new[] { CNavy, CMuted, CTeal, CRed, "sign" }, rows, true);
             }
             else if (_subTab == SubTab.Yearly)
@@ -288,19 +358,19 @@ namespace MyClinic.OriginalTheme
                 rows.Add(new[] { "الإجمالي", Num(income), Num(expenses), Num(net) });
                 d.Ensure(220);
                 SectionTitle(d, "الملخص الشهري");
-                Table(d, new[] { "الشهر", "الدخل", "المصاريف", "الصافي" }, new[] { .28, .24, .24, .24 }, "RCCC",
+                Table(d, new[] { "الشهر", "المحصّل", "المصاريف", "الصافي" }, new[] { .28, .24, .24, .24 }, "RCCC",
                       new[] { CNavy, CTeal, CRed, "sign" }, rows, true);
             }
 
             // Details table
-            var detailItems = r.Visits.Select(v => (Date: v.VisitDate, Type: "دخل", Desc: IncomeDescription(v, r.AllVisits), Cat: "الدخل", Amount: v.TodayPaid))
+            var detailItems = r.Visits.Select(v => (Date: v.VisitDate, Type: "تحصيل", Desc: IncomeDescription(v, r.AllVisits), Cat: "التحصيل", Amount: v.TodayPaid))
                 .Where(it => it.Amount != 0)
                 .Concat(r.Expenses.Select(ex => (Date: ex.ExpenseDate, Type: "مصروف", Desc: ex.Description ?? "", Cat: ClassifyExpense(ex.Description ?? ""), Amount: ex.Amount)))
                 .Where(it => it.Amount != 0)
                 .OrderBy(it => it.Date)
                 .ToList();
             d.Ensure(220);
-            SectionTitle(d, "تفاصيل الدخل والمصاريف");
+            SectionTitle(d, "تفاصيل التحصيل والمصاريف");
             if (detailItems.Count == 0)
             {
                 Txt(d.C, "لا توجد بيانات لهذه الفترة", PgR, d.Y, 18, CMuted);
@@ -310,11 +380,13 @@ namespace MyClinic.OriginalTheme
             {
                 var rows = detailItems.Select(it => new[]
                 {
-                    it.Date.ToString("dd/MM HH:mm", Inv), it.Type, TruncateExport(it.Desc, 58), it.Cat, Num(it.Amount)
+                    it.Date.ToString("dd/MM/yyyy HH:mm", Inv), it.Type, it.Desc, it.Cat, Num(it.Amount)
                 }).ToList();
-                rows.Add(new[] { "", "", "الإجمالي (دخل + مصاريف)", "", Num(detailItems.Sum(it => it.Amount)) });
-                Table(d, new[] { "التاريخ", "النوع", "الوصف", "التصنيف", "المبلغ" }, new[] { .17, .10, .37, .16, .20 }, "RCRCC",
-                      new[] { CNavy, "type", CNavy, CMuted, CNavy }, rows, true);
+                Table(d, new[] { "التاريخ", "النوع", "الوصف", "التصنيف", "المبلغ (ل.س)" }, new[] { .20, .09, .36, .15, .20 }, "RCRCC",
+                      new[] { CNavy, "type", CNavy, CMuted, CNavy }, rows, false);
+                SectionTitle(d, "إجماليات الحركة المالية");
+                Table(d, new[] { "البند", "المبلغ (ل.س)" }, new[] { .70, .30 }, "RC", new[] { CNavy, "sign" },
+                    new List<string[]> { new[] { "إجمالي المبالغ المحصلة", Num(income) }, new[] { "إجمالي المصاريف", Num(expenses) }, new[] { "صافي التحصيل (المحصّل - المصاريف)", Num(net) } }, true);
             }
         }
 
@@ -330,7 +402,7 @@ namespace MyClinic.OriginalTheme
             if (visit.TodayPaid > 0.009)
             {
                 double paidBefore = patientVisits
-                    .Where(v => v.VisitDate < visit.VisitDate)
+                    .Where(v => v.VisitDate < visit.VisitDate || (v.VisitDate == visit.VisitDate && v.Id < visit.Id))
                     .Sum(v => v.TodayPaid);
                 double paidAfter = paidBefore + visit.TodayPaid;
                 var treatmentQueue = patientVisits
@@ -462,11 +534,12 @@ namespace MyClinic.OriginalTheme
                     Txt(d.C, $"{ct.Rows.Count} عملية  ·  {Pct(total > 0 ? ct.Total / total * 100 : 0)} من الإجمالي", PgR - 230, by + 14, 17, CMuted);
                     Txt(d.C, Money(ct.Total), PgM + 24, by + 11, 22, ct.Color, true, Anchor.Left);
                     d.Y += 64;
+                    d.Section = $"تفاصيل المصاريف · {ct.Label}";
 
                     var rows = ct.Rows.Select(ex => new[]
                     {
                         ex.ExpenseDate.ToString("dd/MM/yyyy", Inv),
-                        TruncateExport(CleanExpenseText(ex.Description, ct.Label), 70),
+                        CleanExpenseText(ex.Description, ct.Label),
                         Money(ex.Amount)
                     }).ToList();
                     rows.Add(new[] { "مجموع الفئة", "", Money(ct.Total) });
@@ -494,7 +567,7 @@ namespace MyClinic.OriginalTheme
         private void BuildTreatmentsSection(ReportDoc d, ReportData r)
         {
             string footer = $"إحصائيات العلاجات · {CurrentPeriodLabel()}";
-            ReportBanner(d, "إحصائيات العلاجات", $"الفترة: {CurrentPeriodLabel()}  ·  الدخل بالليرة السورية (ل.س)", footer);
+            ReportBanner(d, "إحصائيات العلاجات", $"الفترة: {CurrentPeriodLabel()}  ·  المبالغ بالليرة السورية (ل.س)", footer);
 
             List<TreatmentIncomeExportRow> rows = BuildTreatmentIncomeExportRows(r.AllVisits, r.PeriodVisits, r.KnownTreatments);
             double totalIncome = rows.Sum(tr => tr.Income);
@@ -504,16 +577,23 @@ namespace MyClinic.OriginalTheme
             var byCount = rows.Where(tr => tr.Count > 0).OrderByDescending(tr => tr.Count).ToList();
             TreatmentIncomeExportRow? topIncome = byIncome.FirstOrDefault();
             TreatmentIncomeExportRow? topCount = byCount.FirstOrDefault();
+            var treatmentValues = r.PeriodVisits.SelectMany(v => ParseTreatments(v.SelectedTreatmentsJson)
+                .Select(t => new { Name = string.IsNullOrWhiteSpace(t.TreatmentName) ? OtherLabel : t.TreatmentName,
+                    Quantity = Math.Max(1, t.Quantity),
+                    Value = (double)t.Cost * Math.Max(1, t.Quantity) *
+                        (t.Currency == "USD" ? v.UsdToSypRateSnapshot > 0 ? v.UsdToSypRateSnapshot : 15000 : 1) }))
+                .GroupBy(t => t.Name, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Value) / g.Sum(t => t.Quantity), StringComparer.Ordinal);
 
             KpiRow(d,
-                new Kpi("إجمالي الدخل", Num(totalIncome), "ل.س", CTeal, CTeal),
+                new Kpi("المحصّل للعلاجات", Num(totalIncome), "ل.س · دفعات الفترة", CTeal, CTeal),
                 new Kpi("عدد العلاجات المنفذة", Num(totalCount), $"من {kinds} أنواع", CNavy, CNavy),
-                new Kpi("الأعلى دخلاً", topIncome?.Name ?? "—", topIncome != null && totalIncome > 0 ? $"{Num(topIncome.Income)} ({Pct(topIncome.Income / totalIncome * 100)})" : "", CNavy, CAmber),
+                new Kpi("الأعلى تحصيلاً", topIncome?.Name ?? "—", topIncome != null && totalIncome > 0 ? $"{Num(topIncome.Income)} ({Pct(topIncome.Income / totalIncome * 100)})" : "", CNavy, CAmber),
                 new Kpi("الأكثر تكراراً", topCount?.Name ?? "—", topCount != null && totalCount > 0 ? $"{topCount.Count} مرة ({Pct((double)topCount.Count / totalCount * 100)})" : "", CNavy, CBlue));
 
             // Pareto
             var paretoItems = byIncome.Select(tr => (tr.Name, tr.Income)).ToList();
-            ChartPanel(d, "الدخل حسب العلاج (مخطط باريتو)", 440, (c, x, y, w, h) => DrawPareto(c, x, y, w, h, paretoItems));
+            ChartPanel(d, "التحصيل حسب العلاج (مخطط باريتو)", 440, (c, x, y, w, h) => DrawPareto(c, x, y, w, h, paretoItems));
 
             // Donut share + count bars
             var donutItems = byIncome.Select((tr, i) => (tr.Name, tr.Income, ReportColors[i % ReportColors.Length])).ToList();
@@ -521,30 +601,27 @@ namespace MyClinic.OriginalTheme
             double donutH = Math.Max(340, 50 + donutItems.Count * 54 + 70);
             double barsH = 24 + Math.Max(1, countRows.Count) * 40 + 56;
             double panelH = Math.Max(donutH, barsH);
-            TwoPanels(d, "حصة كل علاج من الدخل", "عدد مرات كل علاج", panelH,
+            TwoPanels(d, "حصة كل علاج من التحصيل", "عدد مرات كل علاج", panelH,
                 (c, x, y, w, h) => DrawDonutLegend(c, x, y, w, h, donutItems, "", "", Num, true),
                 (c, x, y, w, h) => DrawHBars(c, x, y, w, h, countRows, "العلاجات ذات العدد المسجَّل فقط"));
 
             // Key findings
             var findings = new List<string>();
-            findings.Add($"بلغ إجمالي دخل العلاجات {Num(totalIncome)} ل.س من {Num(totalCount)} علاجاً منفذاً.");
+            findings.Add($"بلغ المحصّل الموزع على العلاجات {Money(totalIncome)}؛ وسُجل {Num(totalCount)} علاجاً منفذاً خلال الفترة. قد تخص الدفعات علاجات سابقة.");
             if (byIncome.Count > 0 && totalIncome > 0)
             {
                 var top3 = byIncome.Take(3).ToList();
-                findings.Add($"أعلى {(top3.Count == 1 ? "بند" : top3.Count == 2 ? "بندين" : "ثلاثة بنود")} دخلاً {(top3.Count == 1 ? "يشكل" : "تشكل")} {Pct(top3.Sum(tr => tr.Income) / totalIncome * 100)} من الإجمالي: {string.Join("، ", top3.Select(tr => tr.Name))}.");
+                findings.Add($"أعلى {(top3.Count == 1 ? "بند" : top3.Count == 2 ? "بندين" : "ثلاثة بنود")} تحصيلاً {(top3.Count == 1 ? "يشكل" : "تشكل")} {Pct(top3.Sum(tr => tr.Income) / totalIncome * 100)} من الإجمالي: {string.Join("، ", top3.Select(tr => tr.Name))}.");
             }
             if (topCount != null && totalCount > 0)
             {
                 double countShare = (double)topCount.Count / totalCount * 100;
                 double incShare = totalIncome > 0 ? topCount.Income / totalIncome * 100 : 0;
-                string avgTxt = topCount.Income > 0 ? $" (متوسط {Num(topCount.Income / topCount.Count)})" : "";
-                findings.Add(incShare < countShare
-                    ? $"«{topCount.Name}» هو الأكثر تكراراً بـ {topCount.Count} مرة، لكنه يساهم بـ {Pct(incShare)} فقط من الدخل لانخفاض سعره{avgTxt}."
-                    : $"«{topCount.Name}» هو الأكثر تكراراً بـ {topCount.Count} مرة، ويساهم بـ {Pct(incShare)} من الدخل.");
+                findings.Add($"«{topCount.Name}» هو الأكثر تكراراً بـ {topCount.Count} مرة ({Pct(countShare)} من العدد)، وحصته من التحصيل {Pct(incShare)}.");
             }
             var noCount = rows.Where(tr => tr.Income > 0.009 && tr.Count == 0).Select(tr => $"«{tr.Name}»").ToList();
             if (noCount.Count > 0)
-                findings.Add($"{(noCount.Count == 1 ? "بند" : "بنود")} {string.Join(" و", noCount)} سُجّل {(noCount.Count == 1 ? "له" : "لها")} دخل دون عدد، لذا لا {(noCount.Count == 1 ? "يدخل" : "تدخل")} في متوسطات السعر.");
+                findings.Add($"{(noCount.Count == 1 ? "بند" : "بنود")} {string.Join(" و", noCount)} سُجل لها تحصيل دون تنفيذ خلال الفترة؛ لذلك لا يتوفر لها متوسط قيمة علاج حالي.");
 
             d.Ensure(160);
             SectionTitle(d, "أهم النتائج");
@@ -565,12 +642,14 @@ namespace MyClinic.OriginalTheme
                     tr.Name,
                     Num(tr.Count),
                     Num(tr.Income),
-                    tr.Count > 0 && tr.Income > 0.009 ? Num(tr.Income / tr.Count) : "—",
+                    treatmentValues.TryGetValue(tr.Name, out double average) ? Num(average) : "—",
                     tr.Income > 0.009 && totalIncome > 0 ? Pct(tr.Income / totalIncome * 100) : "—"
                 }).ToList();
                 tableRows.Add(new[] { "الإجمالي", Num(totalCount), Num(totalIncome), "", totalIncome > 0 ? "100%" : "—" });
-                Table(d, new[] { "اسم العلاج", "العدد", "الدخل (ل.س)", "متوسط السعر", "حصة الدخل" }, new[] { .34, .12, .20, .17, .17 }, "RCCCC",
+                Table(d, new[] { "اسم العلاج", "العدد", "المحصّل (ل.س)", "متوسط قيمة العلاج", "حصة التحصيل" }, new[] { .32, .10, .22, .19, .17 }, "RCCCC",
                       new[] { CNavy, CNavy, CTeal, CNavy, CMuted }, tableRows, true);
+                Bullets(d, new[] { "متوسط قيمة العلاج = مجموع قيم العلاجات المنفذة خلال الفترة ÷ كميتها، بصرف الدولار المحفوظ لكل زيارة. وهو مستقل عن الدفعات المحصلة.",
+                    "التحصيل موزع على العلاجات بحسب ترتيب تكاليفها في سجل المريض؛ وقد يشمل سداد علاجات من فترات سابقة." });
             }
         }
 
@@ -653,9 +732,6 @@ namespace MyClinic.OriginalTheme
             return t.Length == 0 ? "بدون تفاصيل" : t;
         }
 
-        private static string TruncateExport(string value, int max) =>
-            string.IsNullOrWhiteSpace(value) ? "بدون تفاصيل" : value.Length <= max ? value : value[..max] + "...";
-
         private string UnitWord() => _subTab switch { SubTab.Daily => "ساعة", SubTab.Yearly => "شهر", _ => "يوم" };
         private string UnitAcc() => _subTab switch { SubTab.Daily => "ساعة", SubTab.Yearly => "شهراً", _ => "يوماً" };
         private string PeriodWord() => _subTab switch { SubTab.Daily => "هذا اليوم", SubTab.Yearly => "هذه السنة", _ => "هذا الشهر" };
@@ -703,7 +779,7 @@ namespace MyClinic.OriginalTheme
                 FontSize = size,
                 FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
                 Foreground = HexBrush(color),
-                FlowDirection = FlowDirection.RightToLeft,
+                FlowDirection = text.Any(ch => ch >= '\u0600' && ch <= '\u06ff') ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
             tb.Measure(new Size(maxWidth > 0 ? maxWidth : double.PositiveInfinity, double.PositiveInfinity));
@@ -788,18 +864,23 @@ namespace MyClinic.OriginalTheme
             var band = new Rectangle
             {
                 Width = PgW,
-                Height = 300,
+                Height = 310,
                 Fill = new LinearGradientBrush(Color.FromRgb(0x0F, 0x2A, 0x4D), Color.FromRgb(0x1D, 0x45, 0x7C), 20)
             };
             Canvas.SetLeft(band, 0);
             Canvas.SetTop(band, 0);
             c.Children.Add(band);
 
-            Box(c, PgR - 140, 66, 140, 38, CTeal, null, 19);
-            Txt(c, "تقرير إحصائي", PgR - 70, 71, 18, "#FFFFFF", false, Anchor.Center);
-            Txt(c, title, PgR, 116, 56, "#FFFFFF", true);
-            Txt(c, period, PgR, 202, 23, "#C9D5E8");
-            d.Y = 252;
+            var logo = new Image { Source = ReportLogo(), Width = 60, Height = 60 };
+            Canvas.SetLeft(logo, PgM); Canvas.SetTop(logo, 40); c.Children.Add(logo);
+            Txt(c, "عيادتي · My Clinic", PgM + 78, 52, 24, "#FFFFFF", true, Anchor.Left);
+            Box(c, PgR - 150, 48, 150, 38, CTeal, null, 19);
+            Txt(c, "تقرير إحصائي", PgR - 75, 53, 18, "#FFFFFF", false, Anchor.Center);
+            Txt(c, title, PgR, 112, 46, "#FFFFFF", true);
+            Txt(c, period, PgR, 184, 22, "#C9D5E8");
+            Txt(c, $"تاريخ التصدير: {d.CreatedAt:dd/MM/yyyy HH:mm} · جميع المبالغ بالليرة السورية", PgR, 226, 20, "#C9D5E8");
+            d.Section = title;
+            d.Y = 278;
         }
 
         private static void KpiRow(ReportDoc d, params Kpi[] cards)
@@ -830,6 +911,8 @@ namespace MyClinic.OriginalTheme
 
         private static void SectionTitle(ReportDoc d, string text)
         {
+            d.Ensure(170);
+            d.Section = text;
             TitleAt(d.C, PgR, d.Y, text);
             d.Y += 56;
         }
@@ -864,7 +947,8 @@ namespace MyClinic.OriginalTheme
         {
             foreach (string line in lines)
             {
-                d.Ensure(80);
+                double required = WrappedLines(line, PgCW - 30, 19, false).Count * 30.4 + 14;
+                d.Ensure(required);
                 Txt(d.C, "•", PgR, d.Y - 3, 26, CTeal, true);
                 double height = Para(d.C, line, PgR - 30, d.Y, PgCW - 30, 19, CNavy);
                 d.Y += height + 14;
@@ -878,62 +962,109 @@ namespace MyClinic.OriginalTheme
         private static void Table(ReportDoc d, string[] headers, double[] widths, string align, string[] colors,
                                   List<string[]> rows, bool totalLast)
         {
-            const double rowH = 40, headH = 44;
+            const double size = 21, lineH = 33, padding = 12;
             int n = widths.Length;
             double[] colW = widths.Select(wd => wd * PgCW).ToArray();
             double[] colRight = new double[n];
             double cur = PgR;
             for (int i = 0; i < n; i++) { colRight[i] = cur; cur -= colW[i]; }
 
-            void Cell(string text, int i, double y, string color, bool bold)
+            double Height(List<string>[] cells) => cells.Max(c => c.Count) * lineH + padding * 2;
+            List<string>[] Lines(string[] cells, bool bold) => cells.Select((text, i) => WrappedLines(text, colW[i] - 28, size, bold)).ToArray();
+            void Cells(List<string>[] cells, double y, int first, int count, bool bold, bool header = false)
             {
-                if (string.IsNullOrEmpty(text)) return;
-                double mw = colW[i] - 24;
-                switch (align[i])
-                {
-                    case 'R': Txt(d.C, text, colRight[i] - 14, y, 16, color, bold, Anchor.Right, i == 2 && n == 5 || i == 1 && n == 3 || i == 0 && n == 5 ? mw : mw); break;
-                    case 'L': Txt(d.C, text, colRight[i] - colW[i] + 14, y, 16, color, bold, Anchor.Left, mw); break;
-                    default: Txt(d.C, text, colRight[i] - colW[i] / 2, y, 16, color, bold, Anchor.Center, mw); break;
-                }
-            }
-
-            void Header()
-            {
-                d.Ensure(headH + rowH * 2);
-                Box(d.C, PgM, d.Y, PgCW, headH, CHead, null, 8);
-                for (int i = 0; i < n; i++) Cell(headers[i], i, d.Y + 10, CNavy, true);
-                d.Y += headH;
-            }
-
-            Header();
-            for (int ri = 0; ri < rows.Count; ri++)
-            {
-                if (d.Y + rowH > PgH - 110)
-                {
-                    d.NewPage();
-                    Header();
-                }
-                bool isTotal = totalLast && ri == rows.Count - 1;
-                if (isTotal)
-                    Box(d.C, PgM, d.Y + 2, PgCW, rowH - 4, CHead, null, 8);
-                else
-                    HLine(d.C, PgM, PgR, d.Y + rowH, "#EEF1F6");
-
                 for (int i = 0; i < n; i++)
                 {
-                    string text = rows[ri][i];
-                    string color = isTotal ? CNavy : ResolveColor(colors[i], text);
-                    Cell(text, i, d.Y + 9, color, isTotal);
+                    string color = header || (bold && colors[i] != "sign") ? CNavy : ResolveColor(colors[i], string.Join("", cells[i]));
+                    for (int line = first; line < Math.Min(first + count, cells[i].Count); line++)
+                    {
+                        Anchor anchor = align[i] == 'R' ? Anchor.Right : align[i] == 'L' ? Anchor.Left : Anchor.Center;
+                        double x = anchor == Anchor.Right ? colRight[i] - 14 : anchor == Anchor.Left ? colRight[i] - colW[i] + 14 : colRight[i] - colW[i] / 2;
+                        Txt(d.C, cells[i][line], x, y + padding + (line - first) * lineH, size, color, bold, anchor);
+                    }
                 }
-                d.Y += rowH;
             }
-            d.Y += 36;
+            var heading = Lines(headers, true);
+            double headH = Height(heading);
+            string section = d.Section;
+            void Header(bool continued)
+            {
+                if (continued)
+                {
+                    TitleAt(d.C, PgR, d.Y, section + " (تابع)"); d.Y += 56;
+                }
+                Box(d.C, PgM, d.Y, PgCW, headH, CHead, null, 8);
+                Cells(heading, d.Y, 0, heading.Max(c => c.Count), true, true);
+                d.Y += headH;
+            }
+            int initialPage = d.Pages.Count;
+            d.Ensure(headH + (rows.Count == 0 ? 0 : Math.Min(Height(Lines(rows[0], totalLast && rows.Count == 1)), 180)));
+            Header(d.Pages.Count != initialPage);
+            for (int ri = 0; ri < rows.Count; ri++)
+            {
+                bool isTotal = totalLast && ri == rows.Count - 1;
+                var cells = Lines(rows[ri], isTotal);
+                int lineCount = cells.Max(c => c.Count), first = 0;
+                double rowH = Height(cells);
+                double together = rowH;
+                if (totalLast && ri == rows.Count - 2) together += Height(Lines(rows[ri + 1], true));
+                // Keep ordinary rows together; very long descriptions continue without losing text.
+                if (d.Y + together > PgH - 110 && together < PgH - 110 - 156 - headH)
+                { d.NewPage(); Header(true); }
+                while (first < lineCount)
+                {
+                    int capacity = (int)((PgH - 110 - d.Y - padding * 2) / lineH);
+                    if (capacity < 1) { d.NewPage(); Header(true); continue; }
+                    int count = Math.Min(capacity, lineCount - first);
+                    double height = count * lineH + padding * 2;
+                    if (isTotal) Box(d.C, PgM, d.Y + 2, PgCW, height - 4, CHead, null, 8);
+                    else if (ri % 2 == 1) Box(d.C, PgM, d.Y, PgCW, height, "#F8FAFC");
+                    Cells(cells, d.Y, first, count, isTotal);
+                    HLine(d.C, PgM, PgR, d.Y + height, CBorder);
+                    d.Y += height; first += count;
+                    if (first < lineCount) { d.NewPage(); Header(true); }
+                }
+            }
+            d.Y += 24;
+        }
+
+        private static List<string> WrappedLines(string text, double width, double size, bool bold)
+        {
+            var result = new List<string>();
+            var measure = new TextBlock { FontFamily = new FontFamily("Segoe UI"), FontSize = size,
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal, FlowDirection = FlowDirection.RightToLeft };
+            foreach (string paragraph in (text ?? "").Replace("\r", "").Split('\n'))
+            {
+                string line = "";
+                foreach (string word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string candidate = line.Length == 0 ? word : line + " " + word;
+                    measure.Text = candidate; measure.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    if (measure.DesiredSize.Width > width && line.Length > 0) { result.Add(line); line = ""; }
+                    string rest = word;
+                    measure.Text = rest; measure.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    if (measure.DesiredSize.Width > width)
+                    {
+                        var elements = StringInfo.GetTextElementEnumerator(rest);
+                        while (elements.MoveNext())
+                        {
+                            string element = elements.GetTextElement();
+                            measure.Text = line + element; measure.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                            if (measure.DesiredSize.Width > width && line.Length > 0) { result.Add(line); line = ""; }
+                            line += element;
+                        }
+                    }
+                    else line = line.Length == 0 ? rest : line + " " + rest;
+                }
+                result.Add(line);
+            }
+            return result;
         }
 
         private static string ResolveColor(string spec, string text) => spec switch
         {
             "sign" => text.Contains('-') ? CRed : (text == "0" ? CMuted : CTeal),
-            "type" => text == "دخل" ? CTeal : CRed,
+            "type" => text == "تحصيل" ? CTeal : CRed,
             _ => spec
         };
 
@@ -944,7 +1075,7 @@ namespace MyClinic.OriginalTheme
         private static void DrawGroupedBars(Canvas c, double x, double y, double w, double h, List<Bucket> data)
         {
             Box(c, x + w - 40, y + 22, 14, 14, CTeal, null, 3);
-            Txt(c, "الدخل", x + w - 48, y + 16, 16, CMuted);
+            Txt(c, "المحصّل", x + w - 48, y + 16, 16, CMuted);
             Box(c, x + w - 130, y + 22, 14, 14, CRed, null, 3);
             Txt(c, "المصاريف", x + w - 138, y + 16, 16, CMuted);
 
@@ -1045,7 +1176,7 @@ namespace MyClinic.OriginalTheme
             }
 
             Box(c, x + w - 40, y + 26, 14, 14, CNavy, null, 3);
-            Txt(c, "الدخل (ل.س)", x + w - 48, y + 19, 16, CMuted);
+            Txt(c, "المحصّل (ل.س)", x + w - 48, y + 19, 16, CMuted);
             Box(c, x + w - 210, y + 26, 14, 14, CAmber, null, 3);
             Txt(c, "النسبة التراكمية", x + w - 218, y + 19, 16, CMuted);
 
@@ -1169,58 +1300,5 @@ namespace MyClinic.OriginalTheme
             Txt(c, caption, labelRight, yy + 6, 15, CMuted);
         }
 
-        // ═════════════════════════════════════════════════════════════════════
-        // PDF writer (A4 portrait, one JPEG per page)
-        // ═════════════════════════════════════════════════════════════════════
-
-        private static byte[] BuildImagePdf(List<byte[]> images)
-        {
-            int n = images.Count;
-            int objCount = 3 + 3 * n; // ids 1..(2+3n), plus the free entry 0
-            long[] offsets = new long[objCount];
-            using MemoryStream pdf = new();
-
-            void Begin(int id)
-            {
-                offsets[id] = pdf.Position;
-                WriteAscii(pdf, $"{id} 0 obj\n");
-            }
-
-            WriteAscii(pdf, "%PDF-1.4\n");
-            Begin(1);
-            WriteAscii(pdf, "<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
-            Begin(2);
-            WriteAscii(pdf, $"<< /Type /Pages /Kids [{string.Join(" ", Enumerable.Range(0, n).Select(i => $"{3 + 3 * i} 0 R"))}] /Count {n} >>\nendobj\n");
-
-            for (int i = 0; i < n; i++)
-            {
-                int page = 3 + 3 * i, content = page + 1, image = page + 2;
-
-                Begin(page);
-                WriteAscii(pdf, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 {image} 0 R >> >> /Contents {content} 0 R >>\nendobj\n");
-
-                string stream = "q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n";
-                Begin(content);
-                WriteAscii(pdf, $"<< /Length {Encoding.ASCII.GetByteCount(stream)} >>\nstream\n{stream}endstream\nendobj\n");
-
-                Begin(image);
-                WriteAscii(pdf, $"<< /Type /XObject /Subtype /Image /Width {(int)PgW} /Height {(int)PgH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {images[i].Length} >>\nstream\n");
-                pdf.Write(images[i], 0, images[i].Length);
-                WriteAscii(pdf, "\nendstream\nendobj\n");
-            }
-
-            long xref = pdf.Position;
-            WriteAscii(pdf, $"xref\n0 {objCount}\n0000000000 65535 f \n");
-            for (int id = 1; id < objCount; id++)
-                WriteAscii(pdf, $"{offsets[id]:D10} 00000 n \n");
-            WriteAscii(pdf, $"trailer\n<< /Size {objCount} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF");
-            return pdf.ToArray();
-        }
-
-        private static void WriteAscii(Stream stream, string value)
-        {
-            byte[] bytes = Encoding.ASCII.GetBytes(value);
-            stream.Write(bytes, 0, bytes.Length);
-        }
     }
 }

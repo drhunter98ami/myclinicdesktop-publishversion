@@ -177,17 +177,34 @@ internal sealed class StatisticsPdfWriter
             }
         double advance = 0, size = run.FontRenderingEmSize;
         bool rtl = (run.BidiLevel & 1) != 0;
-        Emit($"BT /F{font.Id} {N(size)} Tf");
+        var positioned = new List<(double X, double Y, ushort Glyph, ushort Code)>();
         for (int i = 0; i < run.GlyphIndices.Count; i++)
         {
             ushort glyph = run.GlyphIndices[i];
             Point offset = run.GlyphOffsets != null && run.GlyphOffsets.Count > i ? run.GlyphOffsets[i] : new Point();
             double x = run.BaselineOrigin.X + (rtl ? -advance - font.Typeface.AdvanceWidths[glyph] * size - offset.X : advance + offset.X);
-            double y = run.BaselineOrigin.Y - offset.Y;
-            ushort code = font.Code(glyph, unicode[i] ?? "\u200B");
-            Emit($"1 0 0 -1 {N(x)} {N(y)} Tm <{code:X4}> Tj");
+            positioned.Add((x, run.BaselineOrigin.Y - offset.Y, glyph, font.Code(glyph, unicode[i] ?? "\u200B")));
             advance += run.AdvanceWidths[i];
         }
+        if (rtl) positioned.Reverse();
+        Emit($"BT /F{font.Id} {N(size)} Tf");
+        var sequence = new StringBuilder();
+        double expectedX = 0, baseline = double.NaN;
+        foreach (var glyph in positioned)
+        {
+            if (double.IsNaN(baseline) || Math.Abs(glyph.Y - baseline) > .001)
+            {
+                if (sequence.Length > 0) { Emit($"[{sequence}] TJ"); sequence.Clear(); }
+                Emit($"1 0 0 -1 {N(glyph.X)} {N(glyph.Y)} Tm");
+                baseline = glyph.Y; expectedX = glyph.X;
+            }
+            // A single text array per baseline lets PDF readers recognize whole Arabic words.
+            double adjustment = (expectedX - glyph.X) / size * 1000;
+            if (Math.Abs(adjustment) > .001) sequence.Append(N(adjustment)).Append(' ');
+            sequence.Append('<').Append(glyph.Code.ToString("X4", CultureInfo.InvariantCulture)).Append("> ");
+            expectedX = glyph.X + font.Typeface.AdvanceWidths[glyph.Glyph] * size;
+        }
+        if (sequence.Length > 0) Emit($"[{sequence}] TJ");
         Emit("ET");
     }
     private void Image(ImageDrawing drawing, double opacity)
@@ -212,10 +229,9 @@ internal sealed class StatisticsPdfWriter
     }
     private void Embed(PdfFont font)
     {
-        using var bytes = new MemoryStream();
-        using (Stream stream = font.Typeface.GetFontStream()) stream.CopyTo(bytes);
-        int file = Stream(bytes.ToArray(), $"/Length1 {bytes.Length}");
-        string name = "ReportFont" + font.Id;
+        byte[] bytes = font.Typeface.ComputeSubset(font.Codes.Keys.Select(k => k.Glyph).Append((ushort)0).Distinct().ToArray());
+        int file = Stream(bytes, $"/Length1 {bytes.Length}");
+        string name = "REPORT+Font" + font.Id;
         int descriptor = Add($"<< /Type /FontDescriptor /FontName /{name} /Flags 32 /FontBBox [-2000 -2000 4000 4000] /ItalicAngle 0 /Ascent 1100 /Descent -400 /CapHeight 750 /StemV 80 /FontFile2 {file} 0 R >>");
         byte[] map = new byte[(font.Codes.Count + 1) * 2];
         var widths = new StringBuilder();

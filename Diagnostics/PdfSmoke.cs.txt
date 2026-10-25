@@ -1,0 +1,121 @@
+using System.Collections;
+using System.Reflection;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using MyClinic;
+using MyClinic.Models;
+
+static class PdfChecks
+{
+    const BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic;
+    static int checks;
+    static void Assert(bool condition, string description) { if (!condition) throw new Exception(description); checks++; }
+    static void Set(object target, string name, object value) => target.GetType().GetField(name, Hidden | BindingFlags.Public)!.SetValue(target, value);
+    static object Call(object target, string method, params object[] args) => target.GetType().GetMethod(method, Hidden)!.Invoke(target, args)!;
+    static IEnumerable<TextBlock> Texts(Canvas canvas) => canvas.Children.OfType<TextBlock>();
+    static string Treatments(string name, decimal cost, int quantity = 1, string currency = "SYP") => JsonSerializer.Serialize(new[] { new { TreatmentName = name, Cost = cost, Quantity = quantity, Currency = currency } });
+    static void Run(Type type, string name, string period, DateTime start, DateTime today, bool empty = false, bool longText = false)
+    {
+        object view = Activator.CreateInstance(type)!;
+        Set(view, "_selectedYear", start.Year); Set(view, "_selectedMonth", start.Month); Set(view, "_selectedDay", start);
+        Set(view, "_subTab", Enum.Parse(type.GetNestedType("SubTab", BindingFlags.NonPublic)!, period));
+        var dataType = type.GetNestedType("ReportData", BindingFlags.NonPublic)!;
+        object data = Activator.CreateInstance(dataType)!; Set(data, "CreatedAt", today.AddHours(16));
+        string description = "صيانة - تفاصيل مصروف طويلة لاختبار التفاف النص دون اقتطاع أي كلمة من السجل المالي";
+        var all = new List<Visit>(); var expenses = new List<ExpenseEntry>();
+        if (!empty)
+        {
+            // Prior-period treatment is paid this month; average value must use today's cost, not the old collection.
+            all.Add(new Visit { Id = 1, PatientId = 1, VisitDate = start.AddMonths(-1), CurrentCost = 900000, TodayPaid = 0,
+                SelectedTreatmentsJson = Treatments("تنظيف الأسنان", 900000) });
+            all.Add(new Visit { Id = 2, PatientId = 1, VisitDate = start.AddHours(9), CurrentCost = 600000, TodayPaid = 700000,
+                SelectedTreatmentsJson = Treatments("تنظيف الأسنان", 20, 2, "USD"), UsdToSypRateSnapshot = 15000 });
+            all.Add(new Visit { Id = 3, PatientId = 2, VisitDate = start.AddHours(10), CurrentCost = 500000, TodayPaid = 200000,
+                SelectedTreatmentsJson = Treatments("حشوات تجميلية", 500000) });
+            all.Add(new Visit { Id = 4, PatientId = 1, VisitDate = start.AddMonths(-1).AddHours(9), TodayPaid = 100000 });
+            all.Add(new Visit { Id = 5, PatientId = 3, VisitDate = today.AddDays(1), TodayPaid = 99999999, CurrentCost = 99999999 });
+            int rows = longText ? 45 : 3;
+            for (int i = 0; i < rows; i++) expenses.Add(new ExpenseEntry { Id = i + 1, ExpenseDate = start.AddHours(8 + i % 10),
+                Amount = 150000 + i, Description = longText && i == 0 ? "صيانة - " + string.Join(" ", Enumerable.Repeat(description, 100)) + " نهاية التفاصيل الكاملة" : description + " " + i });
+            expenses.Add(new ExpenseEntry { Id = 500, ExpenseDate = start.AddMonths(-1), Amount = 250000, Description = "مخبر - سابق" });
+            expenses.Add(new ExpenseEntry { Id = 501, ExpenseDate = today.AddDays(1), Amount = 99999999, Description = "صيانة - مستقبلي" });
+        }
+        Set(data, "AllVisits", all); Set(data, "ComparisonExpenses", expenses);
+        Set(data, "KnownTreatments", new List<string> { "تنظيف الأسنان", "حشوات تجميلية", "معالجة جذور" });
+        Call(view, "SelectReportPeriod", data);
+        var selected = (List<Visit>)dataType.GetField("PeriodVisits")!.GetValue(data)!;
+        Assert(selected.All(v => v.VisitDate.Date <= today), "Future visits excluded from actual totals");
+        var docType = type.GetNestedType("ReportDoc", BindingFlags.NonPublic)!;
+        object doc = Activator.CreateInstance(docType)!; Set(doc, "CreatedAt", today.AddHours(16));
+        Call(view, "BuildOverview", doc, data);
+        var pages = (IList)docType.GetField("Pages")!.GetValue(doc)!;
+        Assert(pages.Count == 1, name + ": overview fits a single page");
+        Assert((double)docType.GetField("Y")!.GetValue(doc)! < 1644, name + ": overview clears footer");
+        var canvas = (Canvas)pages[0]!.GetType().GetField("Item1")!.GetValue(pages[0])!;
+        Assert(Texts(canvas).Any(t => t.Text.Contains("المقارنة مع الفترة السابقة")), "Overview includes comparison");
+        Assert(Texts(canvas).Any(t => t.Text.Contains("تاريخ التصدير")), "Export date included");
+        if (period == "Monthly" && !empty)
+        {
+            Assert(Texts(canvas).Any(t => t.Text == "100,000"), "Comparison includes prior-period collections");
+            Assert(Texts(canvas).Any(t => t.Text == "250,000"), "Comparison includes prior-period expenses");
+            Assert(Texts(canvas).Any(t => t.Text.Contains("24/09/2026")), "Partial month compares the same elapsed dates");
+            Assert(!Texts(canvas).Any(t => t.Text.Contains("99,999,999")), "Future observations excluded from overview");
+        }
+        Call(view, "BuildIncomeSection", doc, data); Call(view, "BuildExpensesSection", doc, data); Call(view, "BuildTreatmentsSection", doc, data);
+        var text = new List<string>();
+        foreach (object entry in pages)
+        {
+            var page = (Canvas)entry.GetType().GetField("Item1")!.GetValue(entry)!;
+            foreach (TextBlock block in Texts(page))
+            {
+                text.Add(block.Text); block.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double bottom = Canvas.GetTop(block) + block.DesiredSize.Height;
+                Assert(bottom <= 1645, name + ": text fits above footer: " + block.Text);
+            }
+        }
+        Assert(!text.Any(t => t.Contains("دخل + مصاريف") || t.Contains("متوسط السعر") || t.Contains("لانخفاض سعره")), "No misleading totals or treatment price claims");
+        if (!empty)
+        {
+            Assert(text.Contains("300,000"), "Treatment average uses performed cost and historical USD rate");
+            Assert(text.Any(t => t.Contains("إجمالي المبالغ المحصلة")), "Collections total is separate");
+        }
+        if (longText)
+        {
+            Assert(text.Any(t => t.Contains("نهاية التفاصيل الكاملة")), "Very long description is retained in full");
+            Assert(text.Count(t => t.Contains("(تابع)")) > 2, "Long tables repeat section titles");
+        }
+        Assert(!text.Any(t => t.Contains("NaN") || t.Contains("Infinity")), "Zero denominators remain readable");
+        var wrap = type.GetMethod("WrappedLines", BindingFlags.Static | BindingFlags.NonPublic)!;
+        string wrapInput = description + " " + new string('X', 220) + " نهاية التفاصيل";
+        var wrapped = (List<string>)wrap.Invoke(null, new object[] { wrapInput, 240d, 21d, false })!;
+        Assert(string.Concat(wrapped).Replace(" ", "") == wrapInput.Replace(" ", ""), "Wrapping preserves every character, including long tokens");
+        DateTime timestamp = start.AddHours(12);
+        var firstPayment = new Visit { Id = 20, PatientId = 10, VisitDate = timestamp, TodayPaid = 100, SelectedTreatmentsJson = Treatments("الأول", 100) };
+        var secondPayment = new Visit { Id = 21, PatientId = 10, VisitDate = timestamp, TodayPaid = 200, SelectedTreatmentsJson = Treatments("الثاني", 200) };
+        var descriptionMethod = type.GetMethod("IncomeDescription", BindingFlags.Static | BindingFlags.NonPublic)!;
+        string allocated = (string)descriptionMethod.Invoke(null, new object[] { secondPayment, new List<Visit> { firstPayment, secondPayment } })!;
+        Assert(allocated.Contains("الثاني") && !allocated.Contains("الأول"), "Equal-timestamp payment descriptions follow visit ID order");
+        byte[] pdf = (byte[])Call(view, "BuildReportPdf", data);
+        Assert(System.Text.Encoding.ASCII.GetString(pdf, 0, 8) == "%PDF-1.7", "Native PDF produced");
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine("obj/PdfSmoke/previews", name + ".pdf"), pdf);
+        Console.WriteLine($"{name}: {pages.Count} pages; {pdf.Length:N0} bytes");
+    }
+    [STAThread] static int Main()
+    {
+        try
+        {
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/MyClinic;component/PerformanceStyles.xaml") });
+            System.IO.Directory.CreateDirectory("obj/PdfSmoke/previews");
+            Run(typeof(MyClinic.StatisticsView), "monthly", "Monthly", new(2026, 10, 1), new(2026, 10, 24));
+            Run(typeof(MyClinic.OriginalTheme.StatisticsView), "original-monthly-long", "Monthly", new(2026, 10, 1), new(2026, 10, 24), longText: true);
+            Run(typeof(MyClinic.StatisticsView), "daily", "Daily", new(2026, 10, 24), new(2026, 10, 24));
+            Run(typeof(MyClinic.StatisticsView), "yearly-leap", "Yearly", new(2024, 1, 1), new(2024, 2, 29));
+            Run(typeof(MyClinic.StatisticsView), "empty", "Monthly", new(2026, 9, 1), new(2026, 10, 24), empty: true);
+            Run(typeof(MyClinic.StatisticsView), "future", "Monthly", new(2026, 11, 1), new(2026, 10, 24), empty: true);
+            app.Shutdown(); Console.WriteLine($"PASS: {checks} PDF assertions."); return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}
