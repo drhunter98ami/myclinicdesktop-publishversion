@@ -1240,7 +1240,7 @@ namespace MyClinic
             bool costValid = TryParseMoney(TxtCurrentCost.Text, out decimal currentCost) && currentCost >= 0;
             valid &= ValidationAssist.Check(TxtCurrentCost, costValid, "يرجى إدخال تكلفة صحيحة للزيارة.");
             bool paidValid = TryParseMoney(TxtTodayPaid.Text, out decimal todayPaid) && ClinicInput.ValidPayment(currentCost, todayPaid);
-            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "الدفعة يجب أن تكون بين صفر وتكلفة الزيارة. سجّل دفعات الديون السابقة من الشؤون المالية.");
+            valid &= ValidationAssist.Check(TxtTodayPaid, paidValid, "يرجى إدخال دفعة صحيحة غير سالبة.");
             valid &= ValidationAssist.Check(CmbPregnancyMonth, ChkPregnant.IsChecked != true || CmbPregnancyMonth.SelectedIndex >= 0, "اختر شهر الحمل.");
             if (!valid)
             {
@@ -1421,9 +1421,10 @@ namespace MyClinic
             }
             if (TxtPaymentHint != null)
             {
-                TxtPaymentHint.Text = todayPaid > currentCost ? "الدفعة تتجاوز تكلفة الزيارة. سجّل دفعات الديون السابقة في الشؤون المالية." :
-                    "المبالغ المحاسبية بالليرة السورية (SYP). رصيد الزيارات السابقة معروض بشكل منفصل.";
-                TxtPaymentHint.SetResourceReference(TextBlock.ForegroundProperty, todayPaid > currentCost ? "VisitWarningFg" : "AppTextSecondary");
+                TxtPaymentHint.Text = todayPaid > currentCost
+                    ? "تجاوز تكلفة الزيارة مسموح؛ وسيُخصّص الفائض لسداد الديون السابقة."
+                    : "يمكن أن تتجاوز الدفعة تكلفة الزيارة لسداد ديون سابقة. رصيد الزيارات السابقة معروض بشكل منفصل.";
+                TxtPaymentHint.SetResourceReference(TextBlock.ForegroundProperty, "AppTextSecondary");
             }
         }
 

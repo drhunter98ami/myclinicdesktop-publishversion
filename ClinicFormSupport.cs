@@ -43,7 +43,7 @@ public static class ClinicInput
         value == "لا توجد أمراض معروفة" ? 1 : 2;
 
     // Existing accounts use SYP as the accounting currency; treatment prices may be USD.
-    public static bool ValidPayment(decimal cost, decimal paid) => cost >= 0 && paid >= 0 && paid <= cost;
+    public static bool ValidPayment(decimal cost, decimal paid) => cost >= 0 && paid >= 0;
 }
 
 public interface IRecoverableClinicForm
