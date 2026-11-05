@@ -48,8 +48,8 @@ public sealed class FinancialTransactions(AppDbContext db, string actor)
     public async Task<int> SaveUpcomingAsync(int? id, string category, string details, decimal amount, DateTime? due)
     {
         FinanceMoney.RequirePositive(amount);
-        if (!ExpenseCategories.IsCategory(category) || string.IsNullOrWhiteSpace(details))
-            throw new ArgumentException("أكمل الفئة والتفاصيل.");
+        if (!ExpenseCategories.IsCategory(category))
+            throw new ArgumentException("اختر فئة المستحق.");
         using var transaction = await db.Database.BeginTransactionAsync();
         var payment = id.HasValue ? await db.UpcomingPayments.FindAsync(id.Value) ?? throw new InvalidOperationException("لم تعد الدفعة موجودة.") : new UpcomingPayment();
         if (id.HasValue) await db.Entry(payment).ReloadAsync();

@@ -62,7 +62,6 @@ public partial class FinancialRecordsView
     {
         if (_busy || !ValidAmount(TxtUpcomingAmount, out var amount)) return;
         if (CmbUpcomingCategory.SelectedItem is not string category) { ValidationAssist.Show(CmbUpcomingCategory, "اختر الفئة."); return; }
-        if (string.IsNullOrWhiteSpace(TxtUpcomingDescription.Text)) { ValidationAssist.Show(TxtUpcomingDescription, "أدخل التفاصيل."); return; }
         if (!TryReadDate(DpUpcomingDue, false, out var due)) return;
         int? editId = _upcomingEditId; string details = TxtUpcomingDescription.Text.Trim();
         await MutateAsync(async db =>

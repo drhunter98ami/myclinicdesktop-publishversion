@@ -651,7 +651,7 @@
                                         <ComboBox x:Name="CmbExpenseCategory" AutomationProperties.Name="الفئة"/>
                                     </StackPanel>
                                     <StackPanel Width="180" Margin="0,0,10,6">
-                                        <TextBlock Text="تفاصيل المصروف" Style="{StaticResource Label}"/>
+                                        <TextBlock Text="تفاصيل المصروف (اختياري)" Style="{StaticResource Label}"/>
                                         <TextBox x:Name="TxtExpenseDetails" AutomationProperties.Name="تفاصيل المصروف"/>
                                     </StackPanel>
                                     <StackPanel Width="140" Margin="0,0,10,6">
@@ -746,7 +746,7 @@
                                             <ComboBox x:Name="CmbUpcomingCategory" AutomationProperties.Name="الفئة"/>
                                         </StackPanel>
                                         <StackPanel Width="160" Margin="0,0,10,6">
-                                            <TextBlock Text="التفاصيل" Style="{StaticResource Label}"/>
+                                            <TextBlock Text="التفاصيل (اختياري)" Style="{StaticResource Label}"/>
                                             <TextBox x:Name="TxtUpcomingDescription" AutomationProperties.Name="التفاصيل"/>
                                         </StackPanel>
                                         <StackPanel Width="130" Margin="0,0,10,6">
