@@ -241,7 +241,7 @@ public partial class FinancialRecordsView : UserControl
     private static Brush ExpenseCategoryBrush(string category)
     {
         // Use the category's fixed position so filtering and ranking never change its color.
-        string[] colors = { "#166534", "#22C55E", "#047857", "#84CC16", "#0D9488", "#4D7C0F", "#10B981", "#15803D", "#65A30D" };
+        string[] colors = { "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316", "#EC4899", "#84CC16", "#6366F1", "#14B8A6", "#FB923C", "#A855F7", "#22C55E", "#E11D48" };
         int index = ExpenseCategories.Labels.ToList().IndexOf(category);
         var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[Math.Max(0, index) % colors.Length]));
         brush.Freeze();

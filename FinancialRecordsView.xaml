@@ -577,10 +577,31 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="التاريخ" Binding="{Binding DateText}" SortMemberPath="Date" Width="112" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTextColumn Header="الوقت" Binding="{Binding TimeText}" SortMemberPath="Date" Width="70" ElementStyle="{StaticResource CellText}"/>
-                                    <DataGridTemplateColumn Header="المريض" Width="*" SortMemberPath="PatientName" MinWidth="180">
+                                    <DataGridTemplateColumn Header="المريض" Width="240" SortMemberPath="PatientName" MinWidth="180">
+                                        <DataGridTemplateColumn.CellStyle>
+                                            <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                            </Style>
+                                        </DataGridTemplateColumn.CellStyle>
+                                        <DataGridTemplateColumn.HeaderStyle>
+                                            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="ContentTemplate">
+                                                    <Setter.Value>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch"/>
+                                                        </DataTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </DataGridTemplateColumn.HeaderStyle>
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Button Content="{Binding PatientName}" Click="OpenPatient_Click" HorizontalContentAlignment="Right" Style="{StaticResource Link}"/>
+                                                <Button Click="OpenPatient_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Right" Padding="0" FlowDirection="LeftToRight" Style="{StaticResource Link}">
+                                                    <TextBlock Text="{Binding PatientName}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" TextTrimming="CharacterEllipsis"/>
+                                                </Button>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
@@ -595,6 +616,7 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="المحصّل" Binding="{Binding PaidText}" SortMemberPath="Paid" Width="145" ElementStyle="{StaticResource MoneyText}"/>
+                                    <DataGridTextColumn Header="رقم العملية" Binding="{Binding Id}" SortMemberPath="Id" Width="85" ElementStyle="{StaticResource CellText}"/>
                                     <DataGridTemplateColumn Header="التفاصيل" Width="90">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -695,7 +717,7 @@
                                                         <ColumnDefinition Width="150"/>
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding Category}"/>
-                                                    <ProgressBar Grid.Column="1" Height="6" Value="{Binding Percent, Mode=OneWay}" Maximum="100" Margin="10,0" Foreground="{Binding Color}" Background="{DynamicResource AppBorder}"/>
+                                                    <ProgressBar Grid.Column="1" Height="6" Value="{Binding Percent, Mode=OneWay}" Maximum="100" Margin="10,0" Foreground="{Binding Color}" Background="{DynamicResource AppCardBg}" BorderThickness="0" BorderBrush="Transparent"/>
                                                     <TextBlock Grid.Column="2" Text="{Binding AmountText}" TextAlignment="Left"/>
                                                 </Grid>
                                             </DataTemplate>
@@ -908,7 +930,7 @@
                         </StackPanel>
                     </UniformGrid>
                     <WrapPanel Margin="0,0,0,8">
-                        <Button Content="تصدير كشف CSV" Click="ExportPatient_Click" Margin="0,0,8,0"/>
+                        <Button Content="تصدير كشف الحساب PDF" Click="ExportPatient_Click" Margin="0,0,8,0"/>
                         <Button Content="طباعة الكشف" Click="PrintPatient_Click"/>
                     </WrapPanel>
                 </StackPanel>

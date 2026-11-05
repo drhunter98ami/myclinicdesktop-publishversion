@@ -179,8 +179,10 @@ namespace MyClinic.OriginalTheme
             CategoryBreakdown.IsEnabled = false;
             var period = _subTab switch { SubTab.Daily => StatisticsPeriod.Day, SubTab.Monthly => StatisticsPeriod.Month, _ => StatisticsPeriod.Year };
             DateTime start = SelectedPeriodStart(), end = SelectedPeriodEnd();
-            DateTime previousStart = StatisticsAnalytics.PreviousPeriodStart(start, period);
-            DateTime exclusiveEnd = end.AddDays(1);
+            DateTime comparisonStart = StatisticsAnalytics.PreviousPeriodStart(start, period);
+            DateTime comparisonEnd = StatisticsAnalytics.PeriodEnd(comparisonStart, period);
+            DateTime queryStart = start < comparisonStart ? start : comparisonStart;
+            DateTime exclusiveEnd = (end > comparisonEnd ? end : comparisonEnd).AddDays(1);
             MainTab tab = _mainTab;
             try
             {
@@ -193,12 +195,12 @@ namespace MyClinic.OriginalTheme
                 List<Visit> visits = new();
                 List<ExpenseEntry> expenses = new();
                 if (tab == MainTab.Expenses)
-                    expenses = await ctx.Expenses.AsNoTracking().Where(e => e.ExpenseDate >= previousStart && e.ExpenseDate < exclusiveEnd).ToListAsync();
+                    expenses = await ctx.Expenses.AsNoTracking().Where(e => e.ExpenseDate >= queryStart && e.ExpenseDate < exclusiveEnd).ToListAsync();
                 else
                 {
                     // Income allocation requires complete treatment/payment histories.
                     var query = ctx.Visits.AsNoTracking();
-                    if (tab != MainTab.Income) query = query.Where(v => v.VisitDate >= previousStart && v.VisitDate < exclusiveEnd);
+                    if (tab != MainTab.Income) query = query.Where(v => v.VisitDate >= queryStart && v.VisitDate < exclusiveEnd);
                     visits = await query.ToListAsync();
                 }
                 if (version != _refreshVersion) return;
@@ -207,7 +209,7 @@ namespace MyClinic.OriginalTheme
                 switch (tab)
                 {
                     case MainTab.Income: ShowIncome(visits, selected, names); break;
-                    case MainTab.Expenses: ShowExpenses(expenses.Where(e => e.ExpenseDate >= start && e.ExpenseDate < exclusiveEnd && e.ExpenseDate.Date <= today).ToList()); break;
+                    case MainTab.Expenses: ShowExpenses(expenses.Where(e => e.ExpenseDate >= start && e.ExpenseDate < end.AddDays(1) && e.ExpenseDate.Date <= today).ToList()); break;
                     case MainTab.Visits: ShowVisits(selected); break;
                     case MainTab.Treatments: ShowTreatments(selected, names); break;
                 }

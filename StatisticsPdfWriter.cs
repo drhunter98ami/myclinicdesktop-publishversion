@@ -9,8 +9,7 @@ using System.Windows.Media.Imaging;
 
 namespace MyClinic;
 
-// Exports the report's WPF drawings, preserving shaped Arabic glyphs and vector charts.
-// This deliberately supports the drawing primitives used by the statistics report only.
+// Exports WPF report drawings while preserving shaped Arabic glyphs and vector artwork.
 internal sealed class StatisticsPdfWriter
 {
     private readonly List<byte[]> objects = new();

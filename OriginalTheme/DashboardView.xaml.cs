@@ -17,8 +17,6 @@ namespace MyClinic.OriginalTheme
     public partial class DashboardView : UserControl
     {
         private enum ViewMode { Daily, Monthly }
-        private enum StatusFilter { Upcoming, Past, All }
-
         private readonly BulkObservableCollection<AppointmentCardModel> _appointments = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
         private readonly List<Patient> _allPatients = new(); 
@@ -33,7 +31,6 @@ namespace MyClinic.OriginalTheme
         private bool _isLoadingFileKitCanalCount;
         private Task? _refreshTask;
         private ViewMode _viewMode;
-        private StatusFilter _statusFilter;
 
         public DashboardView()
         {
@@ -46,7 +43,6 @@ namespace MyClinic.OriginalTheme
             _isLoadingFileKitCanalCount = false;
 
             _viewMode = ViewMode.Monthly;
-            _statusFilter = StatusFilter.Upcoming;
 
             AppointmentsItemsControl.ItemsSource = _appointments;
             
@@ -740,24 +736,6 @@ namespace MyClinic.OriginalTheme
             ApplyAppointmentsFilter();
         }
 
-        private void BtnFilterUpcoming_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.Upcoming;
-            ApplyAppointmentsFilter();
-        }
-
-        private void BtnFilterPast_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.Past;
-            ApplyAppointmentsFilter();
-        }
-
-        private void BtnFilterAll_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.All;
-            ApplyAppointmentsFilter();
-        }
-
         private void BtnCurrentDate_Click(object sender, RoutedEventArgs e)
         {
             DpAppointmentsFilter.SelectedDate = GetSyrianTime().Date;
@@ -990,15 +968,6 @@ namespace MyClinic.OriginalTheme
                 query = query.Where(a => a.AppointmentDateTime.Date == selectedDate.Date);
             }
 
-            if (_statusFilter == StatusFilter.Upcoming)
-            {
-                query = query.Where(a => a.AppointmentDateTime >= syrianNow);
-            }
-            else if (_statusFilter == StatusFilter.Past)
-            {
-                query = query.Where(a => a.AppointmentDateTime < syrianNow);
-            }
-
             if (isSearching)
             {
                 query = query.Where(a => a.PatientName?.ToLowerInvariant().Contains(searchText) == true);
@@ -1212,15 +1181,6 @@ namespace MyClinic.OriginalTheme
             
             BtnDailyView.Background = _viewMode == ViewMode.Daily ? activeBg : inactiveBg;
             BtnDailyView.Foreground = _viewMode == ViewMode.Daily ? activeFg : inactiveFg;
-
-            BtnFilterUpcoming.Background = _statusFilter == StatusFilter.Upcoming ? activeBg : inactiveBg;
-            BtnFilterUpcoming.Foreground = _statusFilter == StatusFilter.Upcoming ? activeFg : inactiveFg;
-
-            BtnFilterPast.Background = _statusFilter == StatusFilter.Past ? activeBg : inactiveBg;
-            BtnFilterPast.Foreground = _statusFilter == StatusFilter.Past ? activeFg : inactiveFg;
-
-            BtnFilterAll.Background = _statusFilter == StatusFilter.All ? activeBg : inactiveBg;
-            BtnFilterAll.Foreground = _statusFilter == StatusFilter.All ? activeFg : inactiveFg;
 
             DateTime syrianToday = GetSyrianTime().Date;
             DateTime selectedDate = (DpAppointmentsFilter.SelectedDate ?? syrianToday).Date;

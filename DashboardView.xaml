@@ -698,20 +698,6 @@
                                 FlowDirection="RightToLeft"
                                 HorizontalAlignment="Left"
                                 Margin="215,0,0,0">
-                        <!-- مجموعة القادمة / السابقة / الكل -->
-                        <Border Background="{DynamicResource DashFilterGroupBg}"
-                                BorderBrush="{DynamicResource DashFilterGroupBorder}"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="4"
-                                Margin="0,0,10,0">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BtnFilterUpcoming" Content="القادمة" Style="{StaticResource RangeButtonStyle}" Width="72" Click="BtnFilterUpcoming_Click"/>
-                                <Button x:Name="BtnFilterPast" Content="السابقة" Style="{StaticResource RangeButtonStyle}" Width="72" Click="BtnFilterPast_Click"/>
-                                <Button x:Name="BtnFilterAll" Content="الكل" Style="{StaticResource RangeButtonStyle}" Width="58" Click="BtnFilterAll_Click"/>
-                            </StackPanel>
-                        </Border>
-
                         <Button x:Name="BtnCurrentDate"
                                 Content="الشهر الحالي"
                                 Height="42"

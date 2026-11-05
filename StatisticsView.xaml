@@ -342,7 +342,6 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -384,15 +383,12 @@
                     </Border>
 
                     <!-- Single combined PDF report (income + expenses, expenses, treatments) for the selected period -->
-                    <Button Grid.Column="2"
-                            x:Name="BtnExportPdf"
-                            Content="تصدير التقرير PDF"
-                            Style="{StaticResource PdfExportBtn}"
-                            Click="BtnExportPdf_Click"/>
+                    <Button Grid.Column="2" x:Name="BtnExportPdf" Content="تصدير التقرير PDF"
+                            Style="{StaticResource PdfExportBtn}" Click="BtnExportPdf_Click"/>
                 </Grid>
 
-                <!-- Row 2: Subtabs (Right) + Chart Type & Date Nav (Left) -->
-                <Grid Grid.Row="2">
+                <!-- Row 1: Subtabs (Right) + Chart Type & Date Nav (Left) -->
+                <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -415,7 +411,7 @@
                     </Border>
 
                     <!-- Date navigation -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel x:Name="DateNavigation" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="BtnNow" Content="الآن" Style="{StaticResource NowBtn}" Margin="0,0,8,0" Click="BtnNow_Click"/>
                         <!-- forward (toward future) -->
                         <Button Content="&#8249;" Style="{StaticResource NavBtn}" Margin="0,0,6,0" Click="BtnNext_Click"/>

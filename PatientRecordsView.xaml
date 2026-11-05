@@ -448,6 +448,7 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <DockPanel Margin="0,0,0,14">
                         <Button x:Name="CloseDrawerButton" DockPanel.Dock="Left" Content="×" Style="{StaticResource RecordButton}" Click="CloseMedicalRecord_Click" AutomationProperties.Name="إغلاق الملف الطبي"/>
+                        <Button DockPanel.Dock="Left" Content="تصدير الملف الطبي PDF" Style="{StaticResource RecordButton}" Click="ExportMedicalHistory_Click" Margin="0,0,8,0"/>
                         <TextBlock Text="الملف الطبي" FontSize="21" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                     </DockPanel>
                     <Border Grid.Row="1" Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,12">

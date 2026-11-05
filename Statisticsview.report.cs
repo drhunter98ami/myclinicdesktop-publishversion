@@ -144,11 +144,13 @@ namespace MyClinic
             var data = new ReportData();
             using (var ctx = new AppDbContext())
             {
-                DateTime previousStart = StatisticsAnalytics.PreviousPeriodStart(SelectedPeriodStart(), ReportPeriod());
-                DateTime exclusiveEnd = SelectedPeriodEnd().AddDays(1);
+                DateTime comparisonStart = StatisticsAnalytics.PreviousPeriodStart(SelectedPeriodStart(), ReportPeriod());
+                DateTime comparisonEnd = StatisticsAnalytics.PeriodEnd(comparisonStart, ReportPeriod());
+                DateTime rangeStart = SelectedPeriodStart() < comparisonStart ? SelectedPeriodStart() : comparisonStart;
+                DateTime exclusiveEnd = (SelectedPeriodEnd() > comparisonEnd ? SelectedPeriodEnd() : comparisonEnd).AddDays(1);
                 data.AllVisits = await ctx.Visits.AsNoTracking().ToListAsync();
                 data.ComparisonExpenses = await ctx.Expenses.AsNoTracking()
-                    .Where(x => x.ExpenseDate >= previousStart && x.ExpenseDate < exclusiveEnd)
+                    .Where(x => x.ExpenseDate >= rangeStart && x.ExpenseDate < exclusiveEnd)
                     .OrderBy(x => x.ExpenseDate)
                     .ToListAsync();
                 data.KnownTreatments = (await ctx.TreatmentCosts

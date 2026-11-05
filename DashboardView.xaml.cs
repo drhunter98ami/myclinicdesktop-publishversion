@@ -17,8 +17,6 @@ namespace MyClinic
     public partial class DashboardView : UserControl
     {
         private enum ViewMode { Daily, Monthly }
-        private enum StatusFilter { Upcoming, Past, All }
-
         private readonly BulkObservableCollection<AppointmentCardModel> _appointments = new();
         private readonly List<AppointmentEntry> _allAppointments = new();
         private readonly List<Patient> _allPatients = new();
@@ -33,7 +31,6 @@ namespace MyClinic
         private bool _isLoadingFileKitCanalCount;
         private Task? _refreshTask;
         private ViewMode _viewMode;
-        private StatusFilter _statusFilter;
 
         public DashboardView()
         {
@@ -46,7 +43,6 @@ namespace MyClinic
             _isLoadingFileKitCanalCount = false;
 
             _viewMode = ViewMode.Monthly;
-            _statusFilter = StatusFilter.Upcoming;
 
             AppointmentsItemsControl.ItemsSource = _appointments;
 
@@ -887,24 +883,6 @@ namespace MyClinic
             ApplyAppointmentsFilter();
         }
 
-        private void BtnFilterUpcoming_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.Upcoming;
-            ApplyAppointmentsFilter();
-        }
-
-        private void BtnFilterPast_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.Past;
-            ApplyAppointmentsFilter();
-        }
-
-        private void BtnFilterAll_Click(object sender, RoutedEventArgs e)
-        {
-            _statusFilter = StatusFilter.All;
-            ApplyAppointmentsFilter();
-        }
-
         private void BtnCurrentDate_Click(object sender, RoutedEventArgs e)
         {
             DpAppointmentsFilter.SelectedDate = GetSyrianTime().Date;
@@ -1133,15 +1111,6 @@ namespace MyClinic
             if (!isSearching)
             {
                 query = query.Where(a => a.AppointmentDateTime.Date == selectedDate.Date);
-            }
-
-            if (_statusFilter == StatusFilter.Upcoming)
-            {
-                query = query.Where(a => a.AppointmentDateTime >= syrianNow);
-            }
-            else if (_statusFilter == StatusFilter.Past)
-            {
-                query = query.Where(a => a.AppointmentDateTime < syrianNow);
             }
 
             if (isSearching)
@@ -1409,21 +1378,9 @@ namespace MyClinic
         {
             bool isDark = IsDarkThemeActive();
 
-            Brush activeFilterBg = (Brush)FindResource("DashActiveFilterBg");
             Brush inactiveBg = Brushes.Transparent;
-            Brush activeFg = Brushes.White;
             Brush primaryText = (Brush)FindResource("AppTextPrimary");
             Brush secondaryText = (Brush)FindResource("AppTextSecondary");
-
-            // أزرار التصفية (القادمة | السابقة | الكل)
-            BtnFilterUpcoming.Background = _statusFilter == StatusFilter.Upcoming ? activeFilterBg : inactiveBg;
-            BtnFilterUpcoming.Foreground = _statusFilter == StatusFilter.Upcoming ? activeFg : primaryText;
-
-            BtnFilterPast.Background = _statusFilter == StatusFilter.Past ? activeFilterBg : inactiveBg;
-            BtnFilterPast.Foreground = _statusFilter == StatusFilter.Past ? activeFg : primaryText;
-
-            BtnFilterAll.Background = _statusFilter == StatusFilter.All ? activeFilterBg : inactiveBg;
-            BtnFilterAll.Foreground = _statusFilter == StatusFilter.All ? activeFg : primaryText;
 
             // أزرار العرض (شهري | يومي) كما في الصور المرفقة
             Brush activeViewBg = isDark ? Brushes.Transparent : Brushes.White;

@@ -65,8 +65,8 @@ internal sealed class StatisticsAnalytics
         for (int i = 0; i < count; i++)
         {
             DateTime date = period == StatisticsPeriod.Year ? start.AddMonths(i) : start.AddDays(i);
-            DateTime? previousDate = period == StatisticsPeriod.Year ? previousStart.AddMonths(i)
-                : previousStart.AddDays(i) <= PeriodEnd(previousStart, period) ? previousStart.AddDays(i) : null;
+            DateTime mappedPreviousDate = period == StatisticsPeriod.Year ? previousStart.AddMonths(i) : previousStart.AddDays(i);
+            DateTime? previousDate = mappedPreviousDate <= previousEnd ? mappedPreviousDate : null;
             double? value = date > cutoff ? null : period == StatisticsPeriod.Year
                 ? days.Where(d => d.Key >= date && d.Key < date.AddMonths(1) && d.Key <= cutoff).Sum(d => d.Value)
                 : days.GetValueOrDefault(date);

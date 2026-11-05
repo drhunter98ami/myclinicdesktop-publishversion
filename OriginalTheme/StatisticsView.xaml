@@ -174,7 +174,6 @@
                     <ColumnDefinition Width="Auto"/>
                     <!-- date nav -->
                 </Grid.ColumnDefinitions>
-
                 <!-- Subtabs -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="BtnDaily"   Content="يومي"   Style="{StaticResource SubTabBtnActive}" Margin="0,0,12,0" Click="BtnDaily_Click"/>
@@ -183,7 +182,7 @@
                 </StackPanel>
 
                 <!-- Date navigation -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel x:Name="DateNavigation" Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="BtnNow" Content="الآن" Style="{StaticResource NowBtn}" Margin="0,0,10,0" Click="BtnNow_Click"/>
                     <!-- Single combined PDF report (income + expenses, expenses, treatments) for the selected period -->
                     <Button x:Name="BtnExportPdf" Content="تصدير التقرير PDF" Style="{StaticResource ExportBtn}" Margin="0,0,10,0" Click="BtnExportPdf_Click"/>
@@ -201,6 +200,7 @@
                     <!-- back (toward past) -->
                     <Button Content="&#8250;" Style="{StaticResource NavBtn}" Margin="6,0,0,0" Click="BtnPrev_Click"/>
                 </StackPanel>
+
             </Grid>
         </Border>
 

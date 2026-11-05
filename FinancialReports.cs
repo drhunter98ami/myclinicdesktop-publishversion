@@ -84,13 +84,40 @@ public partial class FinancialRecordsView
         if (_selectedAccount == null) { ShowStatus("اختر مريضاً أولاً."); return null; }
         var a = _selectedAccount;
         return new("كشف حساب المريض", $"{a.PatientName} · {a.Phone} · حتى {AppClock.Today:dd/MM/yyyy}",
-            new[] { "التاريخ", "النوع", "التكلفة (ل.س)", "المسامحة (ل.س)", "المدفوع (ل.س)", "الرصيد بعد العملية (ل.س)", "الملاحظة" },
-            a.Rows.OrderBy(r => r.Date).ThenBy(r => r.Id).Select(r => new[] { r.Date.ToString("dd/MM/yyyy HH:mm"), r.Kind, Number(r.Cost), Number(r.Forgiven), Number(r.Paid), Number(r.Balance), r.Note }).ToList(),
+            new[] { "التاريخ", "النوع", "التكلفة (ل.س)", "المسامحة (ل.س)", "المدفوع (ل.س)", "الرصيد بعد العملية (ل.س)", "العلاج وتفاصيل الدفعة", "الملاحظة" },
+            a.Rows.OrderBy(r => r.Date).ThenBy(r => r.Id).Select(r => new[]
+            {
+                r.Date.ToString("dd/MM/yyyy HH:mm"), r.Kind, Number(r.Cost), Number(r.Forgiven), Number(r.Paid), Number(r.Balance),
+                r.Treatments.Count == 0 ? "لا يوجد علاج مرتبط بهذه العملية." :
+                    string.Join("؛ ", r.Treatments.Select(t => $"{t.TreatmentName}: تكلفة {t.CostText}، مدفوع {t.PaidText}، من رصيد سابق {t.CreditAppliedText}، مسامحة {t.ForgivenText}، متبقٍ {t.RemainingText}")),
+                r.Note
+            }).ToList(),
             $"التكلفة: {FinanceMoney.Format(a.Cost)} · الدفعات: {FinanceMoney.Format(a.Paid)} · المسامحة: {FinanceMoney.Format(a.Forgiven)} · {BalanceLabel(a.Balance)}");
     }
     private static string Number(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
     private void ExportPeriod_Click(object sender, RoutedEventArgs e) { if (TryRange(out _)) ExportReport(PeriodReport(), $"السجل-المالي-{AppClock.Today:yyyyMMdd}"); }
-    private void ExportPatient_Click(object sender, RoutedEventArgs e) { if (PatientReport() is { } report) ExportReport(report, $"كشف-حساب-{_selectedAccount!.PatientId}-{AppClock.Today:yyyyMMdd}"); }
+    private void ExportPatient_Click(object sender, RoutedEventArgs e)
+    {
+        if (PatientReport() is not { } report) return;
+        var dialog = new SaveFileDialog
+        {
+            Title = "تصدير كشف حساب المريض",
+            FileName = $"كشف-حساب-{_selectedAccount!.PatientId}-{AppClock.Today:yyyyMMdd}.pdf",
+            Filter = "ملف PDF (*.pdf)|*.pdf",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        try
+        {
+            File.WriteAllBytes(dialog.FileName, ClinicPdfReports.FinancialStatement(report, _selectedAccount));
+            ShowStatus("تم تصدير كشف الحساب بصيغة PDF.");
+        }
+        catch (Exception)
+        {
+            ShowStatus("تعذر إنشاء ملف PDF. اختر مجلداً آخر وأعد المحاولة.", true);
+        }
+    }
     private void ExportReport(FinanceReport report, string name)
     {
         var dialog = new SaveFileDialog { Title = "تصدير " + report.Title, FileName = name + ".csv", Filter = "CSV (*.csv)|*.csv", AddExtension = true, OverwritePrompt = true };
