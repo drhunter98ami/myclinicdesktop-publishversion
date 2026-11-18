@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.IO;
 using System.Windows;
 
@@ -11,7 +11,7 @@ public partial class PatientRecordsView
         if (_selectedPatient is null) return;
         if (_visitsLoading || RetryVisitsButton.Visibility == Visibility.Visible)
         {
-            MessageBox.Show("أعد تحميل سجل الزيارات بنجاح قبل تصدير الملف الطبي.", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show("أعد تحميل سجل الزيارات بنجاح قبل تصدير الملف الطبي.", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -28,11 +28,11 @@ public partial class PatientRecordsView
         try
         {
             File.WriteAllBytes(dialog.FileName, ClinicPdfReports.PatientHistory(_selectedPatient, _allPatientVisits));
-            MessageBox.Show("تم تصدير الملف الطبي بنجاح.", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Information);
+            AppMessageBox.Show("تم تصدير الملف الطبي بنجاح.", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"تعذر تصدير الملف الطبي حالياً.\n{ex.Message}", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppMessageBox.Show($"تعذر تصدير الملف الطبي حالياً.\n{ex.Message}", "تصدير الملف الطبي", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

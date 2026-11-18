@@ -24,6 +24,7 @@ namespace MyClinic
         public DbSet<Shortage> Shortages { get; set; }
         public DbSet<AppSettings> AppSettings { get; set; }
         public DbSet<LabName> LabNames { get; set; }
+        public DbSet<LabWorkTypeCost> LabWorkTypeCosts { get; set; }
         public DbSet<TreatmentCost> TreatmentCosts { get; set; }
         public DbSet<ClinicOperation> ClinicOperations { get; set; }
 
@@ -82,6 +83,7 @@ namespace MyClinic
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<ClinicOperation>().HasIndex(o => o.RequestKey).IsUnique();
             modelBuilder.Entity<ClinicOperation>().HasIndex(o => new { o.Kind, o.SourceId });
+            modelBuilder.Entity<LabWorkTypeCost>().HasIndex(w => w.LabNameId);
 
             modelBuilder.Entity<FinancialAuditEntry>().HasIndex(entry => entry.OccurredAt);
             modelBuilder.Entity<UpcomingPayment>().Property(payment => payment.Status).HasDefaultValue("Pending");

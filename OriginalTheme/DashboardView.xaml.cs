@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System;
 using System.Collections.Generic;
@@ -32,6 +32,20 @@ namespace MyClinic.OriginalTheme
         private Task? _refreshTask;
         private ViewMode _viewMode;
 
+        private bool IsDarkThemeActive()
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                return mainWindow.IsDarkTheme;
+            if (Application.Current?.MainWindow is MainWindow appMainWindow)
+                return appMainWindow.IsDarkTheme;
+            if (Window.GetWindow(this) is MyClinic.MainWindow modMain)
+                return modMain.IsDarkTheme;
+            return false;
+        }
+
+        private static SolidColorBrush CreateBrush(string hex) =>
+            new((Color)ColorConverter.ConvertFromString(hex));
+
         public DashboardView()
         {
             _isLoadingFileKitCanalCount = true;
@@ -41,6 +55,7 @@ namespace MyClinic.OriginalTheme
 
             LoadFileKitCanalCount();
             _isLoadingFileKitCanalCount = false;
+            RefreshUnsentLabWorkAlert();
 
             _viewMode = ViewMode.Monthly;
 
@@ -55,12 +70,15 @@ namespace MyClinic.OriginalTheme
 
             GlobalEvents.OnPatientRecordAdded += HandlePatientRecordAdded;
             GlobalEvents.OnFileKitCanalCountChanged += HandleFileKitCanalCountChanged;
+            GlobalEvents.OnLabWorkChanged += HandleLabWorkChanged;
+            IsVisibleChanged += (_, _) => { if (IsVisible) RefreshUnsentLabWorkAlert(); };
         }
 
         internal void ReleaseResources()
         {
             GlobalEvents.OnPatientRecordAdded -= HandlePatientRecordAdded;
             GlobalEvents.OnFileKitCanalCountChanged -= HandleFileKitCanalCountChanged;
+            GlobalEvents.OnLabWorkChanged -= HandleLabWorkChanged;
         }
 
         public void RefreshWelcomeName()
@@ -90,6 +108,50 @@ namespace MyClinic.OriginalTheme
             _ = RefreshNowAsync();
         }
 
+        private void HandleLabWorkChanged()
+        {
+            Dispatcher.Invoke(RefreshUnsentLabWorkAlert);
+        }
+
+        private void RefreshUnsentLabWorkAlert()
+        {
+            if (UnsentLabWorkBanner is null || TxtUnsentLabWorkAlert is null)
+                return;
+
+            try
+            {
+                using var db = new AppDbContext();
+                var unsentWorks = db.LabWorks
+                    .AsNoTracking()
+                    .Where(w => w.WorkStatus == "لم يتم الإرسال" || w.Status == "لم يتم الإرسال")
+                    .ToList();
+
+                if (unsentWorks.Count == 0)
+                {
+                    UnsentLabWorkBanner.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                var labGroups = unsentWorks
+                    .GroupBy(
+                        w => string.IsNullOrWhiteSpace(w.LabName) ? "غير محدد" : w.LabName.Trim(),
+                        StringComparer.CurrentCultureIgnoreCase)
+                    .Select(g => $"{g.Key}: {g.Count()}")
+                    .ToList();
+
+                bool dark = IsDarkThemeActive();
+                UnsentLabWorkBanner.Background = CreateBrush(dark ? "#2E200B" : "#FEF3C7");
+                UnsentLabWorkBanner.BorderBrush = CreateBrush(dark ? "#F59E0B" : "#D97706");
+                TxtUnsentLabWorkAlert.Foreground = CreateBrush(dark ? "#FCD34D" : "#92400E");
+                TxtUnsentLabWorkAlert.Text = $"تنبيه : يوجد عمل لم يتم إرساله — العدد: {unsentWorks.Count} ({string.Join("، ", labGroups)})";
+                UnsentLabWorkBanner.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                UnsentLabWorkBanner.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private void HandleFileKitCanalCountChanged()
         {
             LoadFileKitCanalCount();
@@ -97,7 +159,7 @@ namespace MyClinic.OriginalTheme
 
         private void BtnResetFileKitCanalCount_Click(object sender, RoutedEventArgs e)
         {
-            if (MessageBox.Show("هل تريد تصفير عدد الأقنية لهذا الكيت؟", "تأكيد التصفير", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (AppMessageBox.Show("هل تريد تصفير عدد الأقنية لهذا الكيت؟", "تأكيد التصفير", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
             using var db = new AppDbContext();
@@ -282,8 +344,9 @@ namespace MyClinic.OriginalTheme
                     using var db = new AppDbContext();
                     var appointments = await db.Appointments.AsNoTracking().ToListAsync();
                     var visits = await db.Visits.AsNoTracking().Include(visit => visit.Patient)
+                        .Where(visit => !visit.IsFinancialOnly && (visit.Patient == null || !visit.Patient.IsDeleted))
                         .OrderBy(visit => visit.VisitDate).ToListAsync();
-                    var patients = await db.Patients.AsNoTracking().ToListAsync();
+                    var patients = await db.Patients.AsNoTracking().Where(p => !p.IsDeleted).ToListAsync();
                     return (appointments, visits, patients);
                 });
                 if (_refreshRequested) return;
@@ -365,6 +428,7 @@ namespace MyClinic.OriginalTheme
                 
                 ApplyAppointmentsFilter();
                 UpdateSearchSuggestions();
+                RefreshUnsentLabWorkAlert();
 
                 _hasLoadedData = true;
             }
@@ -374,7 +438,7 @@ namespace MyClinic.OriginalTheme
                 _allPatients.Clear();
                 ReplaceAppointments(Array.Empty<AppointmentCardModel>());
                 EmptyAppointmentsState.Visibility = Visibility.Visible;
-                MessageBox.Show("تعذر تحميل المواعيد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show("تعذر تحميل المواعيد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             finally
             {
@@ -675,7 +739,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر حفظ الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر حفظ الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -802,7 +866,7 @@ namespace MyClinic.OriginalTheme
             if (sender is not Button button || !int.TryParse(button.Tag?.ToString(), out int appointmentId) || appointmentId <= 0)
                 return;
 
-            MessageBoxResult result = MessageBox.Show(
+            MessageBoxResult result = AppMessageBox.Show(
                 "هل أنت متأكد من حذف هذا الموعد؟",
                 "تأكيد حذف الموعد",
                 MessageBoxButton.YesNo,
@@ -832,7 +896,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر حذف الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر حذف الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -846,7 +910,7 @@ namespace MyClinic.OriginalTheme
             if (sender is not Button button || !int.TryParse(button.Tag?.ToString(), out int appointmentId))
                 return;
 
-            MessageBoxResult result = MessageBox.Show(
+            MessageBoxResult result = AppMessageBox.Show(
                 "هل أنت متأكد من حذف هذا الموعد؟",
                 "تأكيد حذف الموعد",
                 MessageBoxButton.YesNo,
@@ -873,7 +937,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر حذف الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر حذف الموعد حالياً.", "المواعيد", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

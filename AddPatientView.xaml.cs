@@ -430,14 +430,56 @@ namespace MyClinic
         {
             if (sender is CheckBox { DataContext: TreatmentSelectionItem selected } checkbox)
                 selected.IsSelected = checkbox.IsChecked == true;
-            if (!_suspendDraft && sender is CheckBox { DataContext: TreatmentSelectionItem chosen } && chosen.IsSelected && _activeTooth != null)
+            if (!_suspendDraft && sender is CheckBox { DataContext: TreatmentSelectionItem chosen })
             {
-                var empty = chosen.ToothDetails.FirstOrDefault(d => string.IsNullOrWhiteSpace(d.ToothId));
-                if (empty != null) empty.ToothId = _activeTooth;
+                if (chosen.IsSelected)
+                {
+                    var unassigned = GetUnassignedSelectedTeeth();
+                    if (unassigned.Count > 1)
+                    {
+                        chosen.Quantity = unassigned.Count;
+                        for (int i = 0; i < unassigned.Count; i++)
+                        {
+                            chosen.ToothDetails[i].ToothId = unassigned[i];
+                            if (chosen.IsRootCanal)
+                                ConfigureCanalsForTooth(chosen.ToothDetails[i]);
+                        }
+                        foreach (string t in unassigned)
+                            _pendingTeeth.Remove(t);
+                        _activeTooth = _pendingTeeth.LastOrDefault();
+                        UpdateSelectedToothBanner();
+                    }
+                    else if (unassigned.Count == 1 || _activeTooth != null)
+                    {
+                        string targetTooth = unassigned.Count == 1 ? unassigned[0] : _activeTooth!;
+                        var empty = chosen.ToothDetails.FirstOrDefault(d => string.IsNullOrWhiteSpace(d.ToothId));
+                        if (empty == null)
+                        {
+                            chosen.Quantity = Math.Max(1, chosen.Quantity) + 1;
+                            empty = chosen.ToothDetails.LastOrDefault();
+                        }
+                        if (empty != null)
+                        {
+                            empty.ToothId = targetTooth;
+                            if (chosen.IsRootCanal)
+                                ConfigureCanalsForTooth(empty);
+                        }
+                        _pendingTeeth.Remove(targetTooth);
+                        _activeTooth = _pendingTeeth.LastOrDefault();
+                        UpdateSelectedToothBanner();
+                    }
+                }
+                else
+                {
+                    chosen.Quantity = 1;
+                    chosen.ToothDetails.Clear();
+                    chosen.ToothDetails.Add(new TreatmentToothDetail { IsRootCanal = chosen.IsRootCanal });
+                    UpdateSelectedToothBanner();
+                }
             }
             if (sender is CheckBox { DataContext: TreatmentSelectionItem item } && item.IsSelected && item.IsRootCanal)
             {
-                foreach (var detail in item.ToothDetails.Where(d => !string.IsNullOrWhiteSpace(d.ToothId)))
+                foreach (var detail in item.ToothDetails.Where(d => !string.IsNullOrWhiteSpace(d.ToothId) && d.Canals.Count == 0))
                     ConfigureCanalsForTooth(detail);
             }
             CalculateTotalCost();
@@ -476,7 +518,9 @@ namespace MyClinic
                 }
 
                 detail.ToothId = tooth;
+                _pendingTeeth.Remove(tooth);
                 SelectToothOnChart(tooth);
+                UpdateSelectedToothBanner();
                 if (detail.IsRootCanal)
                     ConfigureCanalsForTooth(detail);
             }
@@ -571,6 +615,22 @@ namespace MyClinic
 
         private void TreatmentQuantity_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (!_suspendDraft && sender is TextBox { DataContext: TreatmentSelectionItem item } && item.IsSelected)
+            {
+                var unassigned = GetUnassignedSelectedTeeth();
+                foreach (var detail in item.ToothDetails.Where(d => string.IsNullOrWhiteSpace(d.ToothId)))
+                {
+                    if (unassigned.Count == 0) break;
+                    string nextTooth = unassigned[0];
+                    unassigned.RemoveAt(0);
+                    detail.ToothId = nextTooth;
+                    _pendingTeeth.Remove(nextTooth);
+                    if (item.IsRootCanal)
+                        ConfigureCanalsForTooth(detail);
+                }
+                _activeTooth = _pendingTeeth.LastOrDefault();
+                UpdateSelectedToothBanner();
+            }
             CalculateTotalCost();
         }
 
@@ -754,7 +814,7 @@ namespace MyClinic
             if (sender is FrameworkElement { Tag: PatientLookupSuggestion suggestion })
             {
                 if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id &&
-                    MessageBox.Show("اختيار مريض مختلف يمسح بيانات الزيارة الحالية. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                    AppMessageBox.Show("اختيار مريض مختلف يمسح بيانات الزيارة الحالية. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
                 if (_selectedPatientLookup != null && _selectedPatientLookup.Id != suggestion.Snapshot.Id) ResetWorkflowForm();
                 ApplyPatientSuggestion(suggestion.Snapshot);
             }
@@ -854,8 +914,23 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private async void DeleteVisit_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int visitId } || _selectedPatientLookup is null)
+                return;
+
+            string label = (VisitDetailsModal.DataContext as VisitDetailsViewModel)?.VisitDateTimeText ?? $"#{visitId}";
+            if (!await MyClinic.PatientProfileDeletionService.ConfirmAndDeleteVisitAsync(this, visitId, label))
+                return;
+
+            HideVisitDetailsOverlay();
+            _attachmentCache.Remove(visitId);
+            LoadPreviousVisits(_selectedPatientLookup);
+            UiFeedback.Notify(this, "تم حذف الزيارة بنجاح.");
         }
 
         private void OpenVisitEditHistory_Click(object sender, RoutedEventArgs e)
@@ -870,7 +945,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -893,7 +968,7 @@ namespace MyClinic
 
             if (!File.Exists(attachment.FilePath))
             {
-                MessageBox.Show("تعذر العثور على الملف المطلوب.", "المرفقات", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show("تعذر العثور على الملف المطلوب.", "المرفقات", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -907,7 +982,7 @@ namespace MyClinic
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر فتح الملف حالياً.", "المرفقات", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر فتح الملف حالياً.", "المرفقات", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -937,6 +1012,7 @@ namespace MyClinic
             using var db = _createContext();
             List<PatientLookupSnapshot> candidates = db.Patients
                 .AsNoTracking()
+                .Where(patient => !patient.IsDeleted)
                 .Select(patient => new PatientLookupSnapshot
                 {
                     Id = patient.Id,
@@ -952,8 +1028,8 @@ namespace MyClinic
                     SmokingFrequency = patient.SmokingFrequency,
                     Allergies = patient.Allergies,
                     ChronicDiseases = patient.ChronicDiseases,
-                    VisitCount = patient.Visits.Count(),
-                    LatestVisitDate = patient.Visits.Max(visit => (DateTime?)visit.VisitDate)
+                    VisitCount = patient.Visits.Count(visit => !visit.IsFinancialOnly),
+                    LatestVisitDate = patient.Visits.Where(visit => !visit.IsFinancialOnly).Max(visit => (DateTime?)visit.VisitDate)
                 })
                 .ToList();
 
@@ -1049,7 +1125,7 @@ namespace MyClinic
                 if (TxtTotalPatientRemaining != null) TxtTotalPatientRemaining.Text = totalRemaining.ToString("0.##", CultureInfo.CurrentCulture);
                 if (PatientFinancialHistoryPanel != null) PatientFinancialHistoryPanel.Visibility = Visibility.Visible;
 
-                List<VisitHistoryItem> visits = rawVisits.Take(10).Select(MapVisit).ToList();
+                List<VisitHistoryItem> visits = rawVisits.Where(v => !v.IsFinancialOnly).Take(10).Select(MapVisit).ToList();
 
                 _previousVisits.Clear();
                 foreach (VisitHistoryItem visit in visits)
@@ -1096,7 +1172,7 @@ namespace MyClinic
             catch (Exception ex)
             {
                 ClearPreviousVisits();
-                MessageBox.Show(
+                AppMessageBox.Show(
                     $"تعذر تحميل زيارات المريض:\n{ex.Message}",
                     "سجل الزيارات",
                     MessageBoxButton.OK,
@@ -1392,7 +1468,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"حدث خطأ أثناء حفظ البيانات:\n{ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"حدث خطأ أثناء حفظ البيانات:\n{ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1400,7 +1476,7 @@ namespace MyClinic
         {
             if (HasUnsavedChanges())
             {
-                var answer = MessageBox.Show("هل تريد حفظ التغييرات كمسودة قبل الإغلاق؟\nنعم: حفظ مسودة · لا: تجاهل التغييرات · إلغاء: متابعة التحرير",
+                var answer = AppMessageBox.Show("هل تريد حفظ التغييرات كمسودة قبل الإغلاق؟\nنعم: حفظ مسودة · لا: تجاهل التغييرات · إلغاء: متابعة التحرير",
                     "تغييرات غير محفوظة", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
                 if (answer == MessageBoxResult.Cancel) return;
                 if (answer == MessageBoxResult.Yes) { if (!PreserveDraft()) return; }
@@ -1590,7 +1666,7 @@ namespace MyClinic
         {
             if (LstPrescriptionEntries.SelectedIndex < 0 || LstPrescriptionEntries.SelectedIndex >= _prescriptionItems.Count)
             {
-                MessageBox.Show("حدد عنصراً من الوصفة لحذفه.", "الوصفة الطبية", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show("حدد عنصراً من الوصفة لحذفه.", "الوصفة الطبية", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1620,7 +1696,7 @@ namespace MyClinic
             {
                 if (_selectedImagePaths.Count >= MaxVisitImages)
                 {
-                    MessageBox.Show($"يمكن إرفاق {MaxVisitImages} صور كحد أقصى لكل زيارة.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
+                    AppMessageBox.Show($"يمكن إرفاق {MaxVisitImages} صور كحد أقصى لكل زيارة.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
                     break;
                 }
 

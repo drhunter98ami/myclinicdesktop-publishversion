@@ -31,6 +31,7 @@ public partial class AddPatientView : IRecoverableClinicForm
     private readonly Dictionary<int, int> _treatmentFrequency = new();
     private string _currentSection = "PatientSection";
     private string? _activeTooth;
+    private readonly List<string> _pendingTeeth = new();
     private bool _visitCommitted;
     private DateTime? _legacyBirthDate;
 
@@ -130,17 +131,65 @@ public partial class AddPatientView : IRecoverableClinicForm
         ScheduleDraft();
         if (e.OriginalSource is ToggleButton tooth && int.TryParse(tooth.Content?.ToString(), out int id) && ToothGlyph.IsValidId(id))
         {
+            string toothId = id.ToString(CultureInfo.InvariantCulture);
             if (tooth.IsChecked == true)
             {
-                _activeTooth = id.ToString(CultureInfo.InvariantCulture);
-                TxtSelectedTooth.Text = ToothGlyph.Description(id.ToString(CultureInfo.InvariantCulture));
+                _pendingTeeth.Remove(toothId);
+                _pendingTeeth.Add(toothId);
+                _activeTooth = toothId;
+                UpdateSelectedToothBanner();
                 FormMotion.Reveal(ToothSelectionHint);
             }
-            else if (_activeTooth == id.ToString(CultureInfo.InvariantCulture))
+            else
             {
-                _activeTooth = AdultChartControl.GetSelectedTeeth().Concat(ChildChartControl.GetSelectedTeeth()).LastOrDefault();
-                TxtSelectedTooth.Text = _activeTooth == null ? "اختر السن ثم حدّد العلاج المناسب له." : ToothGlyph.Description(_activeTooth);
+                _pendingTeeth.Remove(toothId);
+                if (_activeTooth == toothId)
+                    _activeTooth = _pendingTeeth.LastOrDefault();
+                UpdateSelectedToothBanner();
             }
+        }
+    }
+
+    private List<string> GetUnassignedSelectedTeeth()
+    {
+        var allChartTeeth = GetSelectedToothIds();
+        var assignedTeeth = _treatmentSelectionItems
+            .Where(t => t.IsSelected)
+            .SelectMany(t => t.ToothDetails)
+            .Select(d => d.ToothId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var pending = _pendingTeeth
+            .Where(id => allChartTeeth.Contains(id, StringComparer.Ordinal) && !assignedTeeth.Contains(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        foreach (string chartTooth in allChartTeeth)
+        {
+            if (!assignedTeeth.Contains(chartTooth) && !pending.Contains(chartTooth, StringComparer.Ordinal))
+                pending.Add(chartTooth);
+        }
+        return pending;
+    }
+
+    private void UpdateSelectedToothBanner()
+    {
+        if (TxtSelectedTooth == null) return;
+        var pending = GetUnassignedSelectedTeeth();
+        if (pending.Count == 0)
+        {
+            TxtSelectedTooth.Text = _activeTooth == null
+                ? "اختر السن ثم حدّد العلاج المناسب له."
+                : ToothGlyph.Description(_activeTooth);
+        }
+        else if (pending.Count == 1)
+        {
+            TxtSelectedTooth.Text = ToothGlyph.Description(pending[0]);
+        }
+        else
+        {
+            TxtSelectedTooth.Text = $"تم تحديد {pending.Count} أسنان ({string.Join("، ", pending)}) · اضغط تحديد العلاج أو اختر العلاج لتطبيقه عليها.";
         }
     }
 
@@ -191,7 +240,7 @@ public partial class AddPatientView : IRecoverableClinicForm
     }
     private void DiscardDraft_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show("حذف المسودة والتغييرات الحالية؟", "المسودة", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (AppMessageBox.Show("حذف المسودة والتغييرات الحالية؟", "المسودة", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         if (!DeleteDraft()) return;
         ResetWorkflowForm();
     }
@@ -202,6 +251,7 @@ public partial class AddPatientView : IRecoverableClinicForm
         {
             ResetForm(); _legacyBirthDate = null; TxtBirthYear.Clear(); CmbAllergyStatus.SelectedIndex = 0; CmbChronicDiseaseStatus.SelectedIndex = 0;
             _activeTooth = null;
+            _pendingTeeth.Clear();
             _visitCommitted = false;
             TxtSelectedTooth.Text = "اختر السن ثم حدّد العلاج المناسب له.";
             TxtTreatmentSearch.Clear(); _frequentOnly = false; _treatmentView?.Refresh();
@@ -320,7 +370,7 @@ public partial class AddPatientView : IRecoverableClinicForm
     }
     private void ChangePatient_Click(object sender, RoutedEventArgs e)
     {
-        if (HasUnsavedChanges() && MessageBox.Show("سيتم مسح النموذج الحالي لاختيار مريض آخر. احفظ المسودة أو الزيارة أولاً إذا أردت الاحتفاظ بها. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (HasUnsavedChanges() && AppMessageBox.Show("سيتم مسح النموذج الحالي لاختيار مريض آخر. احفظ المسودة أو الزيارة أولاً إذا أردت الاحتفاظ بها. متابعة؟", "تغيير المريض", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         if (!DeleteDraft()) return;
         ResetWorkflowForm(); JumpToSection("PatientSection"); TxtFullName.Focus();
     }
@@ -366,6 +416,7 @@ public partial class AddPatientView : IRecoverableClinicForm
     private void TreatmentSearch_Changed(object sender, TextChangedEventArgs e) => _treatmentView?.Refresh();
     private void SelectTreatmentForTooth_Click(object sender, RoutedEventArgs e)
     {
+        UpdateSelectedToothBanner();
         ClinicalSection.IsExpanded = true; ClinicalSection.UpdateLayout();
         FormScroll.ScrollToVerticalOffset(TreatmentCard.TranslatePoint(new Point(), FormSections).Y);
         TxtTreatmentSearch.Focus();

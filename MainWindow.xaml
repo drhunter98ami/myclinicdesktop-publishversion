@@ -8,7 +8,7 @@
         WindowState="Maximized"
         FlowDirection="RightToLeft"
         Background="{DynamicResource AppWindowBg}"
-        Icon="Assets/logo.png"
+        Icon="Assets/logo.ico"
         PreviewMouseMove="Window_PreviewMouseMove"
         MouseLeave="Window_MouseLeave">
 

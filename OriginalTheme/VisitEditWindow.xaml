@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="تعديل الزيارة"
         Width="820"
-        Height="780"
+        Height="820"
         MinWidth="680"
         MinHeight="620"
         WindowStartupLocation="CenterOwner"
@@ -21,6 +21,90 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="EditCombo" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource AppInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Padding" Value="10,8"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="ItemBd" Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Right" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="ItemBd" Property="Background" Value="{DynamicResource AppSidebarHoverBg}"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="6">
+                                            <TextBlock Text="⌄" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="28,6,10,6"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Right"
+                                              TextElement.Foreground="{DynamicResource AppTextPrimary}"/>
+                            <Popup Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False">
+                                <Border Background="{DynamicResource AppCardBg}"
+                                        BorderBrush="{DynamicResource AppBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="4"
+                                        Margin="0,3,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="240">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="EditLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/>
@@ -93,7 +177,7 @@
                        FontSize="34"
                        FontWeight="Bold"
                        Foreground="{DynamicResource AppTextPrimary}"/>
-            <TextBlock Text="سيُحفظ كل تغيير مع وقته الدقيق وقيمته قبل التعديل وبعده. تاريخ الزيارة والبيانات المالية والعلاجات والأسنان والوصفة والصور لا تتغير."
+            <TextBlock Text="سيُحفظ كل تغيير مع وقته الدقيق وقيمته قبل التعديل وبعده. يمكنك تعديل الملاحظات والقياسات والوصفة الطبية وإضافة صور."
                        Foreground="{DynamicResource AppTextSecondary}"
                        TextWrapping="Wrap"
                        Margin="0,2,0,0"/>
@@ -149,6 +233,49 @@
                         <TextBox x:Name="TreatmentPlanText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
                         <TextBlock Text="الإجراء النهائي" Style="{StaticResource EditLabel}" Margin="0,12,0,6"/>
                         <TextBox x:Name="FinalTreatmentText" Style="{StaticResource EditField}" MinHeight="70" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{DynamicResource AppCardBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="الوصفة الطبية" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBlock Text="اسم الدواء" Style="{StaticResource EditLabel}"/>
+                        <TextBox x:Name="TxtPrescriptionMedicine" Style="{StaticResource EditField}" Margin="0,0,0,10"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="العيار" Style="{StaticResource EditLabel}"/>
+                                <TextBox x:Name="TxtPrescriptionDosage" Style="{StaticResource EditField}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="التكرار (ساعات)" Style="{StaticResource EditLabel}"/>
+                                <TextBox x:Name="TxtPrescriptionFrequency" Style="{StaticResource EditField}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="التوقيت" Style="{StaticResource EditLabel}"/>
+                                <ComboBox x:Name="CmbPrescriptionTiming" Style="{StaticResource EditCombo}" SelectedIndex="0">
+                                    <ComboBoxItem Content="بعد الطعام"/>
+                                    <ComboBoxItem Content="قبل الطعام"/>
+                                    <ComboBoxItem Content="عند اللزوم"/>
+                                    <ComboBoxItem Content="قبل النوم"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="ملاحظات إضافية" Style="{StaticResource EditLabel}"/>
+                        <TextBox x:Name="TxtPrescriptionNotes" Style="{StaticResource EditField}" MinHeight="55" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Margin="0,0,0,10"/>
+                        <WrapPanel Margin="0,0,0,10">
+                            <Button Content="إضافة للوصفة" Click="AddPrescription_Click" Padding="14,8" Background="#0D9488" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,4"/>
+                            <Button x:Name="BtnUpdatePrescription" Content="تحديث المحدد" Click="UpdatePrescription_Click" Padding="14,8" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Cursor="Hand" Margin="0,0,8,4" IsEnabled="False"/>
+                            <Button Content="حذف المحدد" Click="RemovePrescription_Click" Padding="14,8" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Cursor="Hand" Margin="0,0,0,4"/>
+                        </WrapPanel>
+                        <TextBlock Text="عناصر الوصفة الحالية" Style="{StaticResource EditLabel}"/>
+                        <ListBox x:Name="LstPrescriptionEntries" MinHeight="100" MaxHeight="180" Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" Foreground="{DynamicResource AppTextPrimary}" Padding="6" SelectionChanged="LstPrescriptionEntries_SelectionChanged"/>
                     </StackPanel>
                 </Border>
 

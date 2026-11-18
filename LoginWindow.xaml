@@ -6,7 +6,7 @@
         Background="#111B21"
         ResizeMode="NoResize"
         FlowDirection="RightToLeft"
-        Icon="Assets/logo.png">
+        Icon="Assets/logo.ico">
     
     <Grid Margin="30">
         <Grid.RowDefinitions>

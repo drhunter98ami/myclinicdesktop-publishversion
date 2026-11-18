@@ -25,7 +25,7 @@
      <StackPanel><WrapPanel>
       <StackPanel Width="160" Margin="0,0,0,8"><TextBlock Text="المريض أو العمل" Style="{StaticResource LabFilterLabel}"/><TextBox x:Name="Search" Style="{StaticResource LabFilterInput}" TextChanged="Filter_Changed"/></StackPanel>
       <StackPanel Width="130" Margin="8,0,0,8"><TextBlock Text="المخبر" Style="{StaticResource LabFilterLabel}"/><ComboBox x:Name="LabFilter" Style="{StaticResource LabFilterCombo}" SelectionChanged="Filter_Changed"/></StackPanel>
-      <StackPanel Width="125" Margin="8,0,0,8"><TextBlock Text="حالة العمل" Style="{StaticResource LabFilterLabel}"/><ComboBox x:Name="WorkFilter" Style="{StaticResource LabFilterCombo}" SelectionChanged="Filter_Changed"/></StackPanel>
+      <StackPanel Width="150" Margin="8,0,0,8"><TextBlock Text="حالة العمل" Style="{StaticResource LabFilterLabel}"/><ComboBox x:Name="WorkFilter" Style="{StaticResource LabFilterCombo}" SelectionChanged="Filter_Changed"/></StackPanel>
       <StackPanel Width="125" Margin="8,0,0,8"><TextBlock Text="حالة الدفع" Style="{StaticResource LabFilterLabel}"/><ComboBox x:Name="PaymentFilter" Style="{StaticResource LabFilterCombo}" SelectionChanged="Filter_Changed"/></StackPanel>
       <StackPanel Width="125" Margin="8,0,0,8"><TextBlock Text="التاريخ حسب" Style="{StaticResource LabFilterLabel}"/><ComboBox x:Name="DateBasis" Style="{StaticResource LabFilterCombo}" SelectionChanged="Filter_Changed"/></StackPanel>
      </WrapPanel>
@@ -44,12 +44,13 @@
     <DataGrid.RowStyle><Style TargetType="DataGridRow"><Setter Property="local:FinanceMotion.HighlightId" Value="{Binding Id}"/></Style></DataGrid.RowStyle>
     <DataGrid.Columns>
      <DataGridTextColumn Header="المريض" Binding="{Binding Patient}" SortMemberPath="Patient" Width="*" MinWidth="130"/>
-     <DataGridTextColumn Header="المخبر" Binding="{Binding Lab}" Width="125"/>
+     <DataGridTextColumn Header="المخبر" Binding="{Binding Lab}" Width="120"/>
      <DataGridTextColumn x:Name="WorkTypeColumn" Header="العمل" Binding="{Binding WorkType}" Width="110"/>
-     <DataGridTemplateColumn Header="التسليم" SortMemberPath="WorkStatus" Width="125"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="7" Padding="8,4"><TextBlock Text="{Binding WorkStatus}" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" FontSize="12"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+     <DataGridTextColumn Header="اللون" Binding="{Binding Color}" Width="80"/>
+     <DataGridTemplateColumn Header="الحالة" SortMemberPath="WorkStatus" Width="155"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="7" Padding="8,4"><TextBlock Text="{Binding WorkStatus}" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" FontSize="12"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
      <DataGridTemplateColumn Header="موعد التسليم" SortMemberPath="ExpectedDelivery" Width="120"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Delivery}" TextWrapping="Wrap"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource AppTextSecondary}"/><Style.Triggers><DataTrigger Binding="{Binding Overdue}" Value="True"><Setter Property="Foreground" Value="{DynamicResource WorkspaceDanger}"/><Setter Property="FontWeight" Value="SemiBold"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-     <DataGridTemplateColumn Header="الدفع" SortMemberPath="PaymentStatus" Width="125"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="7" Padding="8,4"><TextBlock Text="{Binding PaymentStatus}" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" FontSize="12"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-     <DataGridTextColumn Header="المتبقي" Binding="{Binding BalanceText}" SortMemberPath="Balance" Width="140" ElementStyle="{StaticResource WorkspaceAmount}"/>
+     <DataGridTemplateColumn Header="الدفع" SortMemberPath="PaymentStatus" Width="120"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border Background="{DynamicResource AppInputBg}" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1" CornerRadius="7" Padding="8,4"><TextBlock Text="{Binding PaymentStatus}" Foreground="{DynamicResource AppTextPrimary}" TextWrapping="Wrap" FontSize="12"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+     <DataGridTextColumn Header="المتبقي" Binding="{Binding BalanceText}" SortMemberPath="Balance" Width="135" ElementStyle="{StaticResource WorkspaceAmount}"/>
      <DataGridTemplateColumn Header="التفاصيل" Width="85"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="فتح" Style="{StaticResource WorkspaceButton}" Click="Details_Click"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
     </DataGrid.Columns>
    </DataGrid><TextBlock x:Name="Empty" Text="لا توجد أعمال تطابق التصفية. غيّر الفترة أو أضف عملاً جديداً." Style="{StaticResource WorkspaceHint}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20" IsHitTestVisible="False"/></Grid>
@@ -66,16 +67,20 @@
         <TextBlock Text="اسم المريض" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="PatientName" Style="{StaticResource WorkspaceInput}" TextChanged="Patient_Changed" Margin="0,0,0,10"/>
         <ListBox x:Name="PatientSuggestions" MaxHeight="130" DisplayMemberPath="FullName" SelectionChanged="Patient_Selected" Background="{DynamicResource AppInputBg}" Foreground="{DynamicResource AppTextPrimary}" BorderBrush="{DynamicResource AppBorder}" Visibility="Collapsed"/>
         <TextBlock Text="ابحث عن مخبر" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabSearch" Style="{StaticResource WorkspaceInput}" TextChanged="LabSearch_Changed" Margin="0,0,0,6"/>
-        <DockPanel Margin="0,0,0,12"><Button Content="إضافة مخبر" Style="{StaticResource WorkspaceButton}" Click="AddLab_Click" DockPanel.Dock="Left" Margin="8,0,0,0"/><ComboBox x:Name="LabName" Style="{StaticResource WorkspaceCombo}" DisplayMemberPath="Name"/></DockPanel>
-        <TextBlock Text="نوع العمل" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="WorkType" Style="{StaticResource WorkspaceInput}" Margin="0,0,0,12"/>
+        <DockPanel Margin="0,0,0,12"><Button Content="إضافة مخبر" Style="{StaticResource WorkspaceButton}" Click="AddLab_Click" DockPanel.Dock="Left" Margin="8,0,0,0"/><ComboBox x:Name="LabName" Style="{StaticResource WorkspaceCombo}" DisplayMemberPath="Name" SelectionChanged="LabName_Changed"/></DockPanel>
+        <TextBlock Text="نوع العمل" Style="{StaticResource WorkspaceLabel}"/>
+        <ComboBox x:Name="WorkTypeCombo" Style="{StaticResource WorkspaceCombo}" DisplayMemberPath="WorkTypeName" SelectionChanged="WorkType_Changed" Margin="0,0,0,8"/>
+        <TextBox x:Name="WorkType" Tag="زيركون، فينير... (اختر من القائمة أعلاه أو اكتب نوع العمل)" Style="{StaticResource WorkspaceInput}" Margin="0,0,0,12"/>
         <WrapPanel><StackPanel Width="180" Margin="0,0,0,12"><TextBlock Text="التكلفة" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="Cost" TextChanged="CurrencyPreview_Changed" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></StackPanel><StackPanel Width="100" Margin="10,0,0,12"><TextBlock Text="العملة" Style="{StaticResource WorkspaceLabel}"/><ComboBox x:Name="WorkCurrency" SelectionChanged="WorkCurrency_Changed" Style="{StaticResource WorkspaceCombo}"/></StackPanel></WrapPanel>
         <StackPanel x:Name="CurrencyConversionHost" Visibility="Collapsed" Margin="0,0,0,12">
          <TextBlock Text="سعر التحويل · SYP لكل 1 USD" Style="{StaticResource WorkspaceLabel}"/>
          <TextBox x:Name="CurrencyConversionRate" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight" TextChanged="ConversionRate_Changed"/>
          <TextBlock x:Name="CurrencyConversionPreview" Style="{StaticResource WorkspaceHint}" Margin="0,8,0,0"/>
         </StackPanel>
+        <TextBlock Text="اللون" Style="{StaticResource WorkspaceLabel}"/>
+        <TextBox x:Name="WorkColor" Tag="مثال: A1, A2, B1, BL2..." Style="{StaticResource WorkspaceInput}" Margin="0,0,0,12"/>
         <TextBlock Text="موعد التسليم المتوقع" Style="{StaticResource WorkspaceLabel}"/><DatePicker Style="{StaticResource WorkspaceDate}" x:Name="ExpectedDate" MinHeight="38" Margin="0,0,0,12"/>
-        <TextBlock Text="أرقام الأسنان" Style="{StaticResource WorkspaceLabel}"/><DockPanel Margin="0,0,0,12"><Button Content="اختيار الأسنان" Style="{StaticResource WorkspaceButton}" Click="PickTeeth_Click" DockPanel.Dock="Left" Margin="8,0,0,0"/><TextBox x:Name="Teeth" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></DockPanel>
+        <TextBlock Text="أرقام الأسنان" Style="{StaticResource WorkspaceLabel}"/><DockPanel Margin="0,0,0,12"><Button Content="اختيار الأسنان" Style="{StaticResource WorkspaceButton}" Click="PickTeeth_Click" DockPanel.Dock="Left" Margin="8,0,0,0"/><TextBox x:Name="Teeth" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight" TextChanged="Teeth_Changed"/></DockPanel>
         <TextBlock Text="ملاحظات" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="Notes" Style="{StaticResource WorkspaceInput}" AcceptsReturn="True" TextWrapping="Wrap" Height="88" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12"/>
         <StackPanel x:Name="CorrectionHost" Visibility="Collapsed"><TextBlock Text="سبب التصحيح" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="CorrectionReason" Style="{StaticResource WorkspaceInput}" Margin="0,0,0,12"/></StackPanel>
         <TextBlock x:Name="EditorError" TextWrapping="Wrap" Foreground="{DynamicResource WorkspaceDanger}" Margin="0,0,0,10"/>
@@ -84,7 +89,12 @@
        <StackPanel x:Name="Details" Visibility="Collapsed">
         <TextBlock x:Name="DetailSummary" Style="{StaticResource WorkspaceHeading}" FontSize="17" Margin="0,0,0,12"/>
         <TextBlock x:Name="DetailNotes" Style="{StaticResource WorkspaceHint}" Margin="0,0,0,16"/>
-        <WrapPanel Margin="0,0,0,16"><Button x:Name="AdvanceWork" Content="تحديث حالة العمل" Style="{StaticResource WorkspaceButton}" Click="Advance_Click" Margin="0,0,0,8"/><Button x:Name="PayWork" Content="تسجيل دفعة" Style="{StaticResource WorkspacePrimary}" Click="Pay_Click" Margin="8,0,0,8"/><Button Content="تصحيح التفاصيل" Style="{StaticResource WorkspaceButton}" Click="EditWork_Click" Margin="8,0,0,8"/></WrapPanel>
+        <WrapPanel Margin="0,0,0,16">
+         <Button x:Name="BtnMarkSent" Content="تم الإرسال" Style="{StaticResource WorkspaceButton}" Click="MarkSent_Click" Margin="0,0,0,8"/>
+         <Button x:Name="BtnMarkReceived" Content="تم الاستلام" Style="{StaticResource WorkspaceButton}" Click="MarkReceived_Click" Margin="8,0,0,8"/>
+         <Button x:Name="PayWork" Content="تسجيل دفعة" Style="{StaticResource WorkspacePrimary}" Click="Pay_Click" Margin="8,0,0,8"/>
+         <Button Content="تصحيح التفاصيل" Style="{StaticResource WorkspaceButton}" Click="EditWork_Click" Margin="8,0,0,8"/>
+        </WrapPanel>
         <TextBlock Text="سجل العمل والدفعات" Style="{StaticResource WorkspaceHeading}" FontSize="17" Margin="0,0,0,12"/>
         <ItemsControl x:Name="Timeline"><ItemsControl.ItemTemplate><DataTemplate><Border Style="{StaticResource WorkspaceCard}" Padding="12" Margin="0,0,0,8"><StackPanel><TextBlock Text="{Binding Description}" Style="{StaticResource WorkspaceLabel}"/><TextBlock Text="{Binding Detail}" Style="{StaticResource WorkspaceHint}"/><Button Content="عرض المصروف" Visibility="{Binding ExpenseVisibility}" Click="TimelineExpense_Click" Style="{StaticResource WorkspaceButton}" Margin="0,8,0,0"/></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
        </StackPanel>

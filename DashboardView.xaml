@@ -345,8 +345,28 @@
             </Ellipse>
         </Canvas>
 
-        <!-- الصف العلوي: 3 بطاقات منفصلة (الترحيب | عداد الفايلات | أزرار الإضافة) -->
-        <Grid motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="0" Grid.Row="0" Panel.ZIndex="2" Margin="0,0,0,16">
+        <!-- الصف العلوي: تنبيه المخبر + 3 بطاقات منفصلة -->
+        <StackPanel Grid.Row="0" Panel.ZIndex="2">
+            <Border x:Name="UnsentLabWorkBanner"
+                    Visibility="Collapsed"
+                    Background="#2A1C08"
+                    BorderBrush="#F59E0B"
+                    BorderThickness="1.2"
+                    CornerRadius="14"
+                    Padding="16,11"
+                    Margin="0,0,0,12">
+                <DockPanel LastChildFill="True">
+                    <TextBlock Text="⚠" FontSize="18" Foreground="#F59E0B" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="TxtUnsentLabWorkAlert"
+                               Text="تنبيه : يوجد عمل لم يتم إرساله"
+                               Foreground="#FCD34D"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </DockPanel>
+            </Border>
+        <Grid motion:NavigationTransition.Motion="Cards" motion:NavigationTransition.Order="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.45*"/>
                 <ColumnDefinition Width="222"/>
@@ -579,6 +599,7 @@
                 </Grid>
             </Border>
         </Grid>
+        </StackPanel>
 
         <!-- المحتوى الرئيسي (المواعيد والتقويم) -->
         <Border Grid.Row="1"

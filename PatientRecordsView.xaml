@@ -368,7 +368,10 @@
                             </TextBlock>
                         </StackPanel>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <Button Content="سجل الزيارات" Style="{StaticResource RecordButton}" Tag="{Binding}" Click="OpenMedicalRecord_Click" Background="{DynamicResource SettingsPrimaryBtnBg}" Foreground="{DynamicResource SettingsPrimaryBtnFg}" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <Button Content="سجل الزيارات" Style="{StaticResource RecordButton}" Tag="{Binding}" Click="OpenMedicalRecord_Click" Background="{DynamicResource SettingsPrimaryBtnBg}" Foreground="{DynamicResource SettingsPrimaryBtnFg}" Margin="0,0,6,0"/>
+                                <Button Content="حذف الملف" Style="{StaticResource RecordButton}" Tag="{Binding}" Click="DeletePatientProfile_Click" Foreground="#EF4444" Margin="0"/>
+                            </StackPanel>
                             <TextBlock Text="{Binding VisitCountLabel}" Foreground="{DynamicResource AppTextSecondary}" HorizontalAlignment="Center" FontSize="12"/>
                         </StackPanel>
                     </Grid>
@@ -449,6 +452,7 @@
                     <DockPanel Margin="0,0,0,14">
                         <Button x:Name="CloseDrawerButton" DockPanel.Dock="Left" Content="×" Style="{StaticResource RecordButton}" Click="CloseMedicalRecord_Click" AutomationProperties.Name="إغلاق الملف الطبي"/>
                         <Button DockPanel.Dock="Left" Content="تصدير الملف الطبي PDF" Style="{StaticResource RecordButton}" Click="ExportMedicalHistory_Click" Margin="0,0,8,0"/>
+                        <Button DockPanel.Dock="Left" Content="حذف الملف" Style="{StaticResource RecordButton}" Click="DeleteSelectedPatientProfile_Click" Foreground="#EF4444" Margin="0,0,8,0"/>
                         <TextBlock Text="الملف الطبي" FontSize="21" FontWeight="Bold" Foreground="{DynamicResource AppTextPrimary}"/>
                     </DockPanel>
                     <Border Grid.Row="1" Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1" CornerRadius="12" Padding="15" Margin="0,0,0,12">
@@ -477,12 +481,19 @@
                             <ListBox.ItemTemplate><DataTemplate>
                                 <Button Tag="{Binding}" Click="OpenVisitDetails_Click" Style="{StaticResource VisitEntryButtonStyle}" Margin="0,0,0,9">
                                     <Border CornerRadius="12" Padding="14" Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="1,1,3,1">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding VisitDateTimeText}" Foreground="{DynamicResource DashCalendarTodayNumFg}" FontSize="12" FontWeight="Bold"/>
-                                            <TextBlock Text="{Binding Title}" Foreground="{DynamicResource AppTextPrimary}" FontSize="17" FontWeight="Bold" Margin="0,7,0,5" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Details}" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap" MaxHeight="44"/>
-                                            <TextBlock Text="{Binding MetadataText}" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,8,0,0"/>
-                                        </StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding VisitDateTimeText}" Foreground="{DynamicResource DashCalendarTodayNumFg}" FontSize="12" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding Title}" Foreground="{DynamicResource AppTextPrimary}" FontSize="17" FontWeight="Bold" Margin="0,7,0,5" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Details}" Foreground="{DynamicResource AppTextSecondary}" TextWrapping="Wrap" MaxHeight="44"/>
+                                                <TextBlock Text="{Binding MetadataText}" Foreground="{DynamicResource AppTextSecondary}" FontSize="12" Margin="0,8,0,0"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="حذف" Tag="{Binding VisitId}" Click="DeleteVisit_Click" Style="{StaticResource RecordButton}" Height="32" Padding="10,0" Foreground="#EF4444" VerticalAlignment="Top" Margin="8,0,0,0" ToolTip="حذف هذه الزيارة"/>
+                                        </Grid>
                                     </Border>
                                 </Button>
                             </DataTemplate></ListBox.ItemTemplate>
@@ -1013,6 +1024,12 @@
                             BorderThickness="0,1,0,0">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                             <Button Content="طباعة الملخص" Style="{StaticResource RecordButton}" Click="PrintVisit_Click"/>
+                            <Button Content="حذف الزيارة"
+                                    Tag="{Binding VisitId}"
+                                    Click="DeleteVisit_Click"
+                                    Style="{StaticResource RecordButton}"
+                                    Foreground="#EF4444"
+                                    Margin="0,0,10,0"/>
                             <Button Content="تعديل الزيارة"
                                     Tag="{Binding VisitId}"
                                     Click="EditVisit_Click"

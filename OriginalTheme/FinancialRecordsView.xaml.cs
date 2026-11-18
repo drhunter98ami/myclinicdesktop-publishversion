@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MyClinic.Models;
 using System;
 using System.Collections.Generic;
@@ -229,7 +229,7 @@ namespace MyClinic.OriginalTheme
                 _allVisits.Clear();
                 _allExpenses.Clear();
                 ApplyFilters();
-                MessageBox.Show("تعذر تحميل السجل المالي حالياً.", "السجل المالي", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show("تعذر تحميل السجل المالي حالياً.", "السجل المالي", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             finally
             {
@@ -346,7 +346,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر حفظ المصروف حالياً.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر حفظ المصروف حالياً.", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         
@@ -412,7 +412,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر إضافة الدفعة. تأكد من إعداد جدول UpcomingPayment في قاعدة البيانات.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر إضافة الدفعة. تأكد من إعداد جدول UpcomingPayment في قاعدة البيانات.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -454,7 +454,7 @@ namespace MyClinic.OriginalTheme
                 }
                 catch (Exception)
                 {
-                    MessageBox.Show("حدث خطأ أثناء معالجة الدفعة وتحويلها لمصاريف.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                    AppMessageBox.Show("حدث خطأ أثناء معالجة الدفعة وتحويلها لمصاريف.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -463,7 +463,7 @@ namespace MyClinic.OriginalTheme
         {
             if (sender is Button btn && btn.DataContext is UpcomingPaymentRowModel item)
             {
-                if (MessageBox.Show("هل أنت متأكد من إلغاء وحذف هذه الدفعة نهائياً؟", "تأكيد الإلغاء", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                if (AppMessageBox.Show("هل أنت متأكد من إلغاء وحذف هذه الدفعة نهائياً؟", "تأكيد الإلغاء", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     try
                     {
@@ -480,7 +480,7 @@ namespace MyClinic.OriginalTheme
                     }
                     catch (Exception)
                     {
-                        MessageBox.Show("حدث خطأ أثناء إلغاء الدفعة.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                        AppMessageBox.Show("حدث خطأ أثناء إلغاء الدفعة.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
             }
@@ -850,11 +850,11 @@ namespace MyClinic.OriginalTheme
                 {
                     int sortIndex = CmbUnpaidSort.SelectedIndex;
                     if (sortIndex == 0) // Highest Amount
-                        unpaidList = unpaidList.OrderByDescending(u => u.RemainingAmount).ToList();
+                        unpaidList = unpaidList.OrderByDescending(u => u.RemainingAmount).ThenBy(u => u.FirstDebtDate).ThenBy(u => (u.PatientName ?? "").Trim(), StringComparer.CurrentCulture).ToList();
                     else if (sortIndex == 1) // Alphabetical
-                        unpaidList = unpaidList.OrderBy(u => u.PatientName).ToList();
+                        unpaidList = unpaidList.OrderBy(u => (u.PatientName ?? "").Trim(), StringComparer.CurrentCulture).ThenByDescending(u => u.RemainingAmount).ToList();
                     else if (sortIndex == 2) // Oldest
-                        unpaidList = unpaidList.OrderBy(u => u.FirstDebtDate).ToList();
+                        unpaidList = unpaidList.OrderBy(u => u.FirstDebtDate).ThenByDescending(u => u.RemainingAmount).ToList();
                 }
 
                 using var unpaidScroll = ScrollState.Updating(UnpaidItemsControl, CmbUnpaidSort?.SelectedIndex.ToString() ?? "");
@@ -865,7 +865,7 @@ namespace MyClinic.OriginalTheme
             catch (Exception)
             {
                 if (loadVersion != _unpaidLoadVersion) return;
-                MessageBox.Show("حدث خطأ أثناء تحميل سجل الديون.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("حدث خطأ أثناء تحميل سجل الديون.", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1018,7 +1018,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("تعذر تحميل السجل المالي للمريض.", "بحث مريض", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("تعذر تحميل السجل المالي للمريض.", "بحث مريض", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1077,7 +1077,7 @@ namespace MyClinic.OriginalTheme
             }
             catch (Exception)
             {
-                MessageBox.Show("حدث خطأ أثناء إضافة الدفعة. يرجى المحاولة لاحقاً.", "إضافة دفعة", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show("حدث خطأ أثناء إضافة الدفعة. يرجى المحاولة لاحقاً.", "إضافة دفعة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

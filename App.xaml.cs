@@ -44,6 +44,7 @@ public partial class App : Application
               ON Patients (PhoneNumber);");
         EnsureColumnExists(context, "Patients", "DateOfBirth", "TEXT NULL");
         EnsureColumnExists(context, "Patients", "BirthYear", "INTEGER NULL");
+        EnsureColumnExists(context, "Patients", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
 
         context.Database.ExecuteSqlRaw(
             @"CREATE TABLE IF NOT EXISTS Appointments (
@@ -166,7 +167,8 @@ public partial class App : Application
                 LabName TEXT NULL,
                 Cost REAL NOT NULL DEFAULT 0,
                 Teeth TEXT NULL,
-                Status TEXT NOT NULL DEFAULT 'تم الإرسال',
+                Color TEXT NOT NULL DEFAULT '',
+                Status TEXT NOT NULL DEFAULT 'لم يتم الإرسال',
                 DateSent TEXT NOT NULL DEFAULT (datetime('now')),
                 DateReceived TEXT NULL,
                 DatePaid TEXT NULL,
@@ -178,7 +180,18 @@ public partial class App : Application
             @"CREATE TABLE IF NOT EXISTS LabNames (
                 Id INTEGER NOT NULL CONSTRAINT PK_LabNames PRIMARY KEY AUTOINCREMENT,
                 Name TEXT NOT NULL,
+                Phone TEXT NOT NULL DEFAULT '',
+                Address TEXT NOT NULL DEFAULT '',
                 CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            );");
+
+        context.Database.ExecuteSqlRaw(
+            @"CREATE TABLE IF NOT EXISTS LabWorkTypeCosts (
+                Id INTEGER NOT NULL CONSTRAINT PK_LabWorkTypeCosts PRIMARY KEY AUTOINCREMENT,
+                LabNameId INTEGER NOT NULL,
+                WorkTypeName TEXT NOT NULL,
+                Cost TEXT NOT NULL DEFAULT '0',
+                Currency TEXT NOT NULL DEFAULT 'SYP'
             );");
 
         context.Database.ExecuteSqlRaw(
@@ -189,10 +202,10 @@ public partial class App : Application
             );");
 
         EnsureColumnExists(context, "AppSettings", "DefaultCurrency", "TEXT NOT NULL DEFAULT 'SYP'");
-
         EnsureColumnExists(context, "AppSettings", "FileKitCanalCount", "INTEGER NOT NULL DEFAULT 0");
-
         EnsureColumnExists(context, "LabWorks", "LabName", "TEXT NULL");
+        EnsureColumnExists(context, "LabWorks", "Color", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumnExists(context, "LabNames", "Address", "TEXT NOT NULL DEFAULT ''");
 
         // Create TreatmentCosts table if it doesn't exist (for older databases)
         context.Database.ExecuteSqlRaw(
@@ -224,7 +237,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
+            AppMessageBox.Show(
                 $"خطأ في قراءة قاعدة البيانات: {ex.Message}\n\nالتفاصيل:\n{ex.InnerException?.Message ?? ex.StackTrace}",
                 "خطأ في بدء التطبيق",
                 MessageBoxButton.OK,

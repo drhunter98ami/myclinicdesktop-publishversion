@@ -130,11 +130,11 @@ namespace MyClinic
                     Mouse.OverrideCursor = null;
                 }
 
-                MessageBox.Show("تم تصدير التقرير بنجاح.", "التصدير", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show("تم تصدير التقرير بنجاح.", "التصدير", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تصدير التقرير حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تصدير التقرير حالياً.\n{ex.Message}", "التصدير", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally { IsEnabled = true; }
         }

@@ -85,6 +85,7 @@ public sealed class FinanceVisitRow
 
 public sealed class FinanceAccount
 {
+    public int Id => PatientId;
     public int PatientId { get; init; }
     public string PatientName { get; init; } = "";
     public string Phone { get; init; } = "";
@@ -105,6 +106,7 @@ public static class FinancialLedger
     private sealed class Obligation
     {
         public string Name = "";
+        public DateTime Date;
         public decimal Cost, Paid, Forgiven;
         public decimal Remaining => Math.Max(0, Cost - Paid - Forgiven);
     }
@@ -133,12 +135,13 @@ public static class FinancialLedger
             var added = ParseTreatments(visit.SelectedTreatmentsJson).Select(t => new Obligation
             {
                 Name = t.TreatmentName,
+                Date = visit.VisitDate,
                 Cost = decimal.Round(t.Cost * Math.Max(1, t.Quantity) * (t.Currency == "USD" ? FinanceMoney.From(visit.UsdToSypRateSnapshot > 0 ? visit.UsdToSypRateSnapshot : 15000) : 1), 2)
             }).Where(t => t.Cost > 0).ToList();
             decimal automatic = added.Sum(t => t.Cost), current = FinanceMoney.From(visit.CurrentCost);
             decimal gross = Math.Max(automatic, Math.Max(0, current));
             decimal forgiveness = automatic > 0 ? Math.Max(0, automatic - current) : Math.Max(0, -current);
-            if (gross > automatic) added.Add(new() { Name = automatic > 0 ? "تعديل تكلفة الزيارة" : "تكلفة الزيارة", Cost = gross - automatic });
+            if (gross > automatic) added.Add(new() { Name = automatic > 0 ? "تعديل تكلفة الزيارة" : "تكلفة الزيارة", Date = visit.VisitDate, Cost = gross - automatic });
             queue.AddRange(added);
             var touched = new Dictionary<Obligation, (decimal Paid, decimal Forgiven, decimal Credit)>();
             foreach (var item in added) touched[item] = (0, 0, 0);
@@ -174,7 +177,12 @@ public static class FinancialLedger
             decimal previous = balance;
             balance = totalCost - totalPaid - totalForgiven;
             if (balance <= 0) firstDebt = null;
-            else if (previous <= 0 || firstDebt == null) firstDebt = visit.VisitDate.Date;
+            else
+            {
+                var oldestUnpaid = queue.FirstOrDefault(o => o.Remaining > 0);
+                if (oldestUnpaid != null) firstDebt = oldestUnpaid.Date;
+                else if (previous <= 0 || firstDebt == null) firstDebt = visit.VisitDate;
+            }
             rows.Add(new()
             {
                 Id = visit.Id, PatientId = patient.Id, PatientName = patient.FullName ?? "مريض بدون اسم", Phone = patient.PhoneNumber,

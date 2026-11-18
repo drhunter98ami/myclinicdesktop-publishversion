@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Text;
 using System.Windows;
@@ -21,6 +22,69 @@ public partial class PatientRecordsView
     private bool _clearingFilters;
     private bool _experienceReady;
     private int _statusVersion;
+
+    private async void DeletePatientProfile_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { Tag: PatientCardModel patient })
+            return;
+
+        if (!await PatientProfileDeletionService.ConfirmAndDeletePatientAsync(this, patient.Id, patient.DisplayName))
+            return;
+
+        if (_selectedPatient?.Id == patient.Id)
+        {
+            HideVisitDetailsOverlay(immediate: true);
+            HideMedicalRecordDrawer();
+            _selectedPatient = null;
+        }
+        RequestRefresh();
+        await EnsureDataCurrentAsync();
+        ShowRecordsStatus("تم حذف ملف المريض بنجاح ✓");
+    }
+
+    private async void DeleteSelectedPatientProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedPatient is null)
+            return;
+
+        var patient = _selectedPatient;
+        if (!await PatientProfileDeletionService.ConfirmAndDeletePatientAsync(this, patient.Id, patient.DisplayName))
+            return;
+
+        HideVisitDetailsOverlay(immediate: true);
+        HideMedicalRecordDrawer();
+        _selectedPatient = null;
+        RequestRefresh();
+        await EnsureDataCurrentAsync();
+        ShowRecordsStatus("تم حذف ملف المريض بنجاح ✓");
+    }
+
+    private async void DeleteVisit_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        int? visitId = sender switch
+        {
+            FrameworkElement { Tag: int id } => id,
+            FrameworkElement { Tag: VisitHistoryItem item } => item.VisitId,
+            _ => null
+        };
+        if (!visitId.HasValue || _selectedPatient is null)
+            return;
+
+        var targetVisit = _allPatientVisits.FirstOrDefault(v => v.VisitId == visitId.Value);
+        string label = targetVisit != null ? $"{targetVisit.VisitDateTimeText} · {targetVisit.Title}" : $"#{visitId.Value}";
+        if (!await PatientProfileDeletionService.ConfirmAndDeleteVisitAsync(this, visitId.Value, label))
+            return;
+
+        HideVisitDetailsOverlay(immediate: true);
+        _attachmentCache.Remove(visitId.Value);
+        RequestRefresh();
+        await EnsureDataCurrentAsync();
+        if (_selectedPatient is not null)
+            await LoadPatientVisitsAsync(_selectedPatient.Id);
+        ShowRecordsStatus("تم حذف الزيارة بنجاح ✓");
+    }
 
     private void AddPatient_Click(object sender, RoutedEventArgs e)
     {
@@ -222,4 +286,201 @@ public static class PatientRecordSearch
 public sealed record RecordedTooth(string Id, bool Recorded)
 {
     public string Description => ToothGlyph.Description(Id) + (Recorded ? " · مسجل لهذه الزيارة" : " · غير مسجل لهذه الزيارة");
+}
+
+public static class PatientProfileDeletionService
+{
+    public static Task<bool> ConfirmAndDeletePatientAsync(FrameworkElement owner, int patientId, string patientName)
+    {
+        bool deleted = false;
+        var dialog = new ClinicDialog(owner, "حذف ملف المريض", "تأكيد حذف الملف");
+        dialog.Note($"هل أنت متأكد من حذف ملف المريض ({patientName}) وجميع زياراته السريرية؟");
+        var deleteFinancials = new CheckBox
+        {
+            Content = "حذف جميع البيانات المالية المرتبطة بهذا الملف",
+            IsChecked = true,
+            Margin = new Thickness(0, 6, 0, 14),
+            FontWeight = FontWeights.SemiBold
+        };
+        deleteFinancials.SetResourceReference(Control.ForegroundProperty, "AppTextPrimary");
+        dialog.Fields.Children.Add(deleteFinancials);
+        dialog.Note("عند إلغاء تحديد الخيار أعلاه، يُحذف الملف السريري والزيارات من سجل المرضى مع الاحتفاظ بالسجلات والدفعات المالية في الشؤون المالية.");
+        dialog.Submit.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626"));
+        dialog.Submit.BorderBrush = dialog.Submit.Background;
+        dialog.Submit.Foreground = Brushes.White;
+
+        dialog.OnSubmit(async () =>
+        {
+            bool removeFinance = deleteFinancials.IsChecked == true;
+            using var db = new AppDbContext();
+            using var tx = await db.Database.BeginTransactionAsync();
+            var patient = await db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == patientId);
+            if (patient == null)
+            {
+                dialog.Complete();
+                return;
+            }
+
+            var visits = await db.Visits.AsNoTracking().Where(v => v.PatientId == patientId).ToListAsync();
+            var visitIds = visits.Select(v => v.Id).ToList();
+
+            await db.Appointments
+                .Where(a => a.PatientId == patientId || (a.PatientId == null && a.PatientName == patient.FullName && a.PhoneNumber == patient.PhoneNumber))
+                .ExecuteDeleteAsync();
+
+            if (removeFinance)
+            {
+                await db.LabWorks
+                    .Where(w => w.PatientId == patientId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(w => w.PatientId, (int?)null));
+
+                if (visitIds.Count > 0)
+                {
+                    await db.FinancialAuditEntries.Where(a => a.EntityType == "Visit" && visitIds.Contains(a.EntityId)).ExecuteDeleteAsync();
+                    await db.ToothRecords.Where(t => visitIds.Contains(t.VisitId)).ExecuteDeleteAsync();
+                    await db.VisitEditHistories.Where(h => visitIds.Contains(h.VisitId)).ExecuteDeleteAsync();
+                    await db.Visits.Where(v => v.PatientId == patientId).ExecuteDeleteAsync();
+                }
+
+                await db.Patients.Where(p => p.Id == patientId).ExecuteDeleteAsync();
+            }
+            else
+            {
+                var nonFinancialVisitIds = visits
+                    .Where(v => v.CurrentCost == 0 && v.TodayPaid == 0)
+                    .Select(v => v.Id)
+                    .ToList();
+                if (nonFinancialVisitIds.Count > 0)
+                {
+                    await db.ToothRecords.Where(t => nonFinancialVisitIds.Contains(t.VisitId)).ExecuteDeleteAsync();
+                    await db.VisitEditHistories.Where(h => nonFinancialVisitIds.Contains(h.VisitId)).ExecuteDeleteAsync();
+                    await db.Visits.Where(v => nonFinancialVisitIds.Contains(v.Id)).ExecuteDeleteAsync();
+                }
+
+                var financialVisits = visits.Where(v => v.CurrentCost != 0 || v.TodayPaid != 0).ToList();
+                if (financialVisits.Count > 0)
+                {
+                    var finIds = financialVisits.Select(v => v.Id).ToList();
+                    await db.ToothRecords.Where(t => finIds.Contains(t.VisitId)).ExecuteDeleteAsync();
+                    await db.VisitEditHistories.Where(h => finIds.Contains(h.VisitId)).ExecuteDeleteAsync();
+                    await db.Visits
+                        .Where(v => finIds.Contains(v.Id))
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(v => v.IsFinancialOnly, true)
+                            .SetProperty(v => v.Symptoms, (string?)null)
+                            .SetProperty(v => v.Diagnosis, (string?)null)
+                            .SetProperty(v => v.PrescriptionJson, (string?)null)
+                            .SetProperty(v => v.TreatmentPlanNotes, (string?)null)
+                            .SetProperty(v => v.FinalTreatment, (string?)null)
+                            .SetProperty(v => v.AttachedImagePathsJson, (string?)null)
+                            .SetProperty(v => v.FinancialNote, "بيانات مالية لملف مريض محذوف"));
+
+                    await db.Patients
+                        .Where(p => p.Id == patientId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsDeleted, true));
+                }
+                else
+                {
+                    await db.LabWorks
+                        .Where(w => w.PatientId == patientId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(w => w.PatientId, (int?)null));
+                    await db.Patients.Where(p => p.Id == patientId).ExecuteDeleteAsync();
+                }
+            }
+
+            await tx.CommitAsync();
+            AppRuntimeCache.RemovePatientVisits(patientId);
+            deleted = true;
+            dialog.Complete();
+            GlobalEvents.NotifyPatientRecordAdded();
+            GlobalEvents.NotifyFinancialRecordAdded();
+            if (Window.GetWindow(owner) is MainWindow mainWindow)
+            {
+                mainWindow.InvalidatePatientRecords();
+                mainWindow.InvalidateFinancialRecords();
+            }
+        });
+
+        dialog.ShowDialog();
+        return Task.FromResult(deleted);
+    }
+
+    public static Task<bool> ConfirmAndDeleteVisitAsync(FrameworkElement owner, int visitId, string visitLabel)
+    {
+        bool deleted = false;
+        var dialog = new ClinicDialog(owner, "حذف الزيارة", "تأكيد حذف الزيارة");
+        dialog.Note($"هل أنت متأكد من حذف الزيارة ({visitLabel})؟");
+        var deleteFinancials = new CheckBox
+        {
+            Content = "حذف جميع البيانات المالية المرتبطة بهذه الزيارة",
+            IsChecked = true,
+            Margin = new Thickness(0, 6, 0, 14),
+            FontWeight = FontWeights.SemiBold
+        };
+        deleteFinancials.SetResourceReference(Control.ForegroundProperty, "AppTextPrimary");
+        dialog.Fields.Children.Add(deleteFinancials);
+        dialog.Note("عند إلغاء تحديد الخيار أعلاه، تُحذف البيانات السريرية للزيارة من سجل المريض مع الاحتفاظ بتكلفتها ودفعاتها في الشؤون المالية.");
+        dialog.Submit.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626"));
+        dialog.Submit.BorderBrush = dialog.Submit.Background;
+        dialog.Submit.Foreground = Brushes.White;
+
+        dialog.OnSubmit(async () =>
+        {
+            bool removeFinance = deleteFinancials.IsChecked == true;
+            using var db = new AppDbContext();
+            using var tx = await db.Database.BeginTransactionAsync();
+            var visit = await db.Visits.AsNoTracking().FirstOrDefaultAsync(v => v.Id == visitId);
+            if (visit == null)
+            {
+                dialog.Complete();
+                return;
+            }
+
+            await db.Appointments
+                .Where(a => a.IsAutomaticallyGenerated && a.PatientId == visit.PatientId && a.AppointmentDateTime == visit.VisitDate)
+                .ExecuteDeleteAsync();
+
+            await db.ToothRecords.Where(t => t.VisitId == visitId).ExecuteDeleteAsync();
+            await db.VisitEditHistories.Where(h => h.VisitId == visitId).ExecuteDeleteAsync();
+
+            if (removeFinance || (visit.CurrentCost == 0 && visit.TodayPaid == 0))
+            {
+                await db.FinancialAuditEntries.Where(a => a.EntityType == "Visit" && a.EntityId == visitId).ExecuteDeleteAsync();
+                await db.Visits.Where(v => v.Id == visitId).ExecuteDeleteAsync();
+                AppRuntimeCache.RemoveVisit(visitId);
+            }
+            else
+            {
+                string note = string.IsNullOrWhiteSpace(visit.FinancialNote)
+                    ? $"بيانات مالية لزيارة محذوفة ({visit.VisitDate:dd/MM/yyyy})"
+                    : visit.FinancialNote;
+                await db.Visits
+                    .Where(v => v.Id == visitId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(v => v.IsFinancialOnly, true)
+                        .SetProperty(v => v.Symptoms, (string?)null)
+                        .SetProperty(v => v.Diagnosis, (string?)null)
+                        .SetProperty(v => v.PrescriptionJson, (string?)null)
+                        .SetProperty(v => v.TreatmentPlanNotes, (string?)null)
+                        .SetProperty(v => v.FinalTreatment, (string?)null)
+                        .SetProperty(v => v.AttachedImagePathsJson, (string?)null)
+                        .SetProperty(v => v.FinancialNote, note));
+                AppRuntimeCache.RemoveVisit(visitId);
+            }
+
+            await tx.CommitAsync();
+            deleted = true;
+            dialog.Complete();
+            GlobalEvents.NotifyPatientRecordAdded();
+            GlobalEvents.NotifyFinancialRecordAdded();
+            if (Window.GetWindow(owner) is MainWindow mainWindow)
+            {
+                mainWindow.InvalidatePatientRecords();
+                mainWindow.InvalidateFinancialRecords();
+            }
+        });
+
+        dialog.ShowDialog();
+        return Task.FromResult(deleted);
+    }
 }

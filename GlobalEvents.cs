@@ -28,6 +28,10 @@ namespace MyClinic
         public static event Action? OnFileKitCanalCountChanged;
         public static void NotifyFileKitCanalCountChanged() => OnFileKitCanalCountChanged?.Invoke();
 
+        // حدث يتم إطلاقه عند تحديث أعمال المخبر أو إعدادات المخابر
+        public static event Action? OnLabWorkChanged;
+        public static void NotifyLabWorkChanged() => OnLabWorkChanged?.Invoke();
+
         // حدث يتم إطلاقه عند تبديل المظهر (الوضع الفاتح / الداكن)
         public static event Action<bool>? OnThemeChanged;
         public static void NotifyThemeChanged(bool isDark) => OnThemeChanged?.Invoke(isDark);

@@ -21,6 +21,8 @@ namespace MyClinic
         private readonly int _visitId;
         private readonly List<string> _selectedImagePaths = new();
         private List<string> _existingImagePaths = new();
+        private readonly List<PrescriptionItem> _prescriptionItems = new();
+        private List<PrescriptionItem> _initialPrescriptionItems = new();
         private string? _initialEditState;
         private bool _saved;
         private bool _saving;
@@ -37,7 +39,7 @@ namespace MyClinic
                 if (_saved) return;
                 if (_saving) { args.Cancel = true; return; }
                 if (_initialEditState is not null && _initialEditState != CaptureEditState())
-                    args.Cancel = MessageBox.Show(this, "توجد تعديلات لم تُحفظ. هل تريد إغلاق الزيارة وتجاهلها؟", "تعديلات غير محفوظة", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
+                    args.Cancel = AppMessageBox.Show(this, "توجد تعديلات لم تُحفظ. هل تريد إغلاق الزيارة وتجاهلها؟", "تعديلات غير محفوظة", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
             };
             GlobalEvents.OnThemeChanged += ApplyThemeVisuals;
             Closed += (_, _) => GlobalEvents.OnThemeChanged -= ApplyThemeVisuals;
@@ -47,8 +49,12 @@ namespace MyClinic
         {
             if (Owner is MainWindow ownerMain)
                 return ownerMain.IsDarkTheme;
+            if (Owner is OriginalTheme.MainWindow ownerOrig)
+                return ownerOrig.IsDarkTheme;
             if (Application.Current?.MainWindow is MainWindow appMain)
                 return appMain.IsDarkTheme;
+            if (Application.Current?.MainWindow is OriginalTheme.MainWindow appOrig)
+                return appOrig.IsDarkTheme;
             return false;
         }
 
@@ -143,7 +149,7 @@ namespace MyClinic
                 .FirstOrDefault(item => item.Id == _visitId);
             if (visit is null)
             {
-                MessageBox.Show("تعذر العثور على الزيارة المطلوبة.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show(this, "تعذر العثور على الزيارة المطلوبة.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
                 Loaded += (_, _) => Close();
                 return;
             }
@@ -162,13 +168,192 @@ namespace MyClinic
             DiagnosisText.Text = visit.Diagnosis ?? string.Empty;
             TreatmentPlanText.Text = visit.TreatmentPlanNotes ?? string.Empty;
             FinalTreatmentText.Text = visit.FinalTreatment ?? string.Empty;
+            _initialPrescriptionItems = DeserializePrescriptions(visit.PrescriptionJson);
+            _prescriptionItems.Clear();
+            foreach (var item in _initialPrescriptionItems)
+            {
+                _prescriptionItems.Add(new PrescriptionItem
+                {
+                    MedicineName = item.MedicineName,
+                    Dosage = item.Dosage,
+                    FrequencyHours = item.FrequencyHours,
+                    Timing = item.Timing,
+                    Notes = item.Notes
+                });
+            }
+            RefreshPrescriptionList();
             _existingImagePaths = DeserializeAttachmentPaths(visit.AttachedImagePathsJson);
             RefreshSelectedImages();
             _initialEditState = CaptureEditState();
         }
 
+        private static List<PrescriptionItem> DeserializePrescriptions(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new();
+            try
+            {
+                return JsonSerializer.Deserialize<List<PrescriptionItem>>(json)?
+                    .Where(item => item is not null && !string.IsNullOrWhiteSpace(item.MedicineName))
+                    .ToList() ?? new();
+            }
+            catch (JsonException)
+            {
+                return new();
+            }
+        }
+
+        private static string FormatPrescriptionItem(PrescriptionItem item)
+        {
+            List<string> parts = new() { item.MedicineName };
+            if (!string.IsNullOrWhiteSpace(item.Dosage)) parts.Add(item.Dosage);
+            if (!string.IsNullOrWhiteSpace(item.FrequencyHours)) parts.Add($"كل {item.FrequencyHours} ساعة");
+            if (!string.IsNullOrWhiteSpace(item.Timing)) parts.Add(item.Timing);
+            if (!string.IsNullOrWhiteSpace(item.Notes)) parts.Add(item.Notes);
+            return string.Join(" | ", parts);
+        }
+
+        private static string FormatPrescriptionSummary(IEnumerable<PrescriptionItem> items)
+        {
+            var list = items.Select(FormatPrescriptionItem).ToList();
+            return list.Count == 0 ? "لا توجد وصفة" : string.Join(" ؛ ", list);
+        }
+
+        private void RefreshPrescriptionList()
+        {
+            if (LstPrescriptionEntries is null) return;
+            int selected = LstPrescriptionEntries.SelectedIndex;
+            LstPrescriptionEntries.ItemsSource = null;
+            LstPrescriptionEntries.ItemsSource = _prescriptionItems.Select(FormatPrescriptionItem).ToList();
+            if (selected >= 0 && selected < _prescriptionItems.Count)
+                LstPrescriptionEntries.SelectedIndex = selected;
+            if (BtnUpdatePrescription is not null)
+                BtnUpdatePrescription.IsEnabled = LstPrescriptionEntries.SelectedIndex >= 0;
+        }
+
+        private void LstPrescriptionEntries_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            int index = LstPrescriptionEntries.SelectedIndex;
+            if (BtnUpdatePrescription is not null)
+                BtnUpdatePrescription.IsEnabled = index >= 0 && index < _prescriptionItems.Count;
+
+            if (index < 0 || index >= _prescriptionItems.Count)
+                return;
+
+            var item = _prescriptionItems[index];
+            TxtPrescriptionMedicine.Text = item.MedicineName;
+            TxtPrescriptionDosage.Text = item.Dosage ?? string.Empty;
+            TxtPrescriptionFrequency.Text = item.FrequencyHours ?? string.Empty;
+            TxtPrescriptionNotes.Text = item.Notes ?? string.Empty;
+            SelectTimingComboBox(item.Timing);
+        }
+
+        private void SelectTimingComboBox(string? timing)
+        {
+            if (string.IsNullOrWhiteSpace(timing))
+            {
+                CmbPrescriptionTiming.SelectedIndex = 0;
+                return;
+            }
+            foreach (ComboBoxItem comboItem in CmbPrescriptionTiming.Items.OfType<ComboBoxItem>())
+            {
+                if (string.Equals(comboItem.Content?.ToString(), timing, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    CmbPrescriptionTiming.SelectedItem = comboItem;
+                    return;
+                }
+            }
+            CmbPrescriptionTiming.SelectedIndex = 0;
+        }
+
+        private void AddPrescription_Click(object sender, RoutedEventArgs e)
+        {
+            string medicineName = TxtPrescriptionMedicine.Text.Trim();
+            if (string.IsNullOrWhiteSpace(medicineName))
+            {
+                ValidationAssist.Show(TxtPrescriptionMedicine, "يرجى إدخال اسم الدواء قبل إضافته إلى الوصفة.");
+                TxtPrescriptionMedicine.Focus();
+                return;
+            }
+
+            _prescriptionItems.Add(new PrescriptionItem
+            {
+                MedicineName = medicineName,
+                Dosage = Normalize(TxtPrescriptionDosage.Text),
+                FrequencyHours = Normalize(TxtPrescriptionFrequency.Text),
+                Timing = (CmbPrescriptionTiming.SelectedItem as ComboBoxItem)?.Content?.ToString(),
+                Notes = Normalize(TxtPrescriptionNotes.Text)
+            });
+
+            ClearPrescriptionInputs();
+            LstPrescriptionEntries.SelectedIndex = -1;
+            RefreshPrescriptionList();
+        }
+
+        private void UpdatePrescription_Click(object sender, RoutedEventArgs e)
+        {
+            int index = LstPrescriptionEntries.SelectedIndex;
+            if (index < 0 || index >= _prescriptionItems.Count)
+            {
+                AppMessageBox.Show(this, "حدد عنصراً من الوصفة لتحديثه.", "الوصفة الطبية", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string medicineName = TxtPrescriptionMedicine.Text.Trim();
+            if (string.IsNullOrWhiteSpace(medicineName))
+            {
+                ValidationAssist.Show(TxtPrescriptionMedicine, "يرجى إدخال اسم الدواء.");
+                TxtPrescriptionMedicine.Focus();
+                return;
+            }
+
+            _prescriptionItems[index] = new PrescriptionItem
+            {
+                MedicineName = medicineName,
+                Dosage = Normalize(TxtPrescriptionDosage.Text),
+                FrequencyHours = Normalize(TxtPrescriptionFrequency.Text),
+                Timing = (CmbPrescriptionTiming.SelectedItem as ComboBoxItem)?.Content?.ToString(),
+                Notes = Normalize(TxtPrescriptionNotes.Text)
+            };
+
+            ClearPrescriptionInputs();
+            LstPrescriptionEntries.SelectedIndex = -1;
+            RefreshPrescriptionList();
+        }
+
+        private void RemovePrescription_Click(object sender, RoutedEventArgs e)
+        {
+            int index = LstPrescriptionEntries.SelectedIndex;
+            if (index < 0 || index >= _prescriptionItems.Count)
+            {
+                AppMessageBox.Show(this, "حدد عنصراً من الوصفة لحذفه.", "الوصفة الطبية", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _prescriptionItems.RemoveAt(index);
+            ClearPrescriptionInputs();
+            LstPrescriptionEntries.SelectedIndex = -1;
+            RefreshPrescriptionList();
+        }
+
+        private void ClearPrescriptionInputs()
+        {
+            TxtPrescriptionMedicine.Clear();
+            TxtPrescriptionDosage.Clear();
+            TxtPrescriptionFrequency.Clear();
+            TxtPrescriptionNotes.Clear();
+            CmbPrescriptionTiming.SelectedIndex = 0;
+        }
+
         private TextBox[] EditableTextFields() => new[] { PregnancyMonthText, BloodPressureText, HeartRateText, TemperatureText, RespiratoryRateText, WeightText, HeightText, BloodSugarText, SymptomsText, DiagnosisText, TreatmentPlanText, FinalTreatmentText };
-        private string CaptureEditState() => JsonSerializer.Serialize(new { Text = EditableTextFields().Select(t => t.Text).ToArray(), Pregnant = IsPregnantCheckBox.IsChecked, Nursing = IsNursingCheckBox.IsChecked, Images = _selectedImagePaths.ToArray() });
+        private string CaptureEditState() => JsonSerializer.Serialize(new
+        {
+            Text = EditableTextFields().Select(t => t.Text).ToArray(),
+            Pregnant = IsPregnantCheckBox.IsChecked,
+            Nursing = IsNursingCheckBox.IsChecked,
+            Images = _selectedImagePaths.ToArray(),
+            Prescription = _prescriptionItems
+        });
 
         private bool ValidateNumericFields()
         {
@@ -191,7 +376,7 @@ namespace MyClinic
             int remainingSlots = MaxVisitImages - _existingImagePaths.Count - _selectedImagePaths.Count;
             if (remainingSlots <= 0)
             {
-                MessageBox.Show($"وصلت الزيارة إلى الحد الأقصى وهو {MaxVisitImages} صور.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show(this, $"وصلت الزيارة إلى الحد الأقصى وهو {MaxVisitImages} صور.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -220,7 +405,7 @@ namespace MyClinic
 
             RefreshSelectedImages();
             if (_existingImagePaths.Count + _selectedImagePaths.Count >= MaxVisitImages)
-                MessageBox.Show($"يمكن إرفاق {MaxVisitImages} صور كحد أقصى لكل زيارة.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show(this, $"يمكن إرفاق {MaxVisitImages} صور كحد أقصى لكل زيارة.", "صور الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ClearSelectedImages_Click(object sender, RoutedEventArgs e)
@@ -260,7 +445,6 @@ namespace MyClinic
             if (!saveFeedback.CanStart) return;
             _saving = true;
 
-
             try
             {
                 await saveFeedback.ShowBusyAsync();
@@ -271,7 +455,7 @@ namespace MyClinic
                     .FirstOrDefaultAsync(item => item.Id == _visitId);
                 if (visit is null)
                 {
-                    MessageBox.Show("لم تعد الزيارة موجودة في قاعدة البيانات.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    AppMessageBox.Show(this, "لم تعد الزيارة موجودة في قاعدة البيانات.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
                     _saved = true;
                     DialogResult = false;
                     return;
@@ -292,10 +476,11 @@ namespace MyClinic
                 AddChange(changes, "التشخيص", FormatValue(visit.Diagnosis), FormatValue(Normalize(DiagnosisText.Text)));
                 AddChange(changes, "خطة العلاج والملاحظات", FormatValue(visit.TreatmentPlanNotes), FormatValue(Normalize(TreatmentPlanText.Text)));
                 AddChange(changes, "الإجراء النهائي", FormatValue(visit.FinalTreatment), FormatValue(Normalize(FinalTreatmentText.Text)));
+                AddChange(changes, "الوصفة الطبية", FormatPrescriptionSummary(DeserializePrescriptions(visit.PrescriptionJson)), FormatPrescriptionSummary(_prescriptionItems));
                 if (_selectedImagePaths.Count > 0)
                 {
                     List<string> afterImages = _existingImagePaths
-                        .Concat(_selectedImagePaths.Select(Path.GetFileName))
+                        .Concat(_selectedImagePaths.Select(p => Path.GetFileName(p) ?? p))
                         .ToList();
                     AddChange(
                         changes,
@@ -306,7 +491,7 @@ namespace MyClinic
 
                 if (changes.Count == 0)
                 {
-                    MessageBox.Show("لم يتم إجراء أي تغييرات على الزيارة.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
+                    AppMessageBox.Show(this, "لم يتم إجراء أي تغييرات على الزيارة.", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Information);
                     _saved = true;
                     DialogResult = false;
                     return;
@@ -327,6 +512,7 @@ namespace MyClinic
                 visit.Diagnosis = Normalize(DiagnosisText.Text);
                 visit.TreatmentPlanNotes = Normalize(TreatmentPlanText.Text);
                 visit.FinalTreatment = Normalize(FinalTreatmentText.Text);
+                visit.PrescriptionJson = _prescriptionItems.Count > 0 ? JsonSerializer.Serialize(_prescriptionItems) : null;
                 if (_selectedImagePaths.Count > 0)
                 {
                     string patientName = string.IsNullOrWhiteSpace(visit.Patient?.FullName) ? "بدون_اسم" : visit.Patient.FullName;
@@ -350,7 +536,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر حفظ تعديل الزيارة:\n{ex.Message}", "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show(this, $"تعذر حفظ تعديل الزيارة:\n{ex.Message}", "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally { _saving = false; }
         }

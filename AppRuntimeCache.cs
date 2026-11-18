@@ -25,6 +25,22 @@ namespace MyClinic
                 RecentVisitsById[visit.Id] = snapshot;
         }
 
+        public static void RemoveVisit(int visitId)
+        {
+            lock (SyncRoot)
+                RecentVisitsById.Remove(visitId);
+        }
+
+        public static void RemovePatientVisits(int patientId)
+        {
+            lock (SyncRoot)
+            {
+                var ids = RecentVisitsById.Values.Where(v => v.PatientId == patientId).Select(v => v.Id).ToList();
+                foreach (int id in ids)
+                    RecentVisitsById.Remove(id);
+            }
+        }
+
         private static Visit CloneVisit(Visit source)
         {
             return new Visit
@@ -48,7 +64,8 @@ namespace MyClinic
                         SmokingType = source.Patient.SmokingType,
                         SmokingFrequency = source.Patient.SmokingFrequency,
                         Allergies = source.Patient.Allergies,
-                        ChronicDiseases = source.Patient.ChronicDiseases
+                        ChronicDiseases = source.Patient.ChronicDiseases,
+                        IsDeleted = source.Patient.IsDeleted
                     },
                 IsPregnant = source.IsPregnant,
                 IsNursing = source.IsNursing,

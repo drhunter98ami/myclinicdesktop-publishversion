@@ -15,7 +15,13 @@ public sealed class LabRow
     public string Patient => Work.PatientName;
     public string Lab => Work.LabName ?? "—";
     public string WorkType => Work.WorkType;
-    public string WorkStatus => Work.WorkStatus;
+    public string Color => string.IsNullOrWhiteSpace(Work.Color) ? "—" : Work.Color;
+    public string WorkStatus => Work.WorkStatus switch
+    {
+        "تم الإرسال" or "قيد العمل" or "جاهز" => "تم الإرسال، جاري العمل",
+        "تم الإستلام" => "تم الاستلام",
+        _ => string.IsNullOrWhiteSpace(Work.WorkStatus) ? "لم يتم الإرسال" : Work.WorkStatus
+    };
     public DateTime? ExpectedDelivery => Work.ExpectedDelivery;
     public decimal Balance => Math.Max(0, Work.Cost - Work.AmountPaid);
     public string BalanceText => WorkspaceUi.Money(Balance, Work.Currency);
@@ -26,13 +32,26 @@ public sealed class LabRow
 public sealed record LabTimeline(string Description, string Detail, int? ExpenseId = null)
 { public Visibility ExpenseVisibility => ExpenseId.HasValue ? Visibility.Visible : Visibility.Collapsed; }
 
+public sealed class LabManagementRow
+{
+    public LabName Lab { get; init; } = new();
+    public int Id => Lab.Id;
+    public string Name => Lab.Name + (Lab.IsArchived ? " (مؤرشف)" : "");
+    public string Phone => string.IsNullOrWhiteSpace(Lab.Phone) ? "—" : Lab.Phone;
+    public string Address => string.IsNullOrWhiteSpace(Lab.Address) ? "—" : Lab.Address;
+}
+
 public partial class LabView : UserControl
 {
-    List<LabWork> _works = new(); List<LabName> _labs = new(); List<Patient> _patients = new(); List<ClinicOperation> _operations = new();
+    List<LabWork> _works = new();
+    List<LabName> _labs = new();
+    List<LabWorkTypeCost> _workTypes = new();
+    List<Patient> _patients = new();
+    List<ClinicOperation> _operations = new();
     LabWork? _selected; int? _editId, _patientId; bool _ready, _loadingPatient, _loadingEditor, _busy, _refreshing; decimal _rate;
     IInputElement? _returnFocus;
-    string _costCurrency = "USD"; decimal? _automaticCost, _conversionSourceCost; string _conversionSourceCurrency = "USD";
-    static readonly string[] Stages = ["تم الإرسال", "قيد العمل", "جاهز", "تم الاستلام"];
+    string _costCurrency = "USD"; decimal? _automaticCost, _conversionSourceCost, _unitCostPerTooth; int _lastToothCount = 1; string _conversionSourceCurrency = "USD";
+    static readonly string[] Stages = ["لم يتم الإرسال", "تم الإرسال، جاري العمل", "تم الاستلام"];
     readonly Func<AppDbContext> _createContext;
     public LabView() : this(() => new AppDbContext()) { }
     public LabView(Func<AppDbContext> createContext)
@@ -48,13 +67,25 @@ public partial class LabView : UserControl
         Loaded += LoadedView; Unloaded += UnloadedView;
     }
     void LoadedView(object sender, RoutedEventArgs e)
-    { WorkspaceUi.Configure(this); Refresh(); GlobalEvents.OnExchangeRateChanged += RateChanged; GlobalEvents.OnThemeChanged += ThemeChanged; MotionPreferences.Changed += MotionChanged; }
+    {
+        WorkspaceUi.Configure(this);
+        Refresh();
+        GlobalEvents.OnExchangeRateChanged += RateChanged;
+        GlobalEvents.OnLabWorkChanged += LabWorkChanged;
+        GlobalEvents.OnThemeChanged += ThemeChanged;
+        MotionPreferences.Changed += MotionChanged;
+    }
     void UnloadedView(object sender, RoutedEventArgs e)
     { ReleaseResources(); GlobalEvents.OnThemeChanged -= ThemeChanged; MotionPreferences.Changed -= MotionChanged; CloseSide(); }
-    public void ReleaseResources() => GlobalEvents.OnExchangeRateChanged -= RateChanged;
+    public void ReleaseResources()
+    {
+        GlobalEvents.OnExchangeRateChanged -= RateChanged;
+        GlobalEvents.OnLabWorkChanged -= LabWorkChanged;
+    }
     void ThemeChanged(bool dark) => WorkspaceUi.Configure(this);
     void MotionChanged(object? sender, EventArgs e) { if (!MotionPreferences.Enabled) FinanceMotion.StopTree(this); }
     void RateChanged() => Dispatcher.Invoke(Refresh);
+    void LabWorkChanged() => Dispatcher.Invoke(Refresh);
     public void RefreshDateForAppTimeChange(DateTime previousAppTime)
     { if (FromDate.SelectedDate?.Date == previousAppTime.Date) FromDate.SelectedDate = AppClock.Today; Filter(); }
     void Refresh()
@@ -65,7 +96,8 @@ public partial class LabView : UserControl
             using var db = _createContext(); _rate = WorkspaceUi.Rate(db);
             _works = db.LabWorks.AsNoTracking().OrderByDescending(w => w.DateSent).ToList();
             _labs = db.LabNames.AsNoTracking().OrderBy(l => l.Name).ToList();
-            _patients = db.Patients.AsNoTracking().OrderBy(p => p.FullName).ToList();
+            _workTypes = db.LabWorkTypeCosts.AsNoTracking().OrderBy(w => w.WorkTypeName).ToList();
+            _patients = db.Patients.AsNoTracking().Where(p => !p.IsDeleted).OrderBy(p => p.FullName).ToList();
             _operations = db.ClinicOperations.AsNoTracking().Where(o => o.Kind == "LabPayment" || o.Kind == "LabStatus" || o.Kind == "LabEdit" || o.Kind == "LabCurrency").ToList();
             string? selected = LabFilter.SelectedItem?.ToString(); LabFilter.ItemsSource = new[] { "كل المخابر" }.Concat(_works.Select(w => w.LabName ?? "—").Concat(_labs.Where(l => !l.IsArchived).Select(l => l.Name)).Distinct().Order());
             LabFilter.SelectedItem = selected; if (LabFilter.SelectedIndex < 0) LabFilter.SelectedIndex = 0;
@@ -96,7 +128,7 @@ public partial class LabView : UserControl
         var sort = CollectionViewSource.GetDefaultView(WorksGrid.ItemsSource)?.SortDescriptions.ToList() ?? new();
         string search = Search.Text.Trim();
         var rows = _works.Where(w => InPeriod(w, start, end)).Select(w => new LabRow { Work = w })
-            .Where(r => r.Patient.Contains(search, StringComparison.CurrentCultureIgnoreCase) || r.WorkType.Contains(search, StringComparison.CurrentCultureIgnoreCase) || (r.Work.Notes ?? "").Contains(search, StringComparison.CurrentCultureIgnoreCase))
+            .Where(r => r.Patient.Contains(search, StringComparison.CurrentCultureIgnoreCase) || r.WorkType.Contains(search, StringComparison.CurrentCultureIgnoreCase) || r.Color.Contains(search, StringComparison.CurrentCultureIgnoreCase) || (r.Work.Notes ?? "").Contains(search, StringComparison.CurrentCultureIgnoreCase))
             .Where(r => LabFilter.SelectedIndex <= 0 || r.Lab == LabFilter.SelectedItem?.ToString())
             .Where(r => WorkFilter.SelectedIndex <= 0 || r.WorkStatus == WorkFilter.SelectedItem?.ToString())
             .Where(r => PaymentFilter.SelectedIndex <= 0 || r.PaymentStatus == PaymentFilter.SelectedItem?.ToString()).ToList();
@@ -143,15 +175,161 @@ public partial class LabView : UserControl
         _editId = work?.Id; _selected = work; _loadingPatient = true; PatientName.Text = work?.PatientName ?? ""; _patientId = work?.PatientId; _loadingPatient = false;
         PatientSuggestions.Visibility = Visibility.Collapsed;
         LabSearch.Clear(); LabName.ItemsSource = _labs.Where(l => !l.IsArchived || l.Id == work?.LabNameId).ToList();
-        LabName.SelectedItem = _labs.FirstOrDefault(l => l.Id == work?.LabNameId || l.Name == work?.LabName);
-        WorkType.Text = work?.WorkType ?? ""; Cost.Text = work?.Cost.ToString("0.####") ?? ""; WorkCurrency.SelectedItem = work?.Currency ?? "USD";
-        WorkCurrency.IsEnabled = true; _costCurrency = work?.Currency ?? "USD"; _automaticCost = _conversionSourceCost = null;
-        CurrencyConversionRate.Text = _rate.ToString("0.####"); CurrencyConversionHost.Visibility = Visibility.Collapsed;
+        LabName.SelectedItem = _labs.FirstOrDefault(l => l.Id == work?.LabNameId || l.Name == work?.LabName) ?? _labs.FirstOrDefault(l => !l.IsArchived);
+        PopulateWorkTypesForSelectedLab(work?.WorkType);
+        WorkType.Text = work?.WorkType ?? (WorkTypeCombo.SelectedItem as LabWorkTypeCost)?.WorkTypeName ?? "";
+        WorkColor.Text = work?.Color ?? "";
         ExpectedDate.SelectedDate = work?.ExpectedDelivery ?? (work == null ? AppClock.Today.AddDays(7) : null);
         Teeth.Text = work?.Teeth ?? ""; Notes.Text = work?.Notes ?? ""; CorrectionReason.Clear(); EditorError.Text = "";
+        _lastToothCount = GetSelectedTeethCount();
+        if (work != null)
+        {
+            Cost.Text = work.Cost.ToString("0.####");
+            WorkCurrency.SelectedItem = work.Currency;
+            _costCurrency = work.Currency;
+            _unitCostPerTooth = work.Cost / _lastToothCount;
+        }
+        else if (WorkTypeCombo.SelectedItem is LabWorkTypeCost selectedType)
+        {
+            WorkCurrency.SelectedItem = selectedType.Currency;
+            _costCurrency = selectedType.Currency;
+            _unitCostPerTooth = selectedType.Cost;
+            Cost.Text = (_unitCostPerTooth.Value * _lastToothCount).ToString("0.####");
+        }
+        else
+        {
+            Cost.Text = "";
+            WorkCurrency.SelectedItem = "USD";
+            _costCurrency = "USD";
+            _unitCostPerTooth = null;
+        }
+        WorkCurrency.IsEnabled = true; _automaticCost = _conversionSourceCost = null;
+        CurrencyConversionRate.Text = _rate.ToString("0.####"); CurrencyConversionHost.Visibility = Visibility.Collapsed;
         CorrectionHost.Visibility = work == null ? Visibility.Collapsed : Visibility.Visible; SideTitle.Text = work == null ? "إضافة عمل مخبري" : "تصحيح تفاصيل العمل";
         _loadingEditor = false;
         ShowSide(true); PatientName.Focus();
+    }
+    void PopulateWorkTypesForSelectedLab(string? currentWorkType = null)
+    {
+        if (LabName.SelectedItem is not LabName selectedLab)
+        {
+            WorkTypeCombo.ItemsSource = Array.Empty<LabWorkTypeCost>();
+            WorkTypeCombo.SelectedIndex = -1;
+            return;
+        }
+        var labOptions = _workTypes.Where(w => w.LabNameId == selectedLab.Id).ToList();
+        WorkTypeCombo.ItemsSource = labOptions;
+        if (!string.IsNullOrWhiteSpace(currentWorkType))
+        {
+            var match = labOptions.FirstOrDefault(w => w.WorkTypeName.Equals(currentWorkType.Trim(), StringComparison.CurrentCultureIgnoreCase));
+            WorkTypeCombo.SelectedItem = match;
+        }
+        else if (labOptions.Count > 0)
+        {
+            WorkTypeCombo.SelectedIndex = 0;
+        }
+        else
+        {
+            WorkTypeCombo.SelectedIndex = -1;
+        }
+    }
+    void LabName_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || _loadingEditor) return;
+        PopulateWorkTypesForSelectedLab();
+        if (WorkTypeCombo.SelectedItem is LabWorkTypeCost selectedType)
+        {
+            ApplyWorkTypeOption(selectedType);
+        }
+        else if (_selected == null)
+        {
+            WorkType.Clear();
+            Cost.Clear();
+        }
+    }
+    void WorkType_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || _loadingEditor) return;
+        if (WorkTypeCombo.SelectedItem is LabWorkTypeCost selectedType)
+        {
+            ApplyWorkTypeOption(selectedType);
+        }
+    }
+    int GetSelectedTeethCount()
+    {
+        if (Teeth == null) return 1;
+        string normalized = WorkspaceUi.Normalize(Teeth.Text).Replace('،', ',');
+        int count = normalized.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim())
+            .Where(ValidTooth)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        return Math.Max(1, count);
+    }
+
+    void ApplyWorkTypeOption(LabWorkTypeCost option)
+    {
+        bool prevLoading = _loadingEditor;
+        _loadingEditor = true;
+        try
+        {
+            WorkType.Text = option.WorkTypeName;
+            int teethCount = GetSelectedTeethCount();
+            _lastToothCount = teethCount;
+            if (_selected == null)
+            {
+                WorkCurrency.SelectedItem = option.Currency;
+                _costCurrency = option.Currency;
+                _unitCostPerTooth = option.Cost;
+                Cost.Text = (option.Cost * teethCount).ToString("0.####");
+            }
+            else
+            {
+                string currentCurr = WorkCurrency.SelectedItem?.ToString() ?? _selected.Currency;
+                decimal unitInCurr = currentCurr == option.Currency
+                    ? option.Cost
+                    : (_rate > 0 ? ClinicTransactions.ConvertLabAmount(option.Cost, option.Currency, currentCurr, _rate) : option.Cost);
+                _unitCostPerTooth = unitInCurr;
+                Cost.Text = (unitInCurr * teethCount).ToString("0.####");
+            }
+        }
+        finally
+        {
+            _loadingEditor = prevLoading;
+        }
+        UpdateCurrencyPreview();
+    }
+
+    void Teeth_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (!_ready || _loadingEditor) return;
+        RecalculateCostForTeethCount();
+    }
+
+    void RecalculateCostForTeethCount()
+    {
+        int newCount = GetSelectedTeethCount();
+        decimal? unitCost = _unitCostPerTooth;
+        if (!unitCost.HasValue && WorkspaceUi.Number(Cost.Text, out decimal currentCost) && currentCost > 0)
+        {
+            unitCost = currentCost / Math.Max(1, _lastToothCount);
+            _unitCostPerTooth = unitCost;
+        }
+        _lastToothCount = newCount;
+        if (unitCost.HasValue && unitCost.Value > 0)
+        {
+            bool prevLoading = _loadingEditor;
+            _loadingEditor = true;
+            try
+            {
+                Cost.Text = (unitCost.Value * newCount).ToString("0.####");
+            }
+            finally
+            {
+                _loadingEditor = prevLoading;
+            }
+            UpdateCurrencyPreview();
+        }
     }
     void Patient_Changed(object sender, TextChangedEventArgs e)
     {
@@ -170,7 +348,10 @@ public partial class LabView : UserControl
     {
         if (_busy) return;
         if (string.IsNullOrWhiteSpace(PatientName.Text)) { EditorError.Text = "أدخل اسم المريض."; PatientName.Focus(); return; }
-        if (LabName.SelectedItem is not LabName lab || string.IsNullOrWhiteSpace(WorkType.Text)) { EditorError.Text = "اختر المخبر وأدخل نوع العمل."; return; }
+        string chosenWorkType = !string.IsNullOrWhiteSpace(WorkType.Text)
+            ? WorkType.Text.Trim()
+            : (WorkTypeCombo.SelectedItem as LabWorkTypeCost)?.WorkTypeName ?? "";
+        if (LabName.SelectedItem is not LabName lab || string.IsNullOrWhiteSpace(chosenWorkType)) { EditorError.Text = "اختر المخبر وحدد نوع العمل."; return; }
         if (!WorkspaceUi.Number(Cost.Text, out decimal cost) || cost <= 0 || cost > 1_000_000_000m) { ValidationAssist.Show(Cost, "أدخل تكلفة موجبة ضمن الحد المسموح."); return; }
         string teeth = WorkspaceUi.Normalize(Teeth.Text).Replace('،', ',');
         var toothIds = teeth.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
@@ -181,8 +362,8 @@ public partial class LabView : UserControl
         decimal conversionRate = _rate;
         if (changingCurrency && (!WorkspaceUi.Number(CurrencyConversionRate.Text, out conversionRate) || conversionRate <= 0 || conversionRate > 1_000_000_000m))
         { ValidationAssist.Show(CurrencyConversionRate, "أدخل سعر تحويل موجباً."); return; }
-        var details = new LabWorkDetails(PatientName.Text.Trim(), _patientId, lab.Id, WorkType.Text.Trim(), cost, currency,
-            string.Join(", ", toothIds), Notes.Text.Trim(), ExpectedDate.SelectedDate, CorrectionReason.Text.Trim(), conversionRate);
+        var details = new LabWorkDetails(PatientName.Text.Trim(), _patientId, lab.Id, chosenWorkType, cost, currency,
+            string.Join(", ", toothIds), WorkColor.Text.Trim(), Notes.Text.Trim(), ExpectedDate.SelectedDate, CorrectionReason.Text.Trim(), conversionRate);
         _busy = true; Editor.IsEnabled = false;
         try
         {
@@ -216,7 +397,13 @@ public partial class LabView : UserControl
         }
         UpdateCurrencyPreview();
     }
-    void CurrencyPreview_Changed(object sender, TextChangedEventArgs e) { if (_ready && !_loadingEditor) UpdateCurrencyPreview(); }
+    void CurrencyPreview_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (!_ready || _loadingEditor) return;
+        if (WorkspaceUi.Number(Cost.Text, out decimal manualCost) && manualCost > 0)
+            _unitCostPerTooth = manualCost / Math.Max(1, GetSelectedTeethCount());
+        UpdateCurrencyPreview();
+    }
     void UpdateCurrencyPreview()
     {
         string currency = WorkCurrency.SelectedItem?.ToString() ?? "USD";
@@ -248,10 +435,18 @@ public partial class LabView : UserControl
     {
         _selected = _works.FirstOrDefault(w => w.Id == id); if (_selected == null) return; var row = new LabRow { Work = _selected };
         SideTitle.Text = "تفاصيل العمل";
-        DetailSummary.Text = $"{row.Patient}\n{row.Lab} · {row.WorkType}\n{row.WorkStatus} · {row.PaymentStatus}\nالتكلفة: {WorkspaceUi.Money(_selected.Cost, _selected.Currency)}\nالمدفوع: {WorkspaceUi.Money(_selected.AmountPaid, _selected.Currency)}\nالمتبقي: {row.BalanceText}";
-        DetailNotes.Text = $"الأسنان: {_selected.Teeth ?? "—"}\nالتسليم: {row.Delivery}\n{_selected.Notes}";
-        AdvanceWork.IsEnabled = !_selected.DateReceived.HasValue; PayWork.IsEnabled = row.Balance > 0;
-        var events = new List<LabTimeline> { new("تم الإرسال", _selected.DateSent.ToString("dd/MM/yyyy HH:mm")) };
+        DetailSummary.Text = $"{row.Patient}\n{row.Lab} · {row.WorkType}" + (!string.IsNullOrWhiteSpace(_selected.Color) ? $" · اللون: {_selected.Color}" : "") + $"\n{row.WorkStatus} · {row.PaymentStatus}\nالتكلفة: {WorkspaceUi.Money(_selected.Cost, _selected.Currency)}\nالمدفوع: {WorkspaceUi.Money(_selected.AmountPaid, _selected.Currency)}\nالمتبقي: {row.BalanceText}";
+        DetailNotes.Text = $"الأسنان: {_selected.Teeth ?? "—"}\nاللون: {(string.IsNullOrWhiteSpace(_selected.Color) ? "—" : _selected.Color)}\nالتسليم: {row.Delivery}\n{_selected.Notes}";
+        bool isReceived = _selected.DateReceived.HasValue || row.WorkStatus == "تم الاستلام";
+        bool isSent = isReceived || row.WorkStatus == "تم الإرسال، جاري العمل";
+        BtnMarkSent.IsEnabled = !isSent;
+        BtnMarkReceived.IsEnabled = !isReceived;
+        PayWork.IsEnabled = row.Balance > 0;
+        var events = new List<LabTimeline>();
+        if (row.WorkStatus == "لم يتم الإرسال")
+            events.Add(new("بانتظار الإرسال", _selected.DateSent.ToString("dd/MM/yyyy HH:mm")));
+        else
+            events.Add(new("تم الإرسال، جاري العمل", _selected.DateSent.ToString("dd/MM/yyyy HH:mm")));
         var records = _operations.Where(o => o.SourceId == id).OrderBy(o => o.OccurredAt).ToList();
         if (_selected.DateReceived.HasValue && !records.Any(o => o.Kind == "LabStatus" && o.Description == "تم الاستلام")) events.Add(new("تم الاستلام · سجل سابق", _selected.DateReceived.Value.ToString("dd/MM/yyyy")));
         decimal historicalPaid = ClinicTransactions.LegacyLabPaid(_selected, records);
@@ -260,12 +455,43 @@ public partial class LabView : UserControl
         Timeline.ItemsSource = events; ShowSide(false);
     }
     void EditWork_Click(object sender, RoutedEventArgs e) { if (_selected != null) OpenEditor(_selected); }
-    void Advance_Click(object sender, RoutedEventArgs e)
+    async void MarkSent_Click(object sender, RoutedEventArgs e)
     {
-        if (_selected == null) return; var work = _selected; int current = Array.IndexOf(Stages, work.WorkStatus);
-        var dialog = new ClinicDialog(this, "تحديث حالة العمل", "تأكيد الحالة"); var stage = dialog.Choice("الحالة الجديدة", Stages.Skip(Math.Max(0, current + 1)));
-        dialog.Note("تسجيل الاستلام يحفظ تاريخ اليوم. لا تتغير حالة الدفع.");
-        dialog.OnSubmit(async () => { using var db = _createContext(); bool changed = await new ClinicTransactions(db).SetWorkStatusAsync(work.Id, work.Revision, stage.SelectedItem?.ToString() ?? ""); if (!changed) throw new InvalidOperationException("اكتملت هذه الخطوة مسبقاً؛ حدّث القائمة."); dialog.Complete(); Refresh(); OpenDetails(work.Id); FinanceMotion.Highlight(WorksGrid, work.Id); Status.Text = "✓ تم تحديث حالة العمل."; }); dialog.ShowDialog();
+        if (_selected == null || _busy) return;
+        var work = _selected;
+        _busy = true;
+        try
+        {
+            using var db = _createContext();
+            bool changed = await new ClinicTransactions(db).SetWorkStatusAsync(work.Id, work.Revision, "تم الإرسال، جاري العمل");
+            if (!changed) { Status.Text = "تم إرسال هذا العمل مسبقاً."; return; }
+            Refresh();
+            OpenDetails(work.Id);
+            FinanceMotion.Highlight(WorksGrid, work.Id);
+            Status.Text = "✓ تم تحديث الحالة إلى: تم الإرسال، جاري العمل.";
+            UiFeedback.Notify(this, "تم تحديث حالة العمل إلى: تم الإرسال، جاري العمل.");
+        }
+        catch (Exception ex) { Status.Text = ex.Message; }
+        finally { _busy = false; }
+    }
+    async void MarkReceived_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected == null || _busy) return;
+        var work = _selected;
+        _busy = true;
+        try
+        {
+            using var db = _createContext();
+            bool changed = await new ClinicTransactions(db).SetWorkStatusAsync(work.Id, work.Revision, "تم الاستلام");
+            if (!changed) { Status.Text = "تم استلام هذا العمل مسبقاً."; return; }
+            Refresh();
+            OpenDetails(work.Id);
+            FinanceMotion.Highlight(WorksGrid, work.Id);
+            Status.Text = "✓ تم تحديث الحالة إلى: تم الاستلام.";
+            UiFeedback.Notify(this, "تم تسجيل استلام العمل المخبري.");
+        }
+        catch (Exception ex) { Status.Text = ex.Message; }
+        finally { _busy = false; }
     }
     void Pay_Click(object sender, RoutedEventArgs e)
     {
@@ -288,26 +514,90 @@ public partial class LabView : UserControl
     void AddLab_Click(object sender, RoutedEventArgs e) => EditLab(null);
     void ManageLabs_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ClinicDialog(this, "إدارة المخابر", "تعديل المخبر المحدد");
-        var choices = dialog.Choice("المخابر · يشمل المؤرشفة", _labs.Select(l => l.Name + (l.IsArchived ? " · مؤرشف" : "")));
-        dialog.OnSubmit(() => { int index = choices.SelectedIndex; dialog.Complete(); if (index >= 0) EditLab(_labs[index]); return Task.CompletedTask; });
-        var add = new Button { Content = "إضافة مخبر", Style = (Style)FindResource("WorkspaceButton") }; add.Click += (_, _) => { dialog.Close(); EditLab(null); }; dialog.Fields.Children.Add(add); dialog.ShowDialog();
+        var dialog = new ClinicDialog(this, "إدارة المخابر", "تعديل المخبر المحدد")
+        {
+            Width = Math.Min(760, SystemParameters.WorkArea.Width - 40)
+        };
+        dialog.Note("قائمة المخابر المضافة (الاسم، رقم الهاتف، العنوان). اختر مخبراً واضغط تعديل، أو أضف مخبراً جديداً.");
+
+        var rows = _labs.Select(l => new LabManagementRow { Lab = l }).ToList();
+        var grid = new DataGrid
+        {
+            Style = (Style)FindResource("WorkspaceGrid"),
+            ItemsSource = rows,
+            MaxHeight = 320,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "اسم المخبر",
+            Binding = new Binding(nameof(LabManagementRow.Name)),
+            Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "رقم الهاتف",
+            Binding = new Binding(nameof(LabManagementRow.Phone)),
+            Width = new DataGridLength(140)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "العنوان",
+            Binding = new Binding(nameof(LabManagementRow.Address)),
+            Width = new DataGridLength(1.4, DataGridLengthUnitType.Star)
+        });
+        if (rows.Count > 0) grid.SelectedIndex = 0;
+        grid.MouseDoubleClick += (_, _) =>
+        {
+            if (grid.SelectedItem is LabManagementRow selectedRow)
+            {
+                dialog.Complete();
+                EditLab(selectedRow.Lab);
+            }
+        };
+        dialog.Fields.Children.Add(grid);
+
+        var add = new Button
+        {
+            Content = "＋ إضافة مخبر جديد",
+            Style = (Style)FindResource("WorkspaceButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        add.Click += (_, _) => { dialog.Close(); EditLab(null); };
+        dialog.Fields.Children.Add(add);
+
+        dialog.OnSubmit(() =>
+        {
+            if (grid.SelectedItem is not LabManagementRow selectedRow)
+                throw new InvalidOperationException("اختر مخبراً من الجدول لتعديله.");
+            dialog.Complete();
+            EditLab(selectedRow.Lab);
+            return Task.CompletedTask;
+        });
+        dialog.ShowDialog();
     }
     void EditLab(LabName? existing)
     {
         var dialog = new ClinicDialog(this, existing == null ? "إضافة مخبر" : "تعديل المخبر");
-        var name = dialog.Input("اسم المخبر", existing?.Name ?? ""); var phone = dialog.Input("رقم التواصل", existing?.Phone ?? "", true);
-        var archived = new CheckBox { Content = "أرشفة المخبر · تبقى الأعمال السابقة محفوظة", IsChecked = existing?.IsArchived ?? false, Margin = new(0, 6, 0, 12) }; archived.SetResourceReference(Control.ForegroundProperty, "AppTextPrimary"); dialog.Fields.Children.Add(archived);
+        var name = dialog.Input("اسم المخبر", existing?.Name ?? "");
+        var phone = dialog.Input("رقم الهاتف", existing?.Phone ?? "", true);
+        var address = dialog.Input("العنوان", existing?.Address ?? "");
+        var archived = new CheckBox { Content = "أرشفة المخبر · تبقى الأعمال السابقة محفوظة", IsChecked = existing?.IsArchived ?? false, Margin = new(0, 6, 0, 12) };
+        archived.SetResourceReference(Control.ForegroundProperty, "AppTextPrimary");
+        dialog.Fields.Children.Add(archived);
         dialog.OnSubmit(async () =>
         {
             if (string.IsNullOrWhiteSpace(name.Text)) throw new InvalidOperationException("أدخل اسم المخبر.");
             using var db = _createContext(); using var tx = await db.Database.BeginTransactionAsync();
             if ((await db.LabNames.AsNoTracking().ToListAsync()).Any(l => l.Id != existing?.Id && l.Name.Equals(name.Text.Trim(), StringComparison.CurrentCultureIgnoreCase))) throw new InvalidOperationException("اسم المخبر موجود مسبقاً.");
             var lab = existing == null ? new LabName() : await db.LabNames.SingleAsync(l => l.Id == existing.Id); string oldName = lab.Name;
-            lab.Name = name.Text.Trim(); lab.Phone = phone.Text.Trim(); lab.IsArchived = archived.IsChecked == true;
+            lab.Name = name.Text.Trim(); lab.Phone = phone.Text.Trim(); lab.Address = address.Text.Trim(); lab.IsArchived = archived.IsChecked == true;
             if (existing == null) db.LabNames.Add(lab); await db.SaveChangesAsync();
             if (existing != null) await db.LabWorks.Where(w => w.LabNameId == lab.Id || (w.LabNameId == null && w.LabName == oldName)).ExecuteUpdateAsync(s => s.SetProperty(w => w.LabName, lab.Name).SetProperty(w => w.LabNameId, (int?)lab.Id));
-            await tx.CommitAsync(); dialog.Complete(); Refresh(); LabSearch.Clear(); LabName.ItemsSource = _labs.Where(l => !l.IsArchived).ToList(); LabName.SelectedItem = _labs.FirstOrDefault(l => l.Id == lab.Id); Status.Text = "✓ تم حفظ المخبر.";
+            await tx.CommitAsync();
+            GlobalEvents.NotifyLabWorkChanged();
+            dialog.Complete(); Refresh(); LabSearch.Clear(); LabName.ItemsSource = _labs.Where(l => !l.IsArchived).ToList(); LabName.SelectedItem = _labs.FirstOrDefault(l => l.Id == lab.Id); Status.Text = "✓ تم حفظ المخبر.";
         }); dialog.ShowDialog();
     }
 }

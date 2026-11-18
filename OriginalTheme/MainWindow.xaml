@@ -8,7 +8,7 @@
         WindowState="Maximized"
         FlowDirection="RightToLeft"
         Background="{DynamicResource AppWindowBg}"
-        Icon="/Assets/logo.png">
+        Icon="/Assets/logo.ico">
 
     <Window.Resources>
         <!-- ScrollBar Style -->

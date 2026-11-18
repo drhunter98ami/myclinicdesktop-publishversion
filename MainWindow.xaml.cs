@@ -133,12 +133,12 @@ namespace MyClinic
                 {
                     if (showResult)
                     {
-                        MessageBox.Show("أنت تستخدم أحدث نسخة متاحة حالياً.", "تفقد التحديثات", MessageBoxButton.OK, MessageBoxImage.Information);
+                        AppMessageBox.Show("أنت تستخدم أحدث نسخة متاحة حالياً.", "تفقد التحديثات", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     return;
                 }
 
-                MessageBoxResult result = MessageBox.Show(
+                MessageBoxResult result = AppMessageBox.Show(
                     $"تتوفر نسخة جديدة: {update.Version}\nحجم الملف: {update.SizeText}\n\nهل تريد فتح صفحة التحميل؟",
                     "تحديث جديد متاح",
                     MessageBoxButton.YesNo,
@@ -156,7 +156,7 @@ namespace MyClinic
                     }
                     catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
                     {
-                        MessageBox.Show(
+                        AppMessageBox.Show(
                             "تعذر فتح صفحة تحميل التحديث. يمكنك المحاولة مرة أخرى لاحقاً.",
                             "تعذر فتح التحميل",
                             MessageBoxButton.OK,
@@ -169,7 +169,7 @@ namespace MyClinic
             {
                 if (showResult)
                 {
-                    MessageBox.Show(
+                    AppMessageBox.Show(
                         "تعذر التحقق من تحديثات GitHub. تحقق من اتصال الإنترنت وحاول لاحقاً.",
                         "تعذر التفقد",
                         MessageBoxButton.OK,
@@ -865,13 +865,13 @@ namespace MyClinic
 
             if (result.Success)
             {
-                MessageBox.Show("تم عمل نسخة احتياطية من البيانات على Google Drive بنجاح!", "نجاح المزامنة", MessageBoxButton.OK, MessageBoxImage.Information);
+                AppMessageBox.Show("تم عمل نسخة احتياطية من البيانات على Google Drive بنجاح!", "نجاح المزامنة", MessageBoxButton.OK, MessageBoxImage.Information);
                 DateTime appTime = AppClock.Now;
                 UpdateLastSyncUI(appTime);
             }
             else
             {
-                MessageBox.Show($"فشلت عملية المزامنة. السبب:\n{result.ErrorMessage}", "خطأ في المزامنة", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"فشلت عملية المزامنة. السبب:\n{result.ErrorMessage}", "خطأ في المزامنة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
             if (TxtSyncDriveLabel is not null)
@@ -881,7 +881,7 @@ namespace MyClinic
 
         public async Task RestoreDatabaseFromDriveAsync()
         {
-            MessageBoxResult confirmResult = MessageBox.Show(
+            MessageBoxResult confirmResult = AppMessageBox.Show(
                 "تحذير: استعادة البيانات ستؤدي إلى حذف البيانات الحالية واستبدالها بالنسخة الموجودة على Google Drive. هل أنت متأكد أنك تريد المتابعة؟",
                 "تأكيد الاستعادة",
                 MessageBoxButton.YesNo,
@@ -895,7 +895,7 @@ namespace MyClinic
 
                 if (result.Success)
                 {
-                    MessageBox.Show("تم تحميل النسخة الاحتياطية بنجاح! سيتم الآن إعادة تشغيل البرنامج لتطبيق البيانات الجديدة.", "نجاح الاستعادة", MessageBoxButton.OK, MessageBoxImage.Information);
+                    AppMessageBox.Show("تم تحميل النسخة الاحتياطية بنجاح! سيتم الآن إعادة تشغيل البرنامج لتطبيق البيانات الجديدة.", "نجاح الاستعادة", MessageBoxButton.OK, MessageBoxImage.Information);
 
                     var processPath = Environment.ProcessPath;
                     if (processPath != null)
@@ -906,7 +906,7 @@ namespace MyClinic
                 }
                 else
                 {
-                    MessageBox.Show($"فشلت عملية الاستعادة. السبب:\n{result.ErrorMessage}", "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
+                    AppMessageBox.Show($"فشلت عملية الاستعادة. السبب:\n{result.ErrorMessage}", "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }

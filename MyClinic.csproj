@@ -11,10 +11,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
   <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="*.xaml" Exclude="App.xaml" />
+    <Page Include="OriginalTheme\*.xaml" />
+    <Compile Include="*.cs" />
+    <Compile Include="Models\*.cs" />
+    <Compile Include="OriginalTheme\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\logo.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,7 +45,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.VisualBasic" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

@@ -2,9 +2,9 @@
  <UserControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="WorkspaceStyles.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary></UserControl.Resources>
  <Grid Margin="20" SizeChanged="Page_SizeChanged">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
-  <Border Style="{StaticResource WorkspaceCard}" local:NavigationTransition.Motion="Header" Margin="0,0,0,14"><StackPanel><TextBlock Text="الإعدادات" Style="{StaticResource WorkspaceHeading}" FontSize="28"/><TextBlock Text="إعدادات واضحة للحسابات والمظهر وبيانات العيادة." Style="{StaticResource WorkspaceHint}" Margin="0,5,0,12"/>
+  <Border Style="{StaticResource WorkspaceCard}" local:NavigationTransition.Motion="Header" Margin="0,0,0,14"><StackPanel><TextBlock Text="الإعدادات" Style="{StaticResource WorkspaceHeading}" FontSize="28"/><TextBlock Text="إعدادات واضحة للحسابات والمظهر والمخبر وبيانات العيادة." Style="{StaticResource WorkspaceHint}" Margin="0,5,0,12"/>
    <TextBlock Text="البحث في الإعدادات" Style="{StaticResource WorkspaceLabel}"/>
-   <TextBox x:Name="SettingsSearch" Style="{StaticResource WorkspaceInput}" TextChanged="SettingsSearch_Changed" AutomationProperties.Name="البحث في الإعدادات" ToolTip="ابحث باسم الإعداد، مثل سعر الصرف أو النسخ الاحتياطي"/>
+   <TextBox x:Name="SettingsSearch" Style="{StaticResource WorkspaceInput}" TextChanged="SettingsSearch_Changed" AutomationProperties.Name="البحث في الإعدادات" ToolTip="ابحث باسم الإعداد، مثل سعر الصرف أو المخبر أو النسخ الاحتياطي"/>
   </StackPanel></Border>
   <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition x:Name="NavColumn" Width="164"/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
    <Border Style="{StaticResource WorkspaceCard}" Padding="6" VerticalAlignment="Top"><ListBox x:Name="Categories" SelectionChanged="Category_Changed" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AppTextPrimary}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -68,6 +68,50 @@
        </DataGrid.Columns>
       </DataGrid>
      </StackPanel></Border>
+     <Border x:Name="LabSettingsCard" Style="{StaticResource WorkspaceCard}" Visibility="Collapsed"><StackPanel>
+      <TextBlock Text="المخبر · المخابر وأنواع العمل" Style="{StaticResource WorkspaceHeading}"/>
+      <TextBlock Text="أضف المخابر (الاسم، رقم الهاتف، العنوان) وحدّد أنواع العمل وتكلفة كل نوع (SYP أو USD) لكل مخبر بشكل مستقل." Style="{StaticResource WorkspaceHint}" Margin="0,8,0,16"/>
+      <TextBlock Text="إضافة مخبر جديد" Style="{StaticResource WorkspaceLabel}"/>
+      <WrapPanel>
+       <StackPanel Width="185" Margin="0,0,0,12"><TextBlock Text="اسم المخبر" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabSettingName" Style="{StaticResource WorkspaceInput}"/></StackPanel>
+       <StackPanel Width="150" Margin="8,0,0,12"><TextBlock Text="رقم الهاتف" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabSettingPhone" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></StackPanel>
+       <StackPanel Width="220" Margin="8,0,0,12"><TextBlock Text="العنوان" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabSettingAddress" Style="{StaticResource WorkspaceInput}"/></StackPanel>
+      </WrapPanel>
+      <Button x:Name="AddLabSettingBtn" Content="إضافة مخبر" Style="{StaticResource WorkspacePrimary}" Click="AddLabSetting_Click" HorizontalAlignment="Left" Margin="0,0,0,16"/>
+      <TextBlock Text="المخابر المضافة" Style="{StaticResource WorkspaceLabel}"/>
+      <DataGrid x:Name="LabsGrid" Style="{StaticResource WorkspaceGrid}" MaxHeight="240" SelectionChanged="LabsGrid_SelectionChanged" Margin="0,0,0,22">
+       <DataGrid.Columns>
+        <DataGridTemplateColumn Header="اسم المخبر" Width="*" MinWidth="130"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceInput}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+        <DataGridTemplateColumn Header="رقم الهاتف" Width="135"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+        <DataGridTemplateColumn Header="العنوان" Width="*" MinWidth="130"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceInput}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+        <DataGridTemplateColumn Header="حفظ" Width="75"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="حفظ" Style="{StaticResource WorkspaceButton}" Click="SaveLabSettingRow_Click"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+        <DataGridTemplateColumn Header="حذف" Width="75"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="حذف" Style="{StaticResource WorkspaceButton}" Click="DeleteLabSetting_Click" Foreground="{DynamicResource WorkspaceDanger}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       </DataGrid.Columns>
+      </DataGrid>
+      <Border Style="{StaticResource WorkspaceCard}" Padding="14" Margin="0,0,0,8">
+       <StackPanel>
+        <TextBlock Text="أنواع العمل والتكلفة للمخبر المحدد" Style="{StaticResource WorkspaceHeading}" FontSize="17"/>
+        <TextBlock Text="لكل مخبر قائمة أنواع عمل وأسعار خاصة به تظهر تلقائياً عند إضافة عمل مخبري." Style="{StaticResource WorkspaceHint}" Margin="0,4,0,12"/>
+        <WrapPanel>
+         <StackPanel Width="185" Margin="0,0,0,12"><TextBlock Text="المخبر" Style="{StaticResource WorkspaceLabel}"/><ComboBox x:Name="SelectedLabForWorkTypes" Style="{StaticResource WorkspaceCombo}" DisplayMemberPath="Name" SelectionChanged="SelectedLabForWorkTypes_Changed"/></StackPanel>
+         <StackPanel Width="195" Margin="8,0,0,12"><TextBlock Text="نوع العمل" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabWorkTypeNameInput" Tag="زيركون، فينير..." Style="{StaticResource WorkspaceInput}"/></StackPanel>
+         <StackPanel Width="115" Margin="8,0,0,12"><TextBlock Text="التكلفة" Style="{StaticResource WorkspaceLabel}"/><TextBox x:Name="LabWorkTypePriceInput" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></StackPanel>
+         <StackPanel Width="95" Margin="8,0,0,12"><TextBlock Text="العملة" Style="{StaticResource WorkspaceLabel}"/><ComboBox x:Name="LabWorkTypeCurrencyInput" Style="{StaticResource WorkspaceCombo}"/></StackPanel>
+        </WrapPanel>
+        <Button x:Name="AddLabWorkTypeBtn" Content="إضافة نوع عمل للمخبر" Style="{StaticResource WorkspacePrimary}" Click="AddLabWorkType_Click" HorizontalAlignment="Left" Margin="0,0,0,14"/>
+        <TextBlock x:Name="LabSettingsStatus" Style="{StaticResource WorkspaceHint}" Margin="0,0,0,10"/>
+        <DataGrid x:Name="LabWorkTypesGrid" Style="{StaticResource WorkspaceGrid}" MaxHeight="300">
+         <DataGrid.Columns>
+          <DataGridTemplateColumn Header="نوع العمل" Width="*" MinWidth="130"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding WorkTypeName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceInput}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="التكلفة" Width="125"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding PriceText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceInput}" FlowDirection="LeftToRight"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="العملة" Width="95"><DataGridTemplateColumn.CellTemplate><DataTemplate><ComboBox ItemsSource="{Binding Currencies}" SelectedItem="{Binding Currency, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource WorkspaceCombo}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="حفظ" Width="75"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="حفظ" Style="{StaticResource WorkspaceButton}" Click="SaveLabWorkTypeRow_Click"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="حذف" Width="75"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="حذف" Style="{StaticResource WorkspaceButton}" Click="DeleteLabWorkType_Click" Foreground="{DynamicResource WorkspaceDanger}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+         </DataGrid.Columns>
+        </DataGrid>
+       </StackPanel>
+      </Border>
+     </StackPanel></Border>
      <Border x:Name="BackupCard" Style="{StaticResource WorkspaceCard}" Visibility="Collapsed"><StackPanel>
       <TextBlock Text="النسخ الاحتياطي" Style="{StaticResource WorkspaceHeading}"/><TextBlock Text="Google Drive · نسخة من قاعدة بيانات العيادة" Style="{StaticResource WorkspaceHint}" Margin="0,8,0,16"/>
       <TextBlock x:Name="BackupInfo" Style="{StaticResource WorkspaceHint}" Margin="0,0,0,16"/>
@@ -80,7 +124,7 @@
       <TextBlock Text="المساعدة وحول التطبيق" Style="{StaticResource WorkspaceHeading}"/><TextBlock x:Name="VersionLabel" Style="{StaticResource WorkspaceHint}" Margin="0,8,0,16"/>
       <WrapPanel><Button x:Name="CheckUpdates" Content="التحقق من التحديثات" Style="{StaticResource WorkspacePrimary}" Click="CheckUpdates_Click" Margin="0,0,0,8"/><Button Content="نسخ معلومات الإصدار" Style="{StaticResource WorkspaceButton}" Click="CopyVersion_Click" Margin="8,0,0,8"/></WrapPanel>
       <TextBlock x:Name="UpdateStatus" Style="{StaticResource WorkspaceHint}" Margin="0,8,0,14"/>
-      <TextBlock Text="ملاحظات التحديث" Style="{StaticResource WorkspaceLabel}"/><TextBlock x:Name="ReleaseNotes" Style="{StaticResource WorkspaceHint}" Margin="0,0,0,22"/>
+      <TextBlock Text="معلومات التحديث" Style="{StaticResource WorkspaceLabel}"/><TextBlock x:Name="ReleaseNotes" Style="{StaticResource WorkspaceHint}" Margin="0,0,0,22"/>
       <TextBlock Text="تواصل مع المطور" Style="{StaticResource WorkspaceLabel}"/><TextBlock Text="للاقتراحات والاستفسارات والإبلاغ عن الأخطاء." Style="{StaticResource WorkspaceHint}" Margin="0,0,0,12"/>
       <TextBlock Text="د. أحمد خليف · +963935606912" Style="{StaticResource WorkspaceHint}"/>
       <WrapPanel Margin="0,12,0,0"><Button Content="تواصل عبر واتساب" Style="{StaticResource WorkspaceButton}" Click="Contact_Click" Margin="0,0,0,8"/><Button Content="نسخ الرقم" Style="{StaticResource WorkspaceButton}" Click="CopyPhone_Click" Margin="8,0,0,8"/></WrapPanel>

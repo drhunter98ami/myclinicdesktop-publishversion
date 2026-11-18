@@ -17,9 +17,11 @@ namespace MyClinic.Models
 
         public string? Teeth { get; set; }
 
-        /// <summary>"تم الإرسال", "تم الإستلام", "تم الدفع"</summary>
+        public string Color { get; set; } = "";
+
+        /// <summary>"لم يتم الإرسال", "تم الإرسال، جاري العمل", "تم الاستلام", "تم الدفع"</summary>
         [Required]
-        public string Status { get; set; } = "تم الإرسال";
+        public string Status { get; set; } = "لم يتم الإرسال";
 
         public DateTime DateSent { get; set; } = AppClock.Now;
 
@@ -33,7 +35,7 @@ namespace MyClinic.Models
         public int? PatientId { get; set; }
         public int? LabNameId { get; set; }
         public string WorkType { get; set; } = "";
-        public string WorkStatus { get; set; } = "تم الإرسال";
+        public string WorkStatus { get; set; } = "لم يتم الإرسال";
         public string Currency { get; set; } = "USD";
         public DateTime? ExpectedDelivery { get; set; }
         public decimal RateSnapshot { get; set; } = 15000;

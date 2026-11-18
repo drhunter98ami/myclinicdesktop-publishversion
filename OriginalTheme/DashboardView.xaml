@@ -308,8 +308,28 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- الهيدر العلوي -->
-        <Border Grid.Row="0" Background="#235DF6" CornerRadius="18" Padding="35" Margin="0,0,0,25">
+        <!-- الهيدر العلوي + تنبيه المخبر -->
+        <StackPanel Grid.Row="0">
+            <Border x:Name="UnsentLabWorkBanner"
+                    Visibility="Collapsed"
+                    Background="#FEF3C7"
+                    BorderBrush="#F59E0B"
+                    BorderThickness="1.2"
+                    CornerRadius="14"
+                    Padding="16,11"
+                    Margin="0,0,0,12">
+                <DockPanel LastChildFill="True">
+                    <TextBlock Text="⚠" FontSize="18" Foreground="#D97706" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="TxtUnsentLabWorkAlert"
+                               Text="تنبيه : يوجد عمل لم يتم إرساله"
+                               Foreground="#92400E"
+                               FontSize="15"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </DockPanel>
+            </Border>
+        <Border Background="#235DF6" CornerRadius="18" Padding="35" Margin="0,0,0,25">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -339,6 +359,7 @@
                 </StackPanel>
             </Grid>
         </Border>
+        </StackPanel>
 
         <!-- المحتوى الرئيسي (البحث، الفلاتر، والمواعيد) -->
         <Border Grid.Row="1" Background="{DynamicResource AppCardBg}" CornerRadius="18" Padding="28" BorderBrush="{DynamicResource AppBorder}" BorderThickness="1">

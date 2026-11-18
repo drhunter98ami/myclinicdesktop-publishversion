@@ -22,7 +22,7 @@ public sealed class ClinicTransactions(AppDbContext db)
         Require(!string.IsNullOrWhiteSpace(details.PatientName) && !string.IsNullOrWhiteSpace(details.WorkType), "أدخل اسم المريض ونوع العمل.");
         Require(!id.HasValue || !string.IsNullOrWhiteSpace(details.Reason), "أدخل سبب التصحيح.");
         using var tx = await db.Database.BeginTransactionAsync();
-        var work = id.HasValue ? await db.LabWorks.AsNoTracking().SingleOrDefaultAsync(w => w.Id == id) ?? throw new InvalidOperationException("لم يعد العمل موجوداً.") : new LabWork();
+        var work = id.HasValue ? await db.LabWorks.AsNoTracking().SingleOrDefaultAsync(w => w.Id == id) ?? throw new InvalidOperationException("لم يعد العمل موجوداً.") : new LabWork { WorkStatus = "لم يتم الإرسال", Status = "لم يتم الإرسال" };
         var lab = await db.LabNames.AsNoTracking().SingleOrDefaultAsync(l => l.Id == details.LabId) ?? throw new InvalidOperationException("لم يعد المخبر موجوداً.");
         Require(!lab.IsArchived || (id.HasValue && (work.LabNameId == lab.Id || work.LabName == lab.Name)), "اختر مخبراً نشطاً للأعمال الجديدة.");
         if (details.PatientId.HasValue) Require(await db.Patients.AnyAsync(p => p.Id == details.PatientId), "لم يعد المريض المحدد موجوداً؛ أعد البحث عنه.");
@@ -40,9 +40,17 @@ public sealed class ClinicTransactions(AppDbContext db)
         }
         work.PatientName = details.PatientName.Trim(); work.PatientId = details.PatientId; work.LabNameId = lab.Id; work.LabName = lab.Name;
         work.WorkType = details.WorkType.Trim(); work.Cost = details.Cost; work.Currency = details.Currency; work.AmountPaid = paid;
-        work.Teeth = details.Teeth; work.Notes = details.Notes.Trim(); work.ExpectedDelivery = details.ExpectedDelivery;
+        work.Teeth = details.Teeth; work.Color = (details.Color ?? "").Trim(); work.Notes = details.Notes.Trim(); work.ExpectedDelivery = details.ExpectedDelivery;
         if (!id.HasValue || currencyChanged) work.RateSnapshot = details.ConversionRate;
-        work.Status = work.AmountPaid >= work.Cost ? work.DateReceived.HasValue ? "تم الدفع" : "تم الدفع ولم يتم الاستلام" : work.WorkStatus;
+        if (!id.HasValue)
+        {
+            work.WorkStatus = "لم يتم الإرسال";
+            work.Status = "لم يتم الإرسال";
+        }
+        else
+        {
+            work.Status = work.AmountPaid >= work.Cost ? work.DateReceived.HasValue ? "تم الدفع" : "تم الدفع ولم يتم الاستلام" : work.WorkStatus;
+        }
         if (id.HasValue) db.LabWorks.Update(work); else db.LabWorks.Add(work);
         await db.SaveChangesAsync();
         if (id.HasValue)
@@ -56,7 +64,9 @@ public sealed class ClinicTransactions(AppDbContext db)
                 EntityType = "LabWork", EntityId = work.Id, Description = description, BeforeJson = before, AfterJson = JsonSerializer.Serialize(work), Reason = details.Reason.Trim() });
             await db.SaveChangesAsync();
         }
-        await tx.CommitAsync(); return work.Id;
+        await tx.CommitAsync();
+        GlobalEvents.NotifyLabWorkChanged();
+        return work.Id;
     }
     public static decimal LegacyLabPaid(Models.LabWork work, IEnumerable<Models.ClinicOperation> history)
     {
@@ -122,22 +132,29 @@ public sealed class ClinicTransactions(AppDbContext db)
     }
     public async Task<bool> SetWorkStatusAsync(int id, int revision, string status)
     {
-        string[] stages = ["تم الإرسال", "قيد العمل", "جاهز", "تم الاستلام"];
+        string[] stages = ["لم يتم الإرسال", "تم الإرسال، جاري العمل", "تم الاستلام"];
         Require(stages.Contains(status), "اختر حالة عمل صحيحة.");
         using var tx = await db.Database.BeginTransactionAsync();
         var work = await db.LabWorks.AsNoTracking().SingleAsync(w => w.Id == id);
-        if (work.DateReceived.HasValue || Array.IndexOf(stages, status) <= Array.IndexOf(stages, work.WorkStatus)) return false;
+        if (work.DateReceived.HasValue || work.WorkStatus == status) return false;
         Require(work.Revision == revision, "تغير العمل؛ حدّث القائمة.");
-        DateTime? received = status == "تم الاستلام" ? AppClock.Now : null;
+        DateTime now = AppClock.Now;
+        DateTime? received = status == "تم الاستلام" ? now : null;
+        DateTime sentDate = status == "تم الإرسال، جاري العمل" ? now : work.DateSent;
         int changed = await db.LabWorks.Where(w => w.Id == id && w.Revision == revision && w.DateReceived == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(w => w.WorkStatus, status).SetProperty(w => w.DateReceived, received)
-                .SetProperty(w => w.Revision, revision + 1).SetProperty(w => w.Status, work.AmountPaid >= work.Cost ? received.HasValue ? "تم الدفع" : "تم الدفع ولم يتم الاستلام" : status));
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.WorkStatus, status)
+                .SetProperty(w => w.DateSent, sentDate)
+                .SetProperty(w => w.DateReceived, received)
+                .SetProperty(w => w.Revision, revision + 1)
+                .SetProperty(w => w.Status, work.AmountPaid >= work.Cost ? received.HasValue ? "تم الدفع" : "تم الدفع ولم يتم الاستلام" : status));
         if (changed == 1)
         {
             db.ClinicOperations.Add(new() { RequestKey = Guid.NewGuid().ToString(), Kind = "LabStatus", SourceId = id,
-                Description = status, OccurredAt = AppClock.Now, Actor = LoginSessionStore.CurrentUsername ?? "" });
+                Description = status, OccurredAt = now, Actor = LoginSessionStore.CurrentUsername ?? "" });
             await db.SaveChangesAsync();
         }
-        await tx.CommitAsync(); return changed == 1;
+        await tx.CommitAsync();
+        if (changed == 1) GlobalEvents.NotifyLabWorkChanged();
+        return changed == 1;
     }
 }

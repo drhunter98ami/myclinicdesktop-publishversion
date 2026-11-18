@@ -1397,6 +1397,7 @@
                     <Border Grid.Row="2" CornerRadius="0,0,25,25" Background="{DynamicResource VisitCardBg}" BorderBrush="{DynamicResource VisitCardBorder}" BorderThickness="0,1,0,0" Padding="20,14">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                             <Button Content="تعديل الزيارة" Tag="{Binding VisitId}" Click="EditVisit_Click" Style="{StaticResource PrimaryActionButton}" Margin="0,0,10,0" />
+                            <Button Content="حذف الزيارة" Tag="{Binding VisitId}" Click="DeleteVisit_Click" Style="{StaticResource SecondaryActionButton}" Foreground="#EF4444" Margin="0,0,10,0" />
                             <Button Content="سجل التعديل" Tag="{Binding VisitId}" Click="OpenVisitEditHistory_Click" Style="{StaticResource SecondaryActionButton}" Margin="0,0,10,0" Visibility="{Binding HasEditHistory, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Button Content="إغلاق" Width="96" Click="CloseVisitDetails_Click" Style="{StaticResource SecondaryActionButton}" />
                         </StackPanel>

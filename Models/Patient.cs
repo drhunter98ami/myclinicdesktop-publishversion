@@ -36,6 +36,8 @@ namespace MyClinic.Models
         public string? Allergies { get; set; }
         public string? ChronicDiseases { get; set; }
 
+        public bool IsDeleted { get; set; }
+
         // ── Navigation ─────────────────────────────────────────────────
         public ICollection<Visit> Visits { get; set; } = new List<Visit>();
     }

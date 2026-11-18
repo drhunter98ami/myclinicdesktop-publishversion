@@ -49,6 +49,7 @@ public partial class FinancialRecordsView : UserControl
         ConfigureFinancePalette(false, false);
         Loaded += FinancialRecordsView_Loaded; Unloaded += FinancialRecordsView_Unloaded;
         IsVisibleChanged += FinancialRecordsView_IsVisibleChanged;
+        CmbUnpaidSort.DropDownClosed += (_, _) => { if (_initialized && !_updating) { ClearGridSort(UnpaidItemsControl); ApplyFilters(); FinanceMotion.Fade(UnpaidItemsControl); } };
         foreach (DatePicker date in new[] { DpFilterDate, DpFilterEnd, DpExpenseDate, DpPaymentDate, DpUpcomingDue })
             date.DateValidationError += (_, e) => { e.ThrowException = false; ShowStatus("أدخل تاريخاً صحيحاً أو اختره من التقويم.", true); };
         ApplyFilters();
@@ -177,6 +178,13 @@ public partial class FinancialRecordsView : UserControl
     private string Query => PatientRecordSearch.Normalize(WorkspaceSearch.Text);
     private bool Matches(string text) => Query.Length == 0 || PatientRecordSearch.Normalize(text).Contains(Query);
     private bool MatchesCategory(string category) => CategoryFilter.SelectedIndex <= 0 || category == CategoryFilter.SelectedItem as string;
+    private static void ClearGridSort(DataGrid grid)
+    {
+        if (grid.ItemsSource != null)
+            CollectionViewSource.GetDefaultView(grid.ItemsSource)?.SortDescriptions.Clear();
+        foreach (var column in grid.Columns)
+            column.SortDirection = null;
+    }
     private void ApplyFilters()
     {
         if (!_initialized || _updating || !TryRange(out var range)) return;
@@ -189,9 +197,28 @@ public partial class FinancialRecordsView : UserControl
             Due = p.DueDate, Status = p.Status, Amount = FinanceMoney.From(p.Amount), ExpenseId = p.ExpenseId, CompletedAt = p.CompletedAt })
             .Where(p => Matches(p.Description) && MatchesCategory(p.Category) && (UpcomingStatusFilter.SelectedIndex == 3 || p.Status == (UpcomingStatusFilter.SelectedIndex switch { 1 => "Paid", 2 => "Cancelled", _ => "Pending" })))
             .OrderBy(p => p.StatusOrder).ThenBy(p => p.DueSort).ThenBy(p => p.Id).ToList();
-        var accounts = _accounts.Where(a => a.Balance > 0 && Matches($"{a.PatientName} {a.Phone}") && (AccountAgeFilter.SelectedIndex switch
+        var filteredAccounts = _accounts.Where(a => a.Balance > 0 && Matches($"{a.PatientName} {a.Phone}") && (AccountAgeFilter.SelectedIndex switch
             { 1 => a.AgeDays <= 30, 2 => a.AgeDays is > 30 and <= 60, 3 => a.AgeDays is > 60 and <= 90, 4 => a.AgeDays > 90, _ => true }));
-        accounts = CmbUnpaidSort.SelectedIndex switch { 1 => accounts.OrderBy(a => a.PatientName), 2 => accounts.OrderBy(a => a.FirstDebtDate), _ => accounts.OrderByDescending(a => a.Balance) };
+        List<FinanceAccount> sortedAccounts = CmbUnpaidSort.SelectedIndex switch
+        {
+            1 => filteredAccounts
+                .OrderBy(a => (a.PatientName ?? "").Trim(), StringComparer.CurrentCulture)
+                .ThenByDescending(a => a.Balance)
+                .ThenBy(a => a.PatientId)
+                .ToList(),
+            2 => filteredAccounts
+                .OrderBy(a => a.FirstDebtDate ?? DateTime.MaxValue)
+                .ThenByDescending(a => a.AgeDays)
+                .ThenByDescending(a => a.Balance)
+                .ThenBy(a => a.PatientId)
+                .ToList(),
+            _ => filteredAccounts
+                .OrderByDescending(a => a.Balance)
+                .ThenBy(a => a.FirstDebtDate ?? DateTime.MaxValue)
+                .ThenBy(a => (a.PatientName ?? "").Trim(), StringComparer.CurrentCulture)
+                .ThenBy(a => a.PatientId)
+                .ToList()
+        };
         SetItems(IncomeItemsControl, income, key); SetItems(ExpenseItemsControl, expenses, key);
         _filteredUpcoming = upcoming;
         _upcomingPage = Math.Clamp(_upcomingPage, 0, Math.Max(0, (upcoming.Count - 1) / UpcomingPageSize));
@@ -199,7 +226,7 @@ public partial class FinancialRecordsView : UserControl
         UpcomingPageLabel.Text = $"الصفحة {_upcomingPage + 1} من {Math.Max(1, (upcoming.Count + UpcomingPageSize - 1) / UpcomingPageSize)} · {upcoming.Count:N0} نتيجة";
         BtnUpcomingPrevious.IsEnabled = _upcomingPage > 0;
         BtnUpcomingNext.IsEnabled = (_upcomingPage + 1) * UpcomingPageSize < upcoming.Count;
-        SetItems(UnpaidItemsControl, accounts.ToList(), "accounts|" + Query + AccountAgeFilter.SelectedIndex);
+        SetItems(UnpaidItemsControl, sortedAccounts, $"accounts|{Query}|{AccountAgeFilter.SelectedIndex}|{CmbUnpaidSort.SelectedIndex}", preserveGridSort: false);
         decimal collected = income.Sum(r => r.Paid), spent = expenses.Sum(e => e.Amount);
         AnimatedNumber.Show(TxtTotalIncome, (double)collected, "{0:#,0.##} ل.س");
         AnimatedNumber.Show(TxtTotalExpenses, (double)spent, "{0:#,0.##} ل.س");
@@ -215,11 +242,11 @@ public partial class FinancialRecordsView : UserControl
         IncomeComparison.ToolTip = ExpenseComparison.ToolTip = NetComparison.ToolTip = $"المقارنة مع {previousRange.Label} بنفس الفلاتر";
         TxtVisitCount.Text = $"{income.Count(r => !r.FinancialOnly):N0} زيارة علاجية · {income.Count(r => r.FinancialOnly):N0} عملية مستقلة";
         TxtPendingCount.Text = $"{_upcoming.Count(p => p.Status == "Pending"):N0} مستحق معلق";
-        TxtUnpaidTotal.Text = $"{accounts.Count():N0} مريض · الإجمالي المعروض: {FinanceMoney.Format(accounts.Sum(a => a.Balance))}";
+        TxtUnpaidTotal.Text = $"{sortedAccounts.Count:N0} مريض · الإجمالي المعروض: {FinanceMoney.Format(sortedAccounts.Sum(a => a.Balance))}";
         EmptyIncomeText.Visibility = income.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyExpenseText.Visibility = expenses.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyUpcomingText.Visibility = upcoming.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyUnpaidText.Visibility = accounts.Any() ? Visibility.Collapsed : Visibility.Visible;
+        EmptyUnpaidText.Visibility = sortedAccounts.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         ((TextBlock)EmptyIncomeText.Children[0]).Text = _rows.Count == 0 ? "لا توجد سجلات مالية بعد." : "لا توجد سجلات دخل مطابقة للفلاتر.";
         ((TextBlock)EmptyExpenseText.Children[0]).Text = _expenses.Count == 0 ? "لم تُسجل مصاريف بعد." : "لا توجد مصاريف مطابقة للفلاتر.";
         ((TextBlock)EmptyUpcomingText.Children[0]).Text = _upcoming.Count == 0 ? "لم تُسجل مستحقات بعد." : "لا توجد مستحقات مطابقة للفلاتر.";
@@ -247,16 +274,33 @@ public partial class FinancialRecordsView : UserControl
         brush.Freeze();
         return brush;
     }
-    private void SetItems<T>(DataGrid grid, List<T> rows, string key)
+    private void SetItems<T>(DataGrid grid, List<T> rows, string key, bool preserveGridSort = true)
     {
         using var scroll = ScrollState.Updating(grid, key);
-        var sorts = CollectionViewSource.GetDefaultView(grid.ItemsSource)?.SortDescriptions.ToList() ?? new();
-        grid.ItemsSource = rows; var view = CollectionViewSource.GetDefaultView(rows);
+        var sorts = preserveGridSort ? (CollectionViewSource.GetDefaultView(grid.ItemsSource)?.SortDescriptions.ToList() ?? new()) : new();
+        if (!preserveGridSort)
+        {
+            foreach (var column in grid.Columns)
+                column.SortDirection = null;
+        }
+        grid.ItemsSource = rows;
+        var view = CollectionViewSource.GetDefaultView(rows);
+        view.SortDescriptions.Clear();
         foreach (var sort in sorts) view.SortDescriptions.Add(sort);
     }
     private DataGrid ActiveGrid => FinanceTabs.SelectedIndex switch { 1 => ExpenseItemsControl, 2 => UpcomingItemsControl, 3 => UnpaidItemsControl, _ => IncomeItemsControl };
     private void UpdateResultsLabel() => ResultsLabel.Text = FinanceTabs.SelectedIndex == 2 ? $"{UpcomingItemsControl.Items.Count:N0} معروض من {_filteredUpcoming.Count:N0} مستحق" : $"{ActiveGrid.Items.Count:N0} سجل معروض";
-    private void WorkspaceFilter_Changed(object sender, RoutedEventArgs e) { if (_initialized && !_updating) { _upcomingPage = 0; ApplyFilters(); FinanceMotion.Fade(ActiveGrid); } }
+    private void WorkspaceFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_initialized && !_updating)
+        {
+            if (ReferenceEquals(sender, CmbUnpaidSort))
+                ClearGridSort(UnpaidItemsControl);
+            _upcomingPage = 0;
+            ApplyFilters();
+            FinanceMotion.Fade(ActiveGrid);
+        }
+    }
     private void PreviousUpcomingPage_Click(object sender, RoutedEventArgs e) { if (_upcomingPage > 0) { _upcomingPage--; ApplyFilters(); } }
     private void NextUpcomingPage_Click(object sender, RoutedEventArgs e) { if ((_upcomingPage + 1) * UpcomingPageSize < _filteredUpcoming.Count) { _upcomingPage++; ApplyFilters(); } }
     private void DateFilter_Changed(object sender, SelectionChangedEventArgs e) { if (_initialized && !_updating) { ApplyFilters(); FinanceMotion.Fade(ActiveGrid); } }

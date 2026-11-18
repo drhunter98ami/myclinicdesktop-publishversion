@@ -22,12 +22,16 @@ public static class ClinicWorkspaceSchema
                 using var alter = connection.CreateCommand(); alter.Transaction = tx;
                 alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}"; alter.ExecuteNonQuery(); return true;
             }
+            Add("Patients", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
             bool prices = Add("Shortages", "PriceKnown", "INTEGER NOT NULL DEFAULT 1");
             Add("Shortages", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
-            Add("LabNames", "Phone", "TEXT NOT NULL DEFAULT ''"); Add("LabNames", "IsArchived", "INTEGER NOT NULL DEFAULT 0");
+            Add("LabNames", "Phone", "TEXT NOT NULL DEFAULT ''");
+            Add("LabNames", "Address", "TEXT NOT NULL DEFAULT ''");
+            Add("LabNames", "IsArchived", "INTEGER NOT NULL DEFAULT 0");
             Add("LabWorks", "PatientId", "INTEGER NULL"); Add("LabWorks", "LabNameId", "INTEGER NULL");
             Add("LabWorks", "WorkType", "TEXT NOT NULL DEFAULT ''");
-            bool backfill = Add("LabWorks", "WorkStatus", "TEXT NOT NULL DEFAULT 'تم الإرسال'");
+            Add("LabWorks", "Color", "TEXT NOT NULL DEFAULT ''");
+            bool backfill = Add("LabWorks", "WorkStatus", "TEXT NOT NULL DEFAULT 'لم يتم الإرسال'");
             Add("LabWorks", "Currency", "TEXT NOT NULL DEFAULT 'USD'");
             Add("LabWorks", "ExpectedDelivery", "TEXT NULL");
             Add("LabWorks", "RateSnapshot", "TEXT NOT NULL DEFAULT '15000'"); Add("LabWorks", "Revision", "INTEGER NOT NULL DEFAULT 0");
@@ -40,12 +44,19 @@ public static class ClinicWorkspaceSchema
                 RateSnapshot TEXT NOT NULL, AmountSyp TEXT NOT NULL, OccurredAt TEXT NOT NULL,
                 ExpenseId INTEGER NULL, Actor TEXT NOT NULL);
                 CREATE UNIQUE INDEX IF NOT EXISTS IX_ClinicOperations_RequestKey ON ClinicOperations(RequestKey);
-                CREATE INDEX IF NOT EXISTS IX_ClinicOperations_Kind_SourceId ON ClinicOperations(Kind, SourceId);";
+                CREATE INDEX IF NOT EXISTS IX_ClinicOperations_Kind_SourceId ON ClinicOperations(Kind, SourceId);
+                CREATE TABLE IF NOT EXISTS LabWorkTypeCosts (
+                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                LabNameId INTEGER NOT NULL,
+                WorkTypeName TEXT NOT NULL,
+                Cost TEXT NOT NULL DEFAULT '0',
+                Currency TEXT NOT NULL DEFAULT 'SYP');
+                CREATE INDEX IF NOT EXISTS IX_LabWorkTypeCosts_LabNameId ON LabWorkTypeCosts(LabNameId);";
             command.ExecuteNonQuery();
             if (prices) { command.CommandText = "UPDATE Shortages SET PriceKnown = 0 WHERE CAST(Price AS REAL) = 0"; command.ExecuteNonQuery(); }
             if (backfill)
             {
-                command.CommandText = @"UPDATE LabWorks SET WorkStatus = CASE WHEN DateReceived IS NOT NULL OR Status IN ('تم الإستلام','تم الاستلام','تم الدفع') THEN 'تم الاستلام' ELSE 'تم الإرسال' END;
+                command.CommandText = @"UPDATE LabWorks SET WorkStatus = CASE WHEN DateReceived IS NOT NULL OR Status IN ('تم الإستلام','تم الاستلام','تم الدفع') THEN 'تم الاستلام' ELSE 'تم الإرسال، جاري العمل' END;
                     UPDATE LabWorks SET AmountPaid = Cost WHERE CAST(AmountPaid AS REAL) = 0 AND Status IN ('تم الدفع','تم الدفع ولم يتم الاستلام');
                     UPDATE LabWorks SET RateSnapshot = COALESCE((SELECT UsdToSypRate FROM AppSettings LIMIT 1),15000);";
                 command.ExecuteNonQuery();

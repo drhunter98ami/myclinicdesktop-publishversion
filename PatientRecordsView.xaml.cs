@@ -324,7 +324,7 @@ namespace MyClinic
             catch (Exception)
             {
                 HideVisitDetailsOverlay(immediate: true);
-                MessageBox.Show("تعذر فتح تفاصيل الزيارة حالياً. تم تجاهل البيانات غير المكتملة.", "تفاصيل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
+                AppMessageBox.Show("تعذر فتح تفاصيل الزيارة حالياً. تم تجاهل البيانات غير المكتملة.", "تفاصيل الزيارة", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -355,7 +355,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تحديث بيانات الزيارة:\n{ex.Message}", "تعديل الزيارة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -371,7 +371,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تحميل سجل تعديل الزيارة:\n{ex.Message}", "سجل التعديل", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -526,6 +526,7 @@ namespace MyClinic
 
             List<PatientSummarySnapshot> summaries = await db.Patients
                 .AsNoTracking()
+                .Where(p => !p.IsDeleted)
                 .Select(p => new PatientSummarySnapshot
                 {
                     Id               = p.Id,
@@ -541,13 +542,13 @@ namespace MyClinic
                     IsSmoker         = p.IsSmoker,
                     SmokingType      = p.SmokingType,
                     SmokingFrequency = p.SmokingFrequency,
-                    VisitCount       = p.Visits.Count(),
-                    LatestVisitDate  = p.Visits.Max(v => (DateTime?)v.VisitDate)
+                    VisitCount       = p.Visits.Count(v => !v.IsFinancialOnly),
+                    LatestVisitDate  = p.Visits.Where(v => !v.IsFinancialOnly).Max(v => (DateTime?)v.VisitDate)
                 })
                 .ToListAsync();
 
             List<Visit> pending = AppRuntimeCache.RecentVisits
-                .Where(v => !dbVisitIds.Contains(v.Id))
+                .Where(v => !dbVisitIds.Contains(v.Id) && !v.IsFinancialOnly && (v.Patient == null || !v.Patient.IsDeleted))
                 .ToList();
 
             List<PatientSummarySnapshot> merged = MergePendingVisitsIntoPatientSummaries(summaries, pending);
@@ -573,7 +574,7 @@ namespace MyClinic
                     using var db = new AppDbContext();
                     return await db.Visits
                     .AsNoTracking()
-                    .Where(v => v.PatientId == patientId)
+                    .Where(v => v.PatientId == patientId && !v.IsFinancialOnly)
                     .Include(v => v.ToothRecords)
                     .Include(v => v.EditHistories)
                     .OrderByDescending(v => v.VisitDate)
@@ -585,7 +586,7 @@ namespace MyClinic
 
                 List<Visit> allVisits = dbVisits
                     .Concat(AppRuntimeCache.RecentVisits
-                        .Where(v => v.PatientId == patientId && !dbIds.Contains(v.Id)))
+                        .Where(v => v.PatientId == patientId && !v.IsFinancialOnly && !dbIds.Contains(v.Id)))
                     .OrderByDescending(v => v.VisitDate)
                     .ToList();
 
@@ -605,7 +606,7 @@ namespace MyClinic
                 // Attachment thumbnails are loaded by OpenVisitDetails_Click on demand.
                 // Opening a patient's history no longer decodes every historical image.
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (loadVersion != _visitLoadVersion || _selectedPatient?.Id != patientId) return;
                 _selectedPatientVisits.Clear();

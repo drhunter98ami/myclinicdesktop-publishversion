@@ -678,7 +678,7 @@ namespace MyClinic
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"تعذر تحميل تفاصيل الفئة.\n{ex.Message}", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
+                AppMessageBox.Show($"تعذر تحميل تفاصيل الفئة.\n{ex.Message}", "المصاريف", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

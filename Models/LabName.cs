@@ -10,6 +10,7 @@ namespace MyClinic.Models
         [Required]
         public string Name { get; set; } = string.Empty;
         public string Phone { get; set; } = "";
+        public string Address { get; set; } = "";
         public bool IsArchived { get; set; }
 
         public DateTime CreatedAt { get; set; } = AppClock.Now;

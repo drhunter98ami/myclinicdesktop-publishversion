@@ -19,6 +19,24 @@ public sealed class TreatmentSettingRow
     public string[] Currencies { get; } = ["SYP", "USD"];
 }
 
+public sealed class LabSettingRow
+{
+    public int Id { get; init; }
+    public string Name { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public string Address { get; set; } = "";
+}
+
+public sealed class LabWorkTypeSettingRow
+{
+    public int Id { get; init; }
+    public int LabNameId { get; init; }
+    public string WorkTypeName { get; set; } = "";
+    public string PriceText { get; set; } = "";
+    public string Currency { get; set; } = "SYP";
+    public string[] Currencies { get; } = ["SYP", "USD"];
+}
+
 public partial class SettingsView : UserControl
 {
     static string _lastCategory = "عام"; static double _lastScroll;
@@ -28,10 +46,14 @@ public partial class SettingsView : UserControl
         ["المظهر"] = "التصميم الجديد الأصلي الداكن الفاتح النظام الحركة التأثيرات",
         ["الحسابات"] = "سعر الصرف الدولار الليرة الوقت التاريخ الساعة متقدمة",
         ["العلاجات"] = "تكاليف العلاجات الأسعار السعر العملة الأقنية سحب عصب",
+        ["المخبر"] = "المخبر المخابر إضافة مخبر رقم الهاتف العنوان نوع العمل زيركون فينير تكلفة عملة",
         ["النسخ الاحتياطي"] = "Google Drive نسخ استعادة نسخة حساب اتصال",
-        ["حول التطبيق"] = "التحديثات الإصدار مساعدة المطور تواصل واتساب"
+        ["حول التطبيق"] = "التحديثات الإصدار مساعدة المطور تواصل واتساب معلومات التحديث"
     };
-    List<TreatmentCost> _treatments = new(); bool _ready, _loading, _busy, _backupBusy; decimal _savedRate;
+    List<TreatmentCost> _treatments = new();
+    List<LabName> _labs = new();
+    List<LabWorkTypeCost> _labWorkTypes = new();
+    bool _ready, _loading, _busy, _backupBusy, _syncingLabSelection; decimal _savedRate;
     readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly Func<AppDbContext> _createContext;
     public SettingsView() : this(() => new AppDbContext()) { }
@@ -43,8 +65,15 @@ public partial class SettingsView : UserControl
         MotionLevelComboBox.ItemsSource = new[] { "بدون حركة", "حركة خفيفة", "حركة كاملة" };
         TreatmentCurrency.ItemsSource = new[] { "SYP", "USD" }; TreatmentCurrency.SelectedIndex = 0;
         TreatmentFilterCurrency.ItemsSource = new[] { "كل العملات", "SYP", "USD" }; TreatmentFilterCurrency.SelectedIndex = 0;
+        LabWorkTypeCurrencyInput.ItemsSource = new[] { "SYP", "USD" }; LabWorkTypeCurrencyInput.SelectedIndex = 0;
         VersionLabel.Text = $"My Clinic · الإصدار {UpdateService.CurrentVersion.ToString(3)}";
-        ReleaseNotes.Text = "• تنظيم النواقص وتسجيل المشتريات الجزئية وسجل المصاريف.\n• فصل تسليم أعمال المخبر عن الدفعات مع حفظ سعر الصرف.\n• إعدادات مصنّفة وخيارات الأقنية ومعاينة المظهر والحركة.\n• عرض حالة النسخ الاحتياطي ونسخة استرداد محلية قبل الاستعادة.";
+        ReleaseNotes.Text =
+            "• إمكانية حذف ملف مريض أو حذف زيارة مفردة مع خيار حذف أو إبقاء البيانات المالية المرتبطة.\n" +
+            "• توحيد جميع نوافذ التنبيهات والرسائل لتعمل بثيم التطبيق الفاتح والداكن.\n" +
+            "• إضافة تبويب المخبر في الإعدادات لإضافة المخابر (الاسم، الهاتف، العنوان) وتخصيص أنواع العمل وأسعارها (SYP / USD) لكل مخبر مع التعبئة التلقائية للتكلفة وإضافة حقل اللون.\n" +
+            "• عرض المخابر كجدول في إدارة المخابر، وتحديث حالة العمل بزرّي (تم الإرسال / تم الاستلام) مع تنبيه في الصفحة الرئيسية للأعمال التي لم يتم إرسالها بعد.\n" +
+            "• إمكانية تعديل الوصفة الطبية من نافذة تعديل الزيارة، وتخصيص العلاجات لكل سن أو لعدة أسنان محددة تلقائياً في نموذج إضافة مريض.\n" +
+            "• محاذاة أسماء المرضى لليمين وتحسين دقة الترتيب (الأعلى مديونية، الاسم، الأقدم) في حسابات المرضى ضمن الشؤون المالية.";
         _clock.Tick += (_, _) => UpdateClockStatus(); _ready = true;
         Loaded += LoadedView; Unloaded += UnloadedView;
     }
@@ -54,20 +83,33 @@ public partial class SettingsView : UserControl
         try
         {
             WorkspaceUi.Configure(this); GlobalEvents.OnThemeChanged += ThemeChanged; MotionPreferences.Changed += MotionPreferencesChanged;
+            GlobalEvents.OnLabWorkChanged += HandleExternalLabChanged;
             Username.Text = LoginSessionStore.CurrentUsername; SaveUsername.IsEnabled = false;
             ColorMode.SelectedIndex = ThemePreference.FollowSystem ? 2 : IsDark ? 1 : 0; MotionLevelComboBox.SelectedIndex = (int)MotionPreferences.Current;
             ModernPreview.BorderThickness = new(InterfaceThemeSettings.IsOriginalTheme ? 1 : 2); OriginalPreview.BorderThickness = new(InterfaceThemeSettings.IsOriginalTheme ? 2 : 1);
             using var db = _createContext(); var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync();
             _savedRate = settings?.UsdToSypRate ?? 15000; ExchangeRate.Text = _savedRate.ToString("0.##"); SavedRate.Text = $"المحفوظ: 1 USD = {_savedRate:N2} SYP\nآخر تحديث: {settings?.UpdatedAt:dd/MM/yyyy HH:mm}";
             AppDate.SelectedDate = AppClock.Today; AppTime.Text = AppClock.Now.ToString("HH:mm"); UpdateClockStatus(); _clock.Start();
-            await LoadTreatments(); ShowBackupInfo();
+            await LoadTreatments();
+            await LoadLabsAndWorkTypes();
+            ShowBackupInfo();
             Categories.SelectedItem = _lastCategory; if (Categories.SelectedIndex < 0) Categories.SelectedIndex = 0;
             ShowCategory(); ContentScroll.ScrollToVerticalOffset(_lastScroll);
         }
         catch (Exception ex) { UsernameStatus.Text = "تعذر تحميل الإعدادات: " + ex.Message; }
         finally { _loading = false; Rate_Changed(this, new RoutedEventArgs()); }
     }
-    void UnloadedView(object sender, RoutedEventArgs e) { _clock.Stop(); GlobalEvents.OnThemeChanged -= ThemeChanged; MotionPreferences.Changed -= MotionPreferencesChanged; }
+    void UnloadedView(object sender, RoutedEventArgs e)
+    {
+        _clock.Stop();
+        GlobalEvents.OnThemeChanged -= ThemeChanged;
+        MotionPreferences.Changed -= MotionPreferencesChanged;
+        GlobalEvents.OnLabWorkChanged -= HandleExternalLabChanged;
+    }
+    async void HandleExternalLabChanged()
+    {
+        if (!_busy && IsLoaded) await LoadLabsAndWorkTypes();
+    }
     bool IsDark => Window.GetWindow(this) is MainWindow m ? m.IsDarkTheme : Window.GetWindow(this) is OriginalTheme.MainWindow o && o.IsDarkTheme;
     void ThemeChanged(bool dark) { WorkspaceUi.Configure(this); if (!ThemePreference.FollowSystem) { _loading = true; ColorMode.SelectedIndex = dark ? 1 : 0; _loading = false; } }
     void MotionPreferencesChanged(object? sender, EventArgs e) { if (!MotionPreferences.Enabled) { FinanceMotion.StopTree(this); BackupProgress.IsIndeterminate = false; } }
@@ -84,7 +126,7 @@ public partial class SettingsView : UserControl
     void ShowCategory()
     {
         if (!_ready) return; string? selected = Categories.SelectedItem?.ToString();
-        foreach (var (name, card) in new[] { ("عام", GeneralCard), ("المظهر", AppearanceCard), ("الحسابات", AccountsCard), ("العلاجات", TreatmentsCard), ("النسخ الاحتياطي", BackupCard), ("حول التطبيق", AboutCard) }) card.Visibility = selected == name ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var (name, card) in new[] { ("عام", GeneralCard), ("المظهر", AppearanceCard), ("الحسابات", AccountsCard), ("العلاجات", TreatmentsCard), ("المخبر", LabSettingsCard), ("النسخ الاحتياطي", BackupCard), ("حول التطبيق", AboutCard) }) card.Visibility = selected == name ? Visibility.Visible : Visibility.Collapsed;
         NoResults.Visibility = selected == null ? Visibility.Visible : Visibility.Collapsed;
         if (selected != null) { _lastCategory = selected; if (!_loading) WorkspaceUi.Reveal(CategoryContent); }
     }
@@ -206,6 +248,244 @@ public partial class SettingsView : UserControl
         dialog.Note($"حذف {row.Name} من قائمة العلاجات الجديدة؟ تبقى الزيارات السابقة محفوظة.");
         dialog.OnSubmit(async () => { using var db = _createContext(); await db.TreatmentCosts.Where(t => t.Id == row.Id).ExecuteDeleteAsync(); dialog.Complete(); await LoadTreatments(); TreatmentStatus.Text = "تم حذف العلاج من القائمة."; }); dialog.ShowDialog();
     }
+
+    // ── Lab Settings Tab Logic ───────────────────────────────────────────────
+
+    async Task LoadLabsAndWorkTypes(int? preferredLabId = null)
+    {
+        using var db = _createContext();
+        int? currentLabId = preferredLabId ?? (SelectedLabForWorkTypes.SelectedItem as LabName)?.Id;
+        _labs = await db.LabNames.AsNoTracking().Where(l => !l.IsArchived).OrderBy(l => l.Name).ToListAsync();
+        _labWorkTypes = await db.LabWorkTypeCosts.AsNoTracking().OrderBy(w => w.WorkTypeName).ToListAsync();
+
+        _syncingLabSelection = true;
+        try
+        {
+            var labRows = _labs.Select(l => new LabSettingRow { Id = l.Id, Name = l.Name, Phone = l.Phone, Address = l.Address }).ToList();
+            LabsGrid.ItemsSource = labRows;
+            SelectedLabForWorkTypes.ItemsSource = _labs;
+            var targetLab = _labs.FirstOrDefault(l => l.Id == currentLabId) ?? _labs.FirstOrDefault();
+            SelectedLabForWorkTypes.SelectedItem = targetLab;
+            if (targetLab != null)
+                LabsGrid.SelectedItem = labRows.FirstOrDefault(r => r.Id == targetLab.Id);
+        }
+        finally
+        {
+            _syncingLabSelection = false;
+        }
+        FilterLabWorkTypes();
+    }
+
+    void LabsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingLabSelection || LabsGrid.SelectedItem is not LabSettingRow row) return;
+        _syncingLabSelection = true;
+        try
+        {
+            SelectedLabForWorkTypes.SelectedItem = _labs.FirstOrDefault(l => l.Id == row.Id);
+        }
+        finally
+        {
+            _syncingLabSelection = false;
+        }
+        FilterLabWorkTypes();
+    }
+
+    void SelectedLabForWorkTypes_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingLabSelection) return;
+        _syncingLabSelection = true;
+        try
+        {
+            if (SelectedLabForWorkTypes.SelectedItem is LabName lab && LabsGrid.ItemsSource is IEnumerable<LabSettingRow> rows)
+                LabsGrid.SelectedItem = rows.FirstOrDefault(r => r.Id == lab.Id);
+        }
+        finally
+        {
+            _syncingLabSelection = false;
+        }
+        FilterLabWorkTypes();
+    }
+
+    void FilterLabWorkTypes()
+    {
+        if (SelectedLabForWorkTypes.SelectedItem is not LabName lab)
+        {
+            LabWorkTypesGrid.ItemsSource = Array.Empty<LabWorkTypeSettingRow>();
+            LabSettingsStatus.Text = _labs.Count == 0 ? "أضف مخبراً أولاً لإدارة أنواع العمل الخاصة به." : "اختر مخبراً لعرض أو إضافة أنواع العمل.";
+            return;
+        }
+        var rows = _labWorkTypes
+            .Where(w => w.LabNameId == lab.Id)
+            .Select(w => new LabWorkTypeSettingRow
+            {
+                Id = w.Id,
+                LabNameId = w.LabNameId,
+                WorkTypeName = w.WorkTypeName,
+                PriceText = w.Cost.ToString("0.##"),
+                Currency = w.Currency
+            })
+            .ToList();
+        LabWorkTypesGrid.ItemsSource = rows;
+        LabSettingsStatus.Text = rows.Count == 0
+            ? $"لا توجد أنواع عمل مضافة لمخبر ({lab.Name}) بعد."
+            : $"{rows.Count} نوع عمل لمخبر ({lab.Name}) · يمكنك التعديل والحفظ مباشرة.";
+    }
+
+    async Task<int> PersistLabSetting(int? id, string name, string phone, string address)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("أدخل اسم المخبر.");
+        using var db = _createContext();
+        if ((await db.LabNames.AsNoTracking().ToListAsync()).Any(l => l.Id != id && l.Name.Equals(name.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            throw new InvalidOperationException("اسم المخبر موجود مسبقاً.");
+        var lab = id.HasValue ? await db.LabNames.SingleAsync(l => l.Id == id.Value) : new LabName();
+        string oldName = lab.Name;
+        lab.Name = name.Trim();
+        lab.Phone = (phone ?? "").Trim();
+        lab.Address = (address ?? "").Trim();
+        if (!id.HasValue) db.LabNames.Add(lab);
+        await db.SaveChangesAsync();
+        if (id.HasValue && !string.Equals(oldName, lab.Name, StringComparison.Ordinal))
+        {
+            await db.LabWorks.Where(w => w.LabNameId == lab.Id || (w.LabNameId == null && w.LabName == oldName))
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.LabName, lab.Name).SetProperty(w => w.LabNameId, (int?)lab.Id));
+        }
+        GlobalEvents.OnLabWorkChanged -= HandleExternalLabChanged;
+        try { GlobalEvents.NotifyLabWorkChanged(); }
+        finally { GlobalEvents.OnLabWorkChanged += HandleExternalLabChanged; }
+        await LoadLabsAndWorkTypes(lab.Id);
+        LabSettingsStatus.Text = "✓ تم حفظ بيانات المخبر.";
+        return lab.Id;
+    }
+
+    async void AddLabSetting_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        _busy = true; AddLabSettingBtn.IsEnabled = false;
+        try
+        {
+            await PersistLabSetting(null, LabSettingName.Text, LabSettingPhone.Text, LabSettingAddress.Text);
+            LabSettingName.Clear(); LabSettingPhone.Clear(); LabSettingAddress.Clear();
+        }
+        catch (Exception ex) { LabSettingsStatus.Text = ex.Message; }
+        finally { _busy = false; AddLabSettingBtn.IsEnabled = true; }
+    }
+
+    async void SaveLabSettingRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || (sender as FrameworkElement)?.DataContext is not LabSettingRow row) return;
+        _busy = true;
+        try { await PersistLabSetting(row.Id, row.Name, row.Phone, row.Address); }
+        catch (Exception ex) { LabSettingsStatus.Text = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    void DeleteLabSetting_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not LabSettingRow row) return;
+        var dialog = new ClinicDialog(this, "حذف مخبر", "تأكيد الحذف");
+        dialog.Note($"هل تريد حذف مخبر ({row.Name}) وأنواع العمل المرتبطة به؟ تبقى الأعمال المخبرية السابقة محفوظة.");
+        dialog.OnSubmit(async () =>
+        {
+            using var db = _createContext();
+            await db.LabWorkTypeCosts.Where(w => w.LabNameId == row.Id).ExecuteDeleteAsync();
+            if (await db.LabWorks.AnyAsync(w => w.LabNameId == row.Id))
+                await db.LabNames.Where(l => l.Id == row.Id).ExecuteUpdateAsync(s => s.SetProperty(l => l.IsArchived, true));
+            else
+                await db.LabNames.Where(l => l.Id == row.Id).ExecuteDeleteAsync();
+            dialog.Complete();
+            GlobalEvents.OnLabWorkChanged -= HandleExternalLabChanged;
+            try { GlobalEvents.NotifyLabWorkChanged(); }
+            finally { GlobalEvents.OnLabWorkChanged += HandleExternalLabChanged; }
+            await LoadLabsAndWorkTypes();
+            LabSettingsStatus.Text = "تم حذف المخبر.";
+        });
+        dialog.ShowDialog();
+    }
+
+    async Task PersistLabWorkType(int? id, int labId, string workTypeName, decimal cost, string currency)
+    {
+        if (labId <= 0) throw new InvalidOperationException("اختر المخبر أولاً.");
+        if (string.IsNullOrWhiteSpace(workTypeName) || cost <= 0 || cost > 1_000_000_000m || currency is not ("USD" or "SYP"))
+            throw new InvalidOperationException("أدخل نوع العمل والتكلفة الموجبة والعملة.");
+        using var db = _createContext();
+        var existingForLab = await db.LabWorkTypeCosts.AsNoTracking().Where(w => w.LabNameId == labId).ToListAsync();
+        if (existingForLab.Any(w => w.Id != id && w.WorkTypeName.Equals(workTypeName.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            throw new InvalidOperationException("نوع العمل موجود مسبقاً لهذا المخبر.");
+        var item = id.HasValue ? await db.LabWorkTypeCosts.SingleAsync(w => w.Id == id.Value) : new LabWorkTypeCost { LabNameId = labId };
+        item.LabNameId = labId;
+        item.WorkTypeName = workTypeName.Trim();
+        item.Cost = cost;
+        item.Currency = currency;
+        if (!id.HasValue) db.LabWorkTypeCosts.Add(item);
+        await db.SaveChangesAsync();
+        GlobalEvents.OnLabWorkChanged -= HandleExternalLabChanged;
+        try { GlobalEvents.NotifyLabWorkChanged(); }
+        finally { GlobalEvents.OnLabWorkChanged += HandleExternalLabChanged; }
+        await LoadLabsAndWorkTypes(labId);
+        LabSettingsStatus.Text = "✓ تم حفظ نوع العمل للمخبر.";
+    }
+
+    async void AddLabWorkType_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        _busy = true; AddLabWorkTypeBtn.IsEnabled = false;
+        try
+        {
+            int labId = (SelectedLabForWorkTypes.SelectedItem as LabName)?.Id ?? 0;
+            if (labId <= 0 && !string.IsNullOrWhiteSpace(LabSettingName.Text))
+            {
+                labId = await PersistLabSetting(null, LabSettingName.Text, LabSettingPhone.Text, LabSettingAddress.Text);
+                LabSettingName.Clear(); LabSettingPhone.Clear(); LabSettingAddress.Clear();
+            }
+            if (labId <= 0) throw new InvalidOperationException("أضف مخبراً أو اختره من القائمة أولاً.");
+            if (!WorkspaceUi.Number(LabWorkTypePriceInput.Text, out decimal cost))
+                throw new InvalidOperationException("أدخل تكلفة صحيحة.");
+            string currency = LabWorkTypeCurrencyInput.SelectedItem?.ToString() ?? "SYP";
+            await PersistLabWorkType(null, labId, LabWorkTypeNameInput.Text, cost, currency);
+            LabWorkTypeNameInput.Clear();
+            LabWorkTypePriceInput.Clear();
+        }
+        catch (Exception ex) { LabSettingsStatus.Text = ex.Message; }
+        finally { _busy = false; AddLabWorkTypeBtn.IsEnabled = true; }
+    }
+
+    async void SaveLabWorkTypeRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || (sender as FrameworkElement)?.DataContext is not LabWorkTypeSettingRow row) return;
+        _busy = true;
+        try
+        {
+            if (!WorkspaceUi.Number(row.PriceText, out decimal cost))
+                throw new InvalidOperationException("أدخل تكلفة صحيحة.");
+            await PersistLabWorkType(row.Id, row.LabNameId, row.WorkTypeName, cost, row.Currency);
+        }
+        catch (Exception ex) { LabSettingsStatus.Text = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    void DeleteLabWorkType_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not LabWorkTypeSettingRow row) return;
+        var dialog = new ClinicDialog(this, "حذف نوع عمل", "تأكيد الحذف");
+        dialog.Note($"حذف ({row.WorkTypeName}) من قائمة أنواع العمل لهذا المخبر؟");
+        dialog.OnSubmit(async () =>
+        {
+            using var db = _createContext();
+            await db.LabWorkTypeCosts.Where(w => w.Id == row.Id).ExecuteDeleteAsync();
+            dialog.Complete();
+            GlobalEvents.OnLabWorkChanged -= HandleExternalLabChanged;
+            try { GlobalEvents.NotifyLabWorkChanged(); }
+            finally { GlobalEvents.OnLabWorkChanged += HandleExternalLabChanged; }
+            await LoadLabsAndWorkTypes(row.LabNameId);
+            LabSettingsStatus.Text = "تم حذف نوع العمل.";
+        });
+        dialog.ShowDialog();
+    }
+
+    // ── Backup & About Logic ─────────────────────────────────────────────────
+
     void ShowBackupInfo()
     {
         var state = GoogleDriveSyncService.ReadState(); BackupInfo.Text = $"الحساب: {(state.Account.Length > 0 ? state.Account : "لم يُتحقق من الاتصال بعد")}\nآخر نسخ ناجح: {(state.LastSuccess.HasValue ? AppClock.FromInstant(state.LastSuccess.Value).ToString("dd/MM/yyyy hh:mm tt", new CultureInfo("ar-SY")) : "غير متوفر")}\nتاريخ نسخة Drive: {FormatRemoteDate(state.DriveModified)}";
