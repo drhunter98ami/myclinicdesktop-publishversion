@@ -196,13 +196,11 @@
                                 <!-- الشعار وحالة الاتصال -->
                                 <StackPanel HorizontalAlignment="Center" Margin="0,6,0,22">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" FlowDirection="LeftToRight" Margin="0,0,0,8">
-                                        <Border Width="48" Height="48" CornerRadius="24" Margin="0,0,12,0" Background="#FFFFFF" BorderBrush="{DynamicResource AppSidebarTopCardBorder}" BorderThickness="1">
-                                            <Image Source="Assets/logo.png" Width="44" Height="44" RenderOptions.BitmapScalingMode="HighQuality">
-                                                <Image.Clip>
-                                                    <EllipseGeometry RadiusX="22" RadiusY="22" Center="22,22" />
-                                                </Image.Clip>
-                                            </Image>
-                                        </Border>
+                                        <Image Source="Assets/logo.png" Width="48" Height="48" Margin="0,0,12,0" RenderOptions.BitmapScalingMode="Fant">
+                                            <Image.Clip>
+                                                <EllipseGeometry RadiusX="24" RadiusY="24" Center="24,24" />
+                                            </Image.Clip>
+                                        </Image>
                                         <TextBlock Text="عيادتي"
                                                    Foreground="{DynamicResource AppSidebarText}"
                                                    FontSize="27"
